@@ -46,6 +46,15 @@ test("order dynamics keeps the Orange PROD blue while LIVE stays orange", async 
   assert.match(core, /live\?"#f47b20":"var\(--a\)"/);
 });
 
+test("desktop filters stay in one row and trend details render beside the chart", async () => {
+  const core = await readFile(join(root, "core", "dashboard-core.js"), "utf8");
+  const css = await readFile(join(root, "core", "dashboard.css"), "utf8");
+  assert.match(core, /class="trend-layout"><svg id="trend"><\/svg><div id="trendPoint"/);
+  assert.match(css, /\.toolbar\{display:grid;grid-template-columns:[^}]*minmax\(190px,1\.3fr\)/);
+  assert.match(css, /\.trend-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 300px/);
+  assert.match(css, /\.trend-layout \.trend-point-grid\{grid-template-columns:1fr\}/);
+});
+
 test("shared Core keeps the full Orange 2.0 parity surface", async () => {
   const core = await readFile(join(root, "core", "dashboard-core.js"), "utf8");
   for (const label of [
