@@ -241,11 +241,13 @@ function dailyFor(ds,marketplaceOverride=null){
  if(hasEntityFilter(f)){
    let m=new Map();
    for(const x of (D.lines||[])){
-     if(!s.has(x.report_date)||!entityMatch(x,f))continue;
-     let a=m.get(x.report_date);
+     if(!s.has(x.report_date))continue;
+     let d=dimFor(x.cabinet,x.sku),y={...x,master_category:d.master_category||"Прочие",category:d.category||"Без категории",brand:d.brand||"Без бренда"};
+     if(!entityMatch(y,f))continue;
+     let a=m.get(y.report_date);
      if(!a)a={report_date:x.report_date,orders_set:new Set(),sku_set:new Set(),units:0,gmv:0,is_live:false,is_reconstructed:false};
-     a.orders_set.add(String(x.cabinet)+"|"+String(x.order_key));a.sku_set.add(String(x.article||x.sku).toLowerCase());
-     a.units+=N(x.units);a.gmv+=N(x.gmv);a.is_live=a.is_live||!!x.is_live;m.set(x.report_date,a)
+     a.orders_set.add(String(y.cabinet)+"|"+String(y.order_key));a.sku_set.add(String(y.article||y.sku).toLowerCase());
+     a.units+=N(y.units);a.gmv+=N(y.gmv);a.is_live=a.is_live||!!y.is_live;m.set(y.report_date,a)
    }
    return [...m.values()].map(a=>({report_date:a.report_date,orders:a.orders_set.size,units:a.units,gmv:a.gmv,distinct_skus:a.sku_set.size,is_live:a.is_live,is_reconstructed:false})).sort((a,b)=>a.report_date.localeCompare(b.report_date))
  }
