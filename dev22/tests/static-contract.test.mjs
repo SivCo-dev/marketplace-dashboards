@@ -56,6 +56,8 @@ test("desktop filters stay in one row and period analytics render beside the cha
   assert.match(css, /\.toolbar\{display:grid;grid-template-columns:[^}]*minmax\(190px,1\.3fr\)/);
   assert.match(css, /\.trend-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 390px/);
   assert.match(css, /\.trend-value-line\{display:flex/);
+  assert.match(css, /\.trend-day-total \.trend-value-line\{display:block/);
+  assert.match(css, /\.trend-day-total \.trend-delta\{display:block/);
   assert.match(core, /Итог за ["+]\+?closedRows\.length\+?["]? закрытых дней/);
   assert.doesNotMatch(core, /LIVE показан отдельно/);
 });
