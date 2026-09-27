@@ -1,0 +1,16 @@
+{
+  "meta": {"tenant_id":"W","generated_at":"2026-09-26T18:00:00+03:00","mode":"dev-fixture"},
+  "sku_daily": [
+    {"report_date":"2026-09-20","marketplace":"OZON","cabinet":"W","external_sku":"W-CHAIR-01","product_name":"Кресло W One","orders":12,"units":13,"gmv":194350,"stock":27,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-21","marketplace":"OZON","cabinet":"W","external_sku":"W-CHAIR-01","product_name":"Кресло W One","orders":13,"units":14,"gmv":209300,"stock":25,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-22","marketplace":"OZON","cabinet":"W","external_sku":"W-CHAIR-01","product_name":"Кресло W One","orders":11,"units":12,"gmv":179400,"stock":22,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-23","marketplace":"OZON","cabinet":"W","external_sku":"W-CHAIR-01","product_name":"Кресло W One","orders":10,"units":11,"gmv":164450,"stock":18,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-24","marketplace":"OZON","cabinet":"W","external_sku":"W-CHAIR-01","product_name":"Кресло W One","orders":8,"units":9,"gmv":134550,"stock":13,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-25","marketplace":"OZON","cabinet":"W","external_sku":"W-CHAIR-01","product_name":"Кресло W One","orders":6,"units":6,"gmv":89700,"stock":8,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-26","marketplace":"OZON","cabinet":"W","external_sku":"W-CHAIR-01","product_name":"Кресло W One","orders":4,"units":4,"gmv":59800,"stock":4,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-20","marketplace":"OZON","cabinet":"W","external_sku":"W-TABLE-02","product_name":"Стол W Two","orders":3,"units":3,"gmv":87000,"stock":18,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-22","marketplace":"OZON","cabinet":"W","external_sku":"W-TABLE-02","product_name":"Стол W Two","orders":4,"units":4,"gmv":116000,"stock":16,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-24","marketplace":"OZON","cabinet":"W","external_sku":"W-TABLE-02","product_name":"Стол W Two","orders":5,"units":5,"gmv":145000,"stock":12,"category":"Мебель","brand":"W"},
+    {"report_date":"2026-09-26","marketplace":"OZON","cabinet":"W","external_sku":"W-TABLE-02","product_name":"Стол W Two","orders":7,"units":7,"gmv":203000,"stock":7,"category":"Мебель","brand":"W"}
+  ]
+}

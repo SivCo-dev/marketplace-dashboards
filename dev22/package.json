@@ -1,0 +1,8 @@
+{
+  "name": "marketplace-dashboard-dev22",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}
