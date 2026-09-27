@@ -27,6 +27,6 @@ Reference: current stable Orange PROD `index.html`. The DEV implementation was c
 - Layout, blocks, filters, tables and SKU card are structurally identical.
 - Tenant differences are limited to names/accounts, explicit SKU aliases and fields actually available in each live DEV snapshot.
 - Missing marketplace links, ads, positions or content values render as unavailable; no substitute or inferred data is generated.
-- Canonical SKU is resolved only by explicit aliases; otherwise `canonical_sku = external_sku`.
+- Snapshot `canonical_sku` is authoritative; explicit aliases apply only when it is missing, then exact `external_sku` is the fallback.
 - LIVE is visible only on the order dynamics chart and is excluded from KPI, comparison, TOP, movers, risks and all-SKU calculations.
 

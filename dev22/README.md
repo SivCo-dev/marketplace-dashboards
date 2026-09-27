@@ -53,9 +53,10 @@ Normalized frontend model всегда содержит оба поля:
 
 Правило разрешения едино для ORANGE, W и CPR:
 
-1. Если для `marketplace + account_id + external_sku` существует explicit alias, `canonical_sku` берётся из alias.
-2. Если explicit alias отсутствует, `canonical_sku = external_sku` с сохранением регистра и символов.
-3. Никакие fuzzy match, очистка знаков, case folding, prefix/suffix heuristics или автоматические merge не выполняются.
+1. Если live snapshot уже содержит непустой `canonical_sku`, используется это значение без изменения.
+2. Только если snapshot canonical отсутствует, применяется explicit alias для `marketplace + account_id + external_sku`.
+3. Если отсутствуют и snapshot canonical, и explicit alias, `canonical_sku = external_sku`.
+4. Никакие fuzzy match, очистка знаков, case folding, prefix/suffix heuristics или автоматические merge не выполняются.
 
 Изменение canonical SKU разрешено только явной строкой в `sku_aliases`:
 
@@ -107,7 +108,7 @@ Normalized frontend model всегда содержит оба поля:
 }
 ```
 
-`canonical_sku` в этом примере отличается от `external_sku` только потому, что `TU → TUW` явно объявлен в tenant config. Без этой записи оба значения были бы `TU`.
+`canonical_sku` в этом примере может прийти непосредственно из snapshot. Explicit alias `TU → TUW` используется только если snapshot canonical отсутствует; без обоих источников оба значения были бы `TU`.
 
 ## Checks
 

@@ -4,7 +4,7 @@
 
 Сделан отдельный DEV-контур для ORANGE, W и CPR. Все три dashboard используют один общий Core и различаются только tenant-конфигурацией и доступностью данных. Полный UI и функциональная карточка SKU восстановлены по текущему Orange Orders Control 2.0; блок-за-блоком результат зафиксирован в `PARITY_CHECKLIST.md`. KPI-блок содержит пять карточек; блоки `Ожидаемо получено` и `Что изменилось` отсутствуют.
 
-Canonical SKU работает по новому контракту: без alias значение равно `external_sku`; alias применяется только из явного mapping. В runtime DEV нет PROD webhook URL.
+Canonical SKU работает по новому контракту: snapshot `canonical_sku` имеет первый приоритет, explicit tenant alias применяется только при его отсутствии, затем используется точный `external_sku`. Case folding, очистка знаков и fuzzy merge не выполняются. В runtime DEV нет PROD webhook URL.
 
 Runtime подключён к отдельной JWT-protected Edge Function `dashboard-data-dev22`. Она читает complete `daily-full` snapshots только из namespace `dev21.dashboard_snapshots` через read-only RPC. Fixtures сохранены только для тестов и не используются tenant configs.
 
@@ -14,7 +14,7 @@ Rollback PROD исправлен: штатная точка возврата —
 
 ## Проверка baseline 2026-09-27
 
-- 18/18 canonical SKU, architecture, Orange parity and LIVE-day tests passed.
+- 21/21 canonical SKU, architecture, Orange parity and LIVE-day tests passed.
 - ORANGE, W и CPR проверены в браузере на периоде 7 дней: 7 closed points + 1 LIVE point.
 - Все tenants используют Orange accent `#f47b20` и единый stylesheet.
 - Browser console: 0 errors/warnings для ORANGE, W и CPR.

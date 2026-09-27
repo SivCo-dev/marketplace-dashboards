@@ -13,7 +13,7 @@ export function createCanonicalSkuResolver(explicitAliases = []) {
   }
 
   return ({ marketplace = "*", account_id = "*", external_sku }) => {
-    const external = String(external_sku ?? "").trim();
+    const external = String(external_sku ?? "");
     if (!external) return "";
 
     const keys = [
@@ -31,7 +31,7 @@ export function createCanonicalSkuResolver(explicitAliases = []) {
 }
 
 function aliasKey(marketplace, accountId, externalSku) {
-  return [marketplace || "*", accountId || "*", externalSku]
-    .map((value) => String(value).trim().toUpperCase())
-    .join("|");
+  const scope = [marketplace || "*", accountId || "*"]
+    .map((value) => String(value).trim().toUpperCase());
+  return [...scope, String(externalSku ?? "")].join("|");
 }
