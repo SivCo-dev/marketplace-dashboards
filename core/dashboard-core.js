@@ -1,7 +1,7 @@
 import { createCanonicalSkuResolver } from "./canonical-sku.js";
 
 function dashboardLayout(config){
-  return `<div id="load" class="load">Загружаю ${X(config.display_name)} Orders…</div><div class="shell"><div class="header"><div><h1>${X(config.display_name)} — Orders Control 2.2</h1><div class="sub">2.2 • единый Dashboard Core • live snapshot</div></div><div class="sub" id="status"></div></div><div id="err" class="err hide"></div>
+  return `<div id="load" class="load">Загружаю ${X(config.display_name)} Orders…</div><div class="shell"><div class="header"><div><h1>${X(config.display_name)} — Orders Control 2.3</h1><div class="sub">2.3 • Product Registry • единый Dashboard Core</div></div><div class="sub" id="status"></div></div><div id="err" class="err hide"></div>
 <div class="toolbar"><div id="cabinetFilterWrap"><label>Кабинет</label><select id="cabinet"><option value="ALL">Все кабинеты</option></select></div><div><label>Период</label><select id="days"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30" selected>30 дней</option><option value="MONTH">Текущий месяц</option><option value="999">Весь период</option></select></div><div id="marketplaceFilterWrap"><label>Маркетплейс</label><select id="marketplace"><option value="ALL" selected>Все маркетплейсы</option></select></div><div><label>Мастер-категория</label><select id="masterCategory"><option value="ALL">Все мастер-категории</option></select></div><div><label>Категория</label><select id="category"><option value="ALL">Все категории</option></select></div><div><label>Бренд</label><select id="brand"><option value="ALL">Все бренды</option></select></div><div><label>Поиск SKU / название</label><input id="q" name="orders_search" type="text" autocomplete="off" spellcheck="false" placeholder="Артикул или название"></div></div>
 <div id="kpis" class="grid5"></div><div class="card pad market-accent-card trend-card"><div class="section-head"><div><div class="ttl">Динамика заказов</div><div class="desc" id="trendDesc">Закрытые дни выбранного периода и оперативная LIVE-точка.</div></div><select id="trendMode" class="inline-select"><option value="units">Штуки</option><option value="gmv" selected>Оборот</option></select></div><div class="trend-layout"><div class="trend-chart-column"><svg id="trend"></svg><div id="trendPeriodNote" class="trend-period-note"></div><div id="trendDayDetail" class="trend-day-detail"><span class="neu">Нажми на точку, чтобы посмотреть выбранный день.</span></div></div><aside id="trendSummary" class="trend-summary"></aside></div></div>
 <div class="workbench">
@@ -41,7 +41,15 @@ let DIM=new Map(),STOCK=[],POSITION=[],CONTENT=[],VISIBILITY=[],ADS=[],LINKS=[];
 function dimKey(cab,sku){return String(cab||"")+"|"+String(sku||"")}
 function rebuildDimMap(){DIM=new Map();for(const d of D.dimensions||[])DIM.set(dimKey(d.cabinet,d.sku),d)}
 function rebuildStockMap(){STOCK=Array.isArray(D.stocks)?D.stocks:[]}
-function rebuildLinkMap(){LINKS=Array.isArray(D.product_links)?D.product_links:[]}
+function rebuildLinkMap(){
+  let base=Array.isArray(D.product_links)?D.product_links:[];
+  let registry=(D.marketplace_products||[]).map(p=>({
+    marketplace:p.marketplace,cabinet:p.cabinet,offer_id:p.offer_id||p.external_sku,
+    external_id:p.marketplace_product_id||p.external_sku,product_url:p.product_url,
+    canonical_sku:p.canonical_sku
+  }));
+  LINKS=base.concat(registry)
+}
 function marketSkuFor(marketplace,a){
  let key=canonicalKey(a),rows=(D&&Array.isArray(D.sku_daily))?D.sku_daily:[];
  let candidates=rows.filter(function(x){
@@ -63,6 +71,11 @@ function productLinkFor(marketplace,a){
  if(arr.length){
    let exact=arr.find(x=>cab&&String(x.cabinet||"")===cab&&x.product_url);
    return (exact||arr.find(x=>x.product_url)||{}).product_url||null
+ }
+ let regs=(D.marketplace_products||[]).filter(p=>String(p.marketplace||"").toUpperCase()===mk&&canonicalKey(p)===canonicalKey(a)&&p.is_active!==false);
+ if(regs.length){
+   let exact=regs.find(x=>cab&&String(x.cabinet||"")===cab&&x.product_url);
+   return (exact||regs.find(x=>x.product_url)||{}).product_url||null
  }
  if(mk==="OZON"&&/^\d+$/.test(String(marketSku||"")))return "https://www.ozon.ru/product/"+marketSku+"/";
  if(mk==="WB"&&/^\d+$/.test(String(marketSku||"")))return "https://www.wildberries.ru/catalog/"+marketSku+"/detail.aspx";
@@ -168,7 +181,7 @@ globalThis.openQuickSku=function(){
 function marketLabel(v){v=String(v||"").toUpperCase();return v==="YANDEX"?"Яндекс":v==="OZON"?"Ozon":v}
 function applyMarketplacePageTheme(){let mk=E("marketplace")?String(E("marketplace").value||"ALL").toUpperCase():"ALL";document.body.classList.remove("market-ALL","market-OZON","market-YANDEX","market-WB");document.body.classList.add("market-"+(mk==="OZON"||mk==="YANDEX"||mk==="WB"?mk:"ALL"))}
 function availableMarketplaces(){
- let src=[].concat(D.daily||[],D.sku_daily||[],D.lines||[]),vals=[...new Set(src.map(rowMarketplace).filter(Boolean))],pri={OZON:1,YANDEX:2,WB:3};
+ let src=[].concat(D.daily||[],D.sku_daily||[],D.lines||[],D.marketplace_products||[]),vals=[...new Set(src.map(rowMarketplace).filter(Boolean))],pri={OZON:1,YANDEX:2,WB:3};
  vals.sort((a,b)=>(pri[a]||99)-(pri[b]||99)||String(a).localeCompare(String(b),"ru"));
  return vals.length?vals:["OZON"]
 }
@@ -591,7 +604,23 @@ function skuMarketStatsForDates(key,ds){
    if(op){if(op.current_price!=null)a.current_price=op.current_price;a.commission_pct=op.commission_pct;a.logistics_per_unit=op.logistics_per_unit;a.received_per_unit=op.received_per_unit;a.econ_source=op;a.has_ref=op.has_ref}
  }
  let out=new Map();
- for(const mk of ["OZON","YANDEX","WB"])out.set(mk,m.get(mk)||{marketplace:mk,units:0,gmv:0,avg_price:null,commission_pct:null,logistics_per_unit:null,received_per_unit:null,current_price:null,cost_units:0,coverage_pct:0,sku:"",article:"",cabinet:""});
+ for(const mk of ["OZON","YANDEX","WB"]){
+   let row=m.get(mk)||{marketplace:mk,units:0,gmv:0,avg_price:null,commission_pct:null,logistics_per_unit:null,received_per_unit:null,current_price:null,cost_units:0,coverage_pct:0,sku:"",article:"",cabinet:""};
+   let regs=(D.marketplace_products||[]).filter(p=>String(p.marketplace||"").toUpperCase()===mk&&canonicalKey(p)===key&&p.is_active!==false);
+   if(regs.length){
+     let reg=regs.find(p=>p.current_price!=null)||regs[0];
+     row.exists=true;row.registry=regs;
+     if(row.current_price==null&&reg.current_price!=null)row.current_price=N(reg.current_price);
+     if(row.commission_pct==null){
+       let cr=regs.find(p=>p.commission_pct!==null&&p.commission_pct!==undefined);
+       if(cr){row.commission_pct=N(cr.commission_pct);row.econ_source={...(row.econ_source||{}),commission_source:cr.commission_source||"категория"}}
+     }
+     if(!row.article)row.article=reg.canonical_sku||reg.offer_id||reg.external_sku||"";
+     if(!row.sku)row.sku=reg.marketplace_product_id||reg.external_sku||"";
+     if(!row.cabinet)row.cabinet=reg.cabinet||"";
+   }else row.exists=!!m.get(mk);
+   out.set(mk,row)
+ }
  return out
 }
 function skuMarketStats(key){return skuMarketStatsForDates(key,periodDates(0))}
@@ -940,7 +969,7 @@ function installInteractions(root){
  },true)
 }
 export async function startDashboard(config){
- validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.2 DEV";
+ validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.3";
  const root=document.getElementById("app");root.innerHTML=dashboardLayout(config);installInteractions(root);
  try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
  catch(e){E("load").classList.add("hide");E("err").classList.remove("hide");E("err").textContent="Ошибка загрузки: "+e.message;throw e}
@@ -950,8 +979,9 @@ function validateConfig(config){for(const key of ["tenant_id","display_name","da
 function normalizeDashboardPayload(payload,config){
  const resolve=createCanonicalSkuResolver(config.sku_aliases||[]),accounts=config.accounts||[];
  const accountFor=(marketplace,cabinet)=>accounts.find(a=>a.marketplace===marketplace&&a.cabinet===cabinet)||accounts.find(a=>a.marketplace===marketplace)||accounts[0]||{};
- const normalize=(row)=>{let account=accountFor(String(row.marketplace||accounts[0]?.marketplace||"OZON").toUpperCase(),String(row.cabinet||accounts[0]?.cabinet||"")),marketplace=String(row.marketplace||account.marketplace||"OZON").toUpperCase(),cabinet=String(row.cabinet||account.cabinet||"");let external_sku=String(row.external_sku??row.article??row.sku??row.offer_id??""),account_id=row.account_id||account.account_id||cabinet;return{...row,marketplace,cabinet,account_id,external_sku,canonical_sku:resolveRowCanonicalSku(row,resolve,{marketplace,account_id,external_sku}),report_date:row.report_date?String(row.report_date).slice(0,10):row.report_date,is_live:isLiveValue(row)}};
- const out={...payload};for(const key of ["daily","sku_daily","lines","dimensions","stocks","content","positions","visibility","ads","product_links","refs","search_queries"])out[key]=Array.isArray(payload[key])?payload[key].map(normalize):[];out.meta={...(payload.meta||{}),tenant_id:config.tenant_id};return out
+ const masterCategoryFallback=(row)=>{if(row.master_category)return row.master_category;let c=String(row.category||"").trim();if(config.tenant_id==="W"&&c==="Зеркала")return"Зеркала";if(config.tenant_id==="CPR"&&c==="Мебель для ванной")return"Мебель";return row.master_category};
+ const normalize=(row)=>{let account=accountFor(String(row.marketplace||accounts[0]?.marketplace||"OZON").toUpperCase(),String(row.cabinet||accounts[0]?.cabinet||"")),marketplace=String(row.marketplace||account.marketplace||"OZON").toUpperCase(),cabinet=String(row.cabinet||account.cabinet||"");let external_sku=String(row.external_sku??row.article??row.sku??row.offer_id??""),account_id=row.account_id||account.account_id||cabinet;return{...row,master_category:masterCategoryFallback(row),marketplace,cabinet,account_id,external_sku,canonical_sku:resolveRowCanonicalSku(row,resolve,{marketplace,account_id,external_sku}),report_date:row.report_date?String(row.report_date).slice(0,10):row.report_date,is_live:isLiveValue(row)}};
+ const out={...payload};for(const key of ["daily","sku_daily","lines","dimensions","stocks","content","positions","visibility","ads","product_links","refs","search_queries","marketplace_products"])out[key]=Array.isArray(payload[key])?payload[key].map(normalize):[];out.meta={...(payload.meta||{}),tenant_id:config.tenant_id};return out
 }
 function isLiveValue(row){return row?.is_live===true||String(row?.is_live).toLowerCase()==="true"}
 
