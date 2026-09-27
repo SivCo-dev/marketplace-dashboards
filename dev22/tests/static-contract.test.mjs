@@ -46,13 +46,18 @@ test("order dynamics keeps the Orange PROD blue while LIVE stays orange", async 
   assert.match(core, /live\?"#f47b20":"var\(--a\)"/);
 });
 
-test("desktop filters stay in one row and trend details render beside the chart", async () => {
+test("desktop filters stay in one row and period analytics render beside the chart", async () => {
   const core = await readFile(join(root, "core", "dashboard-core.js"), "utf8");
   const css = await readFile(join(root, "core", "dashboard.css"), "utf8");
-  assert.match(core, /class="trend-layout"><svg id="trend"><\/svg><div id="trendPoint"/);
+  assert.match(core, /class="trend-layout"><div class="trend-chart-column"><svg id="trend"><\/svg>/);
+  assert.match(core, /id="trendPeriodNote"/);
+  assert.match(core, /id="trendDayDetail"/);
+  assert.match(core, /id="trendSummary"/);
   assert.match(css, /\.toolbar\{display:grid;grid-template-columns:[^}]*minmax\(190px,1\.3fr\)/);
-  assert.match(css, /\.trend-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 300px/);
-  assert.match(css, /\.trend-layout \.trend-point-grid\{grid-template-columns:1fr\}/);
+  assert.match(css, /\.trend-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 390px/);
+  assert.match(css, /\.trend-value-line\{display:flex/);
+  assert.match(core, /Итог за ["+]\+?closedRows\.length\+?["]? закрытых дней/);
+  assert.doesNotMatch(core, /LIVE показан отдельно/);
 });
 
 test("shared Core keeps the full Orange 2.0 parity surface", async () => {

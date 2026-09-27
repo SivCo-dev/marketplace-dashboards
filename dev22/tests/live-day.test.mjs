@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aggregateSku, buildPeriodSelection, buildTrendSeries, calculateKpis } from "../core/dashboard-core.js";
+import { aggregateSku, buildPeriodSelection, buildTrendSeries, calculateKpis, calculateTrendDayComparison, calculateTrendPeriodTotals } from "../core/dashboard-core.js";
 
 function date(offset) {
   const value = new Date("2026-08-15T00:00:00Z");
@@ -63,3 +63,32 @@ test("LIVE remains an explicit graph point with GMV, units and orders", () => {
   const point = buildTrendSeries(view.trendRows).find((item) => item.is_live);
   assert.deepEqual(point, { report_date: live.report_date, gmv: 999999, units: 999, orders: 999, is_live: true });
 });
+
+test("trend period totals and marketplace totals use closed days only", () => {
+  const sample = [
+    { report_date: "2026-09-01", marketplace: "OZON", gmv: 100, units: 2, orders: 1, is_live: false },
+    { report_date: "2026-09-01", marketplace: "WB", gmv: 50, units: 1, orders: 1, is_live: false },
+    { report_date: "2026-09-02", marketplace: "OZON", gmv: 300, units: 6, orders: 3, is_live: false },
+    { report_date: "2026-09-03", marketplace: "OZON", gmv: 9999, units: 99, orders: 99, is_live: true }
+  ];
+  const view = buildPeriodSelection(sample, normalizeCalendar(sample), "2");
+  const totals = calculateTrendPeriodTotals(view.currentRows, [], view.currentDates.length);
+  assert.equal(totals.closedDayCount, 2);
+  assert.deepEqual(totals.total.current, { gmv: 450, units: 9, orders: 5 });
+  assert.deepEqual(totals.markets.current.OZON, { gmv: 400, units: 8, orders: 4 });
+  assert.deepEqual(totals.markets.current.WB, { gmv: 50, units: 1, orders: 1 });
+});
+
+test("closed point compares with selected-period daily average while LIVE has no deltas", () => {
+  const closedDay = { gmv: 300, units: 6, orders: 3 };
+  const periodTotal = { gmv: 400, units: 8, orders: 4 };
+  const closedComparison = calculateTrendDayComparison(closedDay, periodTotal, 2, false);
+  assert.deepEqual(closedComparison.average, { gmv: 200, units: 4, orders: 2 });
+  assert.deepEqual(closedComparison.deltas, { gmv: 50, units: 50, orders: 50 });
+  const liveComparison = calculateTrendDayComparison({ gmv: 999, units: 9, orders: 9 }, periodTotal, 2, true);
+  assert.deepEqual(liveComparison.deltas, { gmv: null, units: null, orders: null });
+});
+
+function normalizeCalendar(items) {
+  return items.map(({ report_date, is_live }) => ({ report_date, is_live }));
+}

@@ -3,7 +3,7 @@ import { createCanonicalSkuResolver } from "./canonical-sku.js";
 function dashboardLayout(config){
   return `<div id="load" class="load">Загружаю ${X(config.display_name)} Orders…</div><div class="shell"><div class="header"><div><h1>${X(config.display_name)} — Orders Control 2.2 DEV</h1><div class="sub">2.2 • единый Dashboard Core • live DEV snapshot</div></div><div class="sub" id="status"></div></div><div id="err" class="err hide"></div>
 <div class="toolbar"><div id="cabinetFilterWrap"><label>Кабинет</label><select id="cabinet"><option value="ALL">Все кабинеты</option></select></div><div><label>Период</label><select id="days"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30" selected>30 дней</option><option value="MONTH">Текущий месяц</option><option value="999">Весь период</option></select></div><div id="marketplaceFilterWrap"><label>Маркетплейс</label><select id="marketplace"><option value="ALL" selected>Все маркетплейсы</option></select></div><div><label>Мастер-категория</label><select id="masterCategory"><option value="ALL">Все мастер-категории</option></select></div><div><label>Категория</label><select id="category"><option value="ALL">Все категории</option></select></div><div><label>Бренд</label><select id="brand"><option value="ALL">Все бренды</option></select></div><div><label>Поиск SKU / название</label><input id="q" name="orders_search" type="text" autocomplete="off" spellcheck="false" placeholder="Артикул или название"></div></div>
-<div id="kpis" class="grid5"></div><div class="card pad market-accent-card trend-card"><div class="section-head"><div><div class="ttl">Динамика заказов</div><div class="desc" id="trendDesc">Закрытые дни выбранного периода и оперативная LIVE-точка.</div></div><select id="trendMode" class="inline-select"><option value="units">Штуки</option><option value="gmv" selected>Оборот</option></select></div><div class="trend-layout"><svg id="trend"></svg><div id="trendPoint" class="trend-point"><span class="neu">Нажми на точку — покажу оборот, штуки и заказы.</span></div></div></div>
+<div id="kpis" class="grid5"></div><div class="card pad market-accent-card trend-card"><div class="section-head"><div><div class="ttl">Динамика заказов</div><div class="desc" id="trendDesc">Закрытые дни выбранного периода и оперативная LIVE-точка.</div></div><select id="trendMode" class="inline-select"><option value="units">Штуки</option><option value="gmv" selected>Оборот</option></select></div><div class="trend-layout"><div class="trend-chart-column"><svg id="trend"></svg><div id="trendPeriodNote" class="trend-period-note"></div><div id="trendDayDetail" class="trend-day-detail"><span class="neu">Нажми на точку, чтобы посмотреть выбранный день.</span></div></div><aside id="trendSummary" class="trend-summary"></aside></div></div>
 <div class="workbench">
   <div class="work-left">
     <div class="card pad market-accent-card">
@@ -132,7 +132,7 @@ function currentFilters(){return{cab:E("cabinet").value,marketplace:E("marketpla
 function dimFor(cab,sku){return DIM.get(dimKey(cab,sku))||{master_category:"Прочие",category:"Без категории",brand:"Без бренда"}}
 function textMatch(article,name,sku,q){return !q||((article||"")+" "+(name||"")+" "+(sku||"")).toLowerCase().includes(q)}
 function entityMatch(x,f){return(f.cab==="ALL"||x.cabinet===f.cab)&&(f.marketplace==="ALL"||rowMarketplace(x)===f.marketplace)&&(f.masterCategory==="ALL"||x.master_category===f.masterCategory)&&(f.category==="ALL"||x.category===f.category)&&(f.brand==="ALL"||x.brand===f.brand)&&textMatch(x.article,x.product_name,x.sku,f.q)}
-function hasEntityFilter(){let f=currentFilters();return f.marketplace!=="ALL"||f.masterCategory!=="ALL"||f.category!=="ALL"||f.brand!=="ALL"||!!f.q}
+function hasEntityFilter(f=currentFilters()){return f.marketplace!=="ALL"||f.masterCategory!=="ALL"||f.category!=="ALL"||f.brand!=="ALL"||!!f.q}
 let skuSearchCollapsed=false;
 globalThis.toggleSkuSearch=function(forceOpen){
  let box=E("skuSearchBox");if(!box)return;
@@ -223,9 +223,9 @@ function periodDates(offset=0){
  let end=ds.length-offset*n,start=Math.max(0,end-n);return ds.slice(start,end)
 }
 function prevPeriodDates(){let cur=periodDates(0),prev=periodDates(1);return prev.slice(-cur.length)}
-function dailyFor(ds){
- let s=new Set(ds),f=currentFilters();
- if(hasEntityFilter()){
+function dailyFor(ds,marketplaceOverride=null){
+ let s=new Set(ds),f=currentFilters();if(marketplaceOverride)f={...f,marketplace:marketplaceOverride};
+ if(hasEntityFilter(f)){
    let m=new Map();
    for(const x of (D.lines||[])){
      if(!s.has(x.report_date)||!entityMatch(x,f))continue;
@@ -298,10 +298,24 @@ function kpis(){
  let arr=[["GMV заказов",R(cur.gmv),dp(cur.gmv,pre.gmv)],["Заказано, шт",I(cur.units),dp(cur.units,pre.units)],["Заказов",I(cur.orders),dp(cur.orders,pre.orders)],["Средняя цена",R(avgPrice),pre.units?dp(avgPrice,pre.gmv/pre.units):null],["GMV / день",R(days?cur.gmv/days:0),null]];
  E("kpis").innerHTML=arr.map(x=>"<div class='card pad'><div class='kl'>"+x[0]+"</div><div class='kv'>"+x[1]+"</div><div class='kd "+C(x[2])+"'>"+(x[2]==null?"":S(x[2])+x[2].toFixed(1)+"%")+"</div></div>").join("")
 }
+const TREND_MARKETS=["OZON","WB","YANDEX"];
+function blankTrendStats(){return{gmv:0,units:0,orders:0}}
+function trendVisibleMarkets(){let mk=currentFilters().marketplace;return mk==="ALL"?TREND_MARKETS:[mk]}
+function trendStatsFor(ds,mk=null){return aggregateDaily(dailyFor(ds,mk))}
+function trendMarketName(mk){return mk==="OZON"?"Ozon":mk==="YANDEX"?"Yandex":"WB"}
+function trendMarketClass(mk){return mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":"wb"}
+function trendDeltaHtml(current,baseline,enabled=true){if(!enabled)return"";let v=dp(current,baseline);if(v==null)return"<span class='trend-delta neu'>—</span>";let cls=v>0?"pos":v<0?"neg":"neu",arrow=v>0?"↑ ":v<0?"↓ ":"";return"<span class='trend-delta "+cls+"'>"+arrow+S(v)+v.toFixed(1)+"%</span>"}
+function trendMetricHtml(label,current,baseline,kind,showDelta=true){let value=kind==="gmv"?R(current):I(current)+(kind==="units"?" шт":"");return"<div class='trend-metric'><span class='trend-metric-label'>"+label+"</span><div class='trend-value-line'><b>"+value+"</b>"+trendDeltaHtml(current,baseline,showDelta)+"</div></div>"}
+function trendMetricsHtml(current,baseline,showDelta=true){return"<div class='trend-metrics'>"+trendMetricHtml("GMV",current.gmv,baseline.gmv,"gmv",showDelta)+trendMetricHtml("Шт.",current.units,baseline.units,"units",showDelta)+trendMetricHtml("Заказы",current.orders,baseline.orders,"orders",showDelta)+"</div>"}
+function trendMarketCardHtml(mk,current,baseline,showDelta=true,compact=false){return"<div class='trend-market-card "+(compact?"compact ":"")+trendMarketClass(mk)+"'><div class='trend-market-head'><span class='trend-market-icon'>"+(mk==="YANDEX"?"Я":mk==="OZON"?"OZ":"WB")+"</span><b>"+trendMarketName(mk)+"</b></div>"+trendMetricsHtml(current,baseline,showDelta)+"</div>"}
+function renderTrendSummary(closedDates,previousDates){
+ let totals=calculateTrendPeriodTotals(dailyFor(closedDates),dailyFor(previousDates),closedDates.length),current=totals.total.current,previous=totals.total.previous,markets=trendVisibleMarkets();
+ E("trendSummary").innerHTML="<div class='trend-summary-total'><div class='trend-summary-title'>Итог за "+closedDates.length+" закрытых дней</div>"+trendMetricsHtml(current,previous,true)+"</div><div class='trend-market-list'>"+markets.map(mk=>trendMarketCardHtml(mk,trendStatsFor(closedDates,mk),trendStatsFor(previousDates,mk),true)).join("")+"</div>"
+}
 function trend(){
- let closedRows=dailyFor(periodDates(0)),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows),prevRows=dailyFor(prevPeriodDates()),mode=E("trendMode").value,field=mode==="gmv"?"gmv":"units",label=mode==="gmv"?"Оборот, ₽":"Штуки";
+ let closedDates=periodDates(0),previousDates=prevPeriodDates(),closedRows=dailyFor(closedDates),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows),prevRows=dailyFor(previousDates),mode=E("trendMode").value,field=mode==="gmv"?"gmv":"units",label=mode==="gmv"?"Оборот, ₽":"Штуки";
  let ff=currentFilters(),scope=[];if(ff.category!=="ALL")scope.push(ff.category);if(ff.brand!=="ALL")scope.push(ff.brand);if(ff.q)scope.push("поиск: "+ff.q);E("trendDesc").textContent=(mode==="gmv"?"Оборот заказов по дням":"Заказанные штуки по дням")+" • LIVE не входит в расчёты"+(scope.length?" • "+scope.join(" • "):"");
- let vals=curRows.concat(prevRows).map(function(x){return N(x[field])}),max=Math.max.apply(null,[1].concat(vals)),W=900,H=240,pl=62,pr=18,pt=20,pb=34,st=(W-pl-pr)/Math.max(1,curRows.length-1);
+ let vals=curRows.concat(prevRows).map(function(x){return N(x[field])}),max=Math.max.apply(null,[1].concat(vals)),W=900,H=260,pl=62,pr=18,pt=20,pb=34,st=(W-pl-pr)/Math.max(1,curRows.length-1);
  function xp(i){return pl+i*st}function yp(v){return H-pb-(N(v)/max)*(H-pt-pb)}
  let z="",ticks=4;
  for(let t=0;t<=ticks;t++){let val=max*t/ticks,y=yp(val);z+="<line x1='"+pl+"' y1='"+y+"' x2='"+(W-pr)+"' y2='"+y+"' stroke='#eef0f3'/><text x='"+(pl-8)+"' y='"+(y+3)+"' text-anchor='end' font-size='9' fill='#667085'>"+(mode==="gmv"?Math.round(val/1000)+"k":Math.round(val))+"</text>"}
@@ -312,15 +326,13 @@ function trend(){
  let pts=closedRows.map(function(r,i){return xp(i)+","+yp(r[field])});
  if(pts.length>1)z+="<polyline fill='none' stroke='var(--a)' stroke-width='4' points='"+pts.join(" ")+"'/>";
  curRows.forEach(function(r,i){let val=N(r[field]),live=isLiveRow(r);z+="<circle class='trend-dot' data-trend-index='"+i+"' cx='"+xp(i)+"' cy='"+yp(val)+"' r='"+(live?6:5)+"' fill='"+(live?"#f47b20":"var(--a)")+"'/><text x='"+xp(i)+"' y='"+(H-8)+"' text-anchor='middle' font-size='9' fill='#667085'>"+r.report_date.slice(5)+"</text>";if(curRows.length<=14)z+="<text x='"+xp(i)+"' y='"+Math.max(12,yp(val)-9)+"' text-anchor='middle' font-size='9' font-weight='700'>"+(mode==="gmv"?Math.round(val/1000)+"k":Math.round(val))+"</text>";if(live)z+="<text x='"+xp(i)+"' y='13' text-anchor='middle' font-size='8' font-weight='800' fill='#c4320a'>LIVE</text>"});
- E("trend").setAttribute("viewBox","0 0 "+W+" "+H);E("trend").innerHTML=z;globalThis._trendCur=curRows;globalThis._trendPrev=prev;globalThis._trendClosedCount=closedRows.length;
- E("trendPoint").innerHTML="<div style='font-weight:800'>"+closedRows.length+" закрытых дней"+(liveRows.length?" <span class='neu'>• LIVE показан отдельно</span>":"")+"</div><div class='desc' style='margin:4px 0 0'>Нажми на точку, чтобы посмотреть детали.</div>"
+ E("trend").setAttribute("viewBox","0 0 "+W+" "+H);E("trend").innerHTML=z;globalThis._trendCur=curRows;globalThis._trendClosedCount=closedRows.length;
+ E("trendPeriodNote").textContent="Итог за "+closedRows.length+" закрытых дней";E("trendDayDetail").innerHTML="<span class='neu'>Нажми на точку, чтобы посмотреть выбранный день.</span>";renderTrendSummary(closedDates,previousDates)
 }
 globalThis.showTrendPoint=function(i){
- let c=(globalThis._trendCur||[])[i];if(!c)return;let live=isLiveRow(c),p=live?null:(globalThis._trendPrev||[])[i];
- function dlt(a,b){let v=dp(a,b);return v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"%"}
- let compare=live?"<div class='neu'>Δ не рассчитывается: день ещё не закрыт.</div>":null;
- function box(label,value,current,previous,suffix=""){return "<div class='trend-point-box'><span class='neu'>"+label+"</span><b>"+value+"</b>"+(compare||"<div class='"+C(N(current)-N(previous))+"'>"+dlt(current,previous)+" • было "+(p?(suffix==="₽"?R(previous):I(previous)+(suffix?" "+suffix:"")):"—")+"</div>")+"</div>"}
- E("trendPoint").innerHTML="<div style='font-weight:800;margin-bottom:7px'>"+(live?"LIVE • ":"")+X(c.report_date)+(live?"":" <span class='neu'>vs "+X(p?p.report_date:"—")+"</span>")+"</div><div class='trend-point-grid'>"+box("Оборот",R(c.gmv),c.gmv,p&&p.gmv,"₽")+box("Штуки",I(c.units)+" шт",c.units,p&&p.units,"шт")+box("Заказы",I(c.orders),c.orders,p&&p.orders)+"</div>"
+ let c=(globalThis._trendCur||[])[i];if(!c)return;let live=isLiveRow(c),closedDays=globalThis._trendClosedCount||periodDates(0).length,currentTotal=trendStatsFor(periodDates(0)),comparison=calculateTrendDayComparison(c,currentTotal,closedDays,live);
+ let markets=trendVisibleMarkets(),dayMarkets=markets.map(mk=>{let rows=dailyFor([c.report_date],mk),day=rows.length?aggregateDaily(rows):blankTrendStats(),total=trendStatsFor(periodDates(0),mk),marketComparison=calculateTrendDayComparison(day,total,closedDays,live);return trendMarketCardHtml(mk,day,marketComparison.average,!live,true)}).join("");
+ E("trendDayDetail").innerHTML="<div class='trend-day-head'><b>"+(live?"LIVE за ":"Данные за ")+X(c.report_date)+"</b><span class='badge "+(live?"bg-live":"bg-fact")+"'>"+(live?"Оперативные данные":"Закрытый день")+"</span></div><div class='trend-day-content'><div class='trend-day-total'>"+trendMetricsHtml(c,comparison.average,!live)+"</div><div class='trend-day-markets'>"+dayMarkets+"</div></div>"+(live?"<div class='trend-live-note'>LIVE: показан только факт, без дельт.</div>":"<div class='trend-average-note'>Дельта к среднему закрытому дню выбранного периода.</div>")
 }
 function allMarketAvgDailySales14d(a){
  let rows=(D&&Array.isArray(D.sku_daily))?D.sku_daily:[],art=normArticle(a&&a.article);if(!art)return 0;
@@ -951,3 +963,12 @@ function aggregateSkuForTests(currentRows,previousRows=[]){let map=new Map;for(c
 export { aggregateSkuForTests as aggregateSku };
 export function calculateKpis(rows,closedDayCount){let gmv=rows.reduce((s,r)=>s+N(r.gmv),0),units=rows.reduce((s,r)=>s+N(r.units),0),orders=rows.reduce((s,r)=>s+N(r.orders),0);return{gmv,units,orders,averagePrice:units?gmv/units:0,gmvPerDay:closedDayCount?gmv/closedDayCount:0}}
 export function buildTrendSeries(rows){let map=new Map;for(const row of rows){let p=map.get(row.report_date)||{report_date:row.report_date,gmv:0,units:0,orders:0,is_live:false};p.gmv+=N(row.gmv);p.units+=N(row.units);p.orders+=N(row.orders);p.is_live||=isLiveValue(row);map.set(row.report_date,p)}return[...map.values()].sort((a,b)=>a.report_date.localeCompare(b.report_date))}
+export function calculateTrendPeriodTotals(currentRows,previousRows=[],closedDayCount=0){
+ const sum=rows=>rows.reduce((a,row)=>{a.gmv+=N(row.gmv);a.units+=N(row.units);a.orders+=N(row.orders);return a},{gmv:0,units:0,orders:0});
+ const group=rows=>{let out={};for(const row of rows){let mk=String(row.marketplace||row.market||row.source_marketplace||"ALL").toUpperCase(),a=out[mk]||(out[mk]={gmv:0,units:0,orders:0});a.gmv+=N(row.gmv);a.units+=N(row.units);a.orders+=N(row.orders)}return out};
+ return{closedDayCount,total:{current:sum(currentRows),previous:sum(previousRows)},markets:{current:group(currentRows),previous:group(previousRows)}}
+}
+export function calculateTrendDayComparison(day,periodTotal,closedDayCount,isLive=false){
+ let count=Math.max(0,N(closedDayCount)),average={gmv:count?N(periodTotal.gmv)/count:0,units:count?N(periodTotal.units)/count:0,orders:count?N(periodTotal.orders)/count:0};
+ let deltas={};for(const key of ["gmv","units","orders"])deltas[key]=isLive?null:dp(day[key],average[key]);return{average,deltas,isLive:!!isLive}
+}
