@@ -611,6 +611,10 @@ function skuMarketStatsForDates(key,ds){
      let reg=regs.find(p=>p.current_price!=null)||regs[0];
      row.exists=true;row.registry=regs;
      if(row.current_price==null&&reg.current_price!=null)row.current_price=N(reg.current_price);
+     if(row.commission_pct==null){
+       let cr=regs.find(p=>p.commission_pct!==null&&p.commission_pct!==undefined);
+       if(cr){row.commission_pct=N(cr.commission_pct);row.econ_source={...(row.econ_source||{}),commission_source:cr.commission_source||"категория"}}
+     }
      if(!row.article)row.article=reg.canonical_sku||reg.offer_id||reg.external_sku||"";
      if(!row.sku)row.sku=reg.marketplace_product_id||reg.external_sku||"";
      if(!row.cabinet)row.cabinet=reg.cabinet||"";
