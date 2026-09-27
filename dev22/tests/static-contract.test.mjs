@@ -38,6 +38,14 @@ test("there is exactly one shared stylesheet and one UI implementation", async (
   for (const label of ["GMV заказов", "Заказано, шт", "Заказов", "Средняя цена", "GMV / день"]) assert.match(core, new RegExp(label));
 });
 
+test("order dynamics keeps the Orange PROD blue while LIVE stays orange", async () => {
+  const core = await readFile(join(root, "core", "dashboard-core.js"), "utf8");
+  const css = await readFile(join(root, "core", "dashboard.css"), "utf8");
+  assert.match(css, /--a:#2563eb/);
+  assert.doesNotMatch(core, /setProperty\(["']--a["']/);
+  assert.match(core, /live\?"#f47b20":"var\(--a\)"/);
+});
+
 test("shared Core keeps the full Orange 2.0 parity surface", async () => {
   const core = await readFile(join(root, "core", "dashboard-core.js"), "utf8");
   for (const label of [

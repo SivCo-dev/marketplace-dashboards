@@ -928,7 +928,7 @@ function installInteractions(root){
  },true)
 }
 export async function startDashboard(config){
- validateConfig(config);CONFIG=config;document.documentElement.style.setProperty("--a",config.theme.accent);document.title=config.display_name+" — Orders Control 2.2 DEV";
+ validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.2 DEV";
  const root=document.getElementById("app");root.innerHTML=dashboardLayout(config);installInteractions(root);
  try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
  catch(e){E("load").classList.add("hide");E("err").classList.remove("hide");E("err").textContent="Ошибка загрузки: "+e.message;throw e}
