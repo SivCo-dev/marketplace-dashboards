@@ -1,8 +1,8 @@
 # Marketplace Dashboard 2.2 — status
 
-Статус: DEV 2.2 functional baseline ready for visual review. Production не изменён.
+Статус: DEV 2.2 Orange PROD 2.0 functional parity baseline ready for visual review. Production не изменён.
 
-Сделан отдельный DEV-контур для ORANGE, W и CPR. Все три dashboard используют один общий Core и различаются только tenant-конфигурацией и доступностью данных. UI построен по текущему Orange Orders Control 2.0. KPI-блок содержит пять карточек; блоки `Ожидаемо получено` и `Что изменилось` отсутствуют.
+Сделан отдельный DEV-контур для ORANGE, W и CPR. Все три dashboard используют один общий Core и различаются только tenant-конфигурацией и доступностью данных. Полный UI и функциональная карточка SKU восстановлены по текущему Orange Orders Control 2.0; блок-за-блоком результат зафиксирован в `PARITY_CHECKLIST.md`. KPI-блок содержит пять карточек; блоки `Ожидаемо получено` и `Что изменилось` отсутствуют.
 
 Canonical SKU работает по новому контракту: без alias значение равно `external_sku`; alias применяется только из явного mapping. В runtime DEV нет PROD webhook URL.
 
@@ -14,7 +14,7 @@ Rollback PROD исправлен: штатная точка возврата —
 
 ## Проверка baseline 2026-09-27
 
-- 17/17 contract, architecture and LIVE-day tests passed.
+- 18/18 canonical SKU, architecture, Orange parity and LIVE-day tests passed.
 - ORANGE, W и CPR проверены в браузере на периоде 7 дней: 7 closed points + 1 LIVE point.
 - Все tenants используют Orange accent `#f47b20` и единый stylesheet.
 - Browser console: 0 errors/warnings для ORANGE, W и CPR.

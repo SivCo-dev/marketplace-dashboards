@@ -31,11 +31,27 @@ test("there is exactly one shared stylesheet and one UI implementation", async (
   const cssFiles = (await readdir(join(root, "core"))).filter((file) => file.endsWith(".css"));
   assert.deepEqual(cssFiles, ["dashboard.css"]);
   const core = await readFile(join(root, "core", "dashboard-core.js"), "utf8");
-  for (const label of ["Динамика заказов", "Проблемные SKU", "TOP по обороту", "Все SKU"]) {
+  for (const label of ["Динамика заказов", "Проблемные SKU", "TOP по обороту", "Рост / падение SKU", "Все SKU"]) {
     assert.match(core, new RegExp(label));
   }
   assert.doesNotMatch(core, /Что изменилось|Ожидаемо получено/);
   for (const label of ["GMV заказов", "Заказано, шт", "Заказов", "Средняя цена", "GMV / день"]) assert.match(core, new RegExp(label));
+});
+
+test("shared Core keeps the full Orange 2.0 parity surface", async () => {
+  const core = await readFile(join(root, "core", "dashboard-core.js"), "utf8");
+  for (const label of [
+    "Кабинет", "Маркетплейс", "Мастер-категория", "Категория", "Бренд", "Поиск SKU / название",
+    "Δ цены", "Δ оборота", "Остаток", "Контент", "Сигнал", "Доля маркетов",
+    "Быстрый поиск SKU", "Обзор", "Динамика", "Текущая цена", "Остаток",
+    "Позиция / видимость", "Реклама", "Комиссия", "Логистика"
+  ]) assert.match(core, new RegExp(label, "i"), `missing Orange parity element: ${label}`);
+
+  for (const contract of [
+    /data-trend-index/, /data-sku-dyn-index/, /data-key/, /data-mode/, /data-tab/,
+    /data-overview-market/, /data-dyn-market/, /data-dyn-metric/, /installInteractions/
+  ]) assert.match(core, contract);
+  assert.doesNotMatch(core, /function\s+summary\s*\(|\bsummary\(\)/);
 });
 
 test("runtime files contain no production n8n URL", async () => {

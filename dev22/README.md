@@ -113,4 +113,4 @@ Normalized frontend model всегда содержит оба поля:
 
 Run `npm test` inside `dev22`. Tests protect the canonical SKU rule, closed-day/LIVE separation, shared Core, test-only fixtures and absence of PROD n8n URLs in runtime files.
 
-See [PROD_ROLLBACK.md](./PROD_ROLLBACK.md) for the immutable PROD baseline.
+See [PARITY_CHECKLIST.md](./PARITY_CHECKLIST.md) for the block-by-block Orange PROD 2.0 comparison and [PROD_ROLLBACK.md](./PROD_ROLLBACK.md) for the immutable PROD baseline.
