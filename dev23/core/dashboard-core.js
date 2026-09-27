@@ -1,7 +1,7 @@
 import { createCanonicalSkuResolver } from "./canonical-sku.js";
 
 function dashboardLayout(config){
-  return `<div id="load" class="load">Загружаю ${X(config.display_name)} Orders…</div><div class="shell"><div class="header"><div><h1>${X(config.display_name)} — Orders Control 2.3 DEV DEV</h1><div class="sub">2.3 DEV • Product Registry • единый Dashboard Core</div></div><div class="sub" id="status"></div></div><div id="err" class="err hide"></div>
+  return `<div id="load" class="load">Загружаю ${X(config.display_name)} Orders…</div><div class="shell"><div class="header"><div><h1>${X(config.display_name)} — Orders Control 2.3</h1><div class="sub">2.3 • Product Registry • единый Dashboard Core</div></div><div class="sub" id="status"></div></div><div id="err" class="err hide"></div>
 <div class="toolbar"><div id="cabinetFilterWrap"><label>Кабинет</label><select id="cabinet"><option value="ALL">Все кабинеты</option></select></div><div><label>Период</label><select id="days"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30" selected>30 дней</option><option value="MONTH">Текущий месяц</option><option value="999">Весь период</option></select></div><div id="marketplaceFilterWrap"><label>Маркетплейс</label><select id="marketplace"><option value="ALL" selected>Все маркетплейсы</option></select></div><div><label>Мастер-категория</label><select id="masterCategory"><option value="ALL">Все мастер-категории</option></select></div><div><label>Категория</label><select id="category"><option value="ALL">Все категории</option></select></div><div><label>Бренд</label><select id="brand"><option value="ALL">Все бренды</option></select></div><div><label>Поиск SKU / название</label><input id="q" name="orders_search" type="text" autocomplete="off" spellcheck="false" placeholder="Артикул или название"></div></div>
 <div id="kpis" class="grid5"></div><div class="card pad market-accent-card trend-card"><div class="section-head"><div><div class="ttl">Динамика заказов</div><div class="desc" id="trendDesc">Закрытые дни выбранного периода и оперативная LIVE-точка.</div></div><select id="trendMode" class="inline-select"><option value="units">Штуки</option><option value="gmv" selected>Оборот</option></select></div><div class="trend-layout"><div class="trend-chart-column"><svg id="trend"></svg><div id="trendPeriodNote" class="trend-period-note"></div><div id="trendDayDetail" class="trend-day-detail"><span class="neu">Нажми на точку, чтобы посмотреть выбранный день.</span></div></div><aside id="trendSummary" class="trend-summary"></aside></div></div>
 <div class="workbench">
@@ -969,7 +969,7 @@ function installInteractions(root){
  },true)
 }
 export async function startDashboard(config){
- validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.3 DEV DEV";
+ validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.3";
  const root=document.getElementById("app");root.innerHTML=dashboardLayout(config);installInteractions(root);
  try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
  catch(e){E("load").classList.add("hide");E("err").classList.remove("hide");E("err").textContent="Ошибка загрузки: "+e.message;throw e}
