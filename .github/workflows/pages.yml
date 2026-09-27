@@ -23,15 +23,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Build production 2.2 site
+      - name: Build production 2.3 site
         shell: bash
         run: |
           mkdir -p _site
           rsync -a --exclude '.git' --exclude '_site' ./ _site/
-          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev22/orange/index.html > _site/index.html
+          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev23/orange/index.html > _site/index.html
           cp _site/index.html _site/orange.html
-          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev22/w/index.html > _site/w.html
-          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev22/cpr/index.html > _site/cpr.html
+          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev23/w/index.html > _site/w.html
+          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev23/cpr/index.html > _site/cpr.html
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
