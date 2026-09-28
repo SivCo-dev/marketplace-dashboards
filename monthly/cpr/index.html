@@ -13,7 +13,7 @@
 .updated{color:var(--muted);font-size:12px;text-align:right}
 .filters{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin-bottom:16px}.f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.f label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:4px}.f select{width:100%;border:0;background:transparent;font:inherit;font-weight:700;outline:none}
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
-.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{grid-template-columns:1.05fr 1.55fr;align-items:start}.right-stack{display:grid;gap:16px;align-content:start}.secondary-grid{grid-template-columns:1.05fr 1.55fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
+.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{grid-template-columns:1.05fr 1.55fr;align-items:start}.right-stack{display:grid;gap:16px;align-content:start}.main-finance-grid.all-markets{grid-template-columns:1fr}.main-finance-grid.all-markets .finance-card{width:100%}.main-finance-grid.all-markets .right-stack{grid-template-columns:1.35fr .85fr;align-items:start}.secondary-grid{grid-template-columns:1.05fr 1.55fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
 .funnel .row{display:grid;grid-template-columns:1.5fr .8fr .55fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f7}.funnel .row:last-child{border-bottom:0}.funnel .amt,.funnel .pct{text-align:right;font-variant-numeric:tabular-nums}.funnel .final{background:#eefaf5;margin:8px -10px -6px;padding:12px 10px;border-radius:10px;font-weight:850}.expense{color:var(--red)}.income{color:var(--green)}
 .trend-wrap{overflow-x:auto}
 .trend-table{width:100%;border-collapse:collapse;min-width:860px}
@@ -47,7 +47,7 @@
 .sku-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}.sku-kpi{border:1px solid var(--line);border-radius:11px;padding:12px}.sku-kpi .l{font-size:10px;color:var(--muted);font-weight:750;text-transform:uppercase}.sku-kpi .v{font-size:18px;font-weight:850;margin-top:5px}.sku-kpi .s{font-size:11px;color:var(--muted);margin-top:4px}
 .econ-table{width:100%;border-collapse:collapse}.econ-table th,.econ-table td{padding:9px 7px;border-bottom:1px solid #eef1f5;text-align:right}.econ-table th:first-child,.econ-table td:first-child{text-align:left}.econ-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.total-row td{font-weight:850;background:#f5faf7}.source-note{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.45}
 @media(max-width:760px){.sku-kpis{grid-template-columns:repeat(2,1fr)}.market-toolbar{align-items:flex-start;flex-direction:column}.expense-list{grid-template-columns:1fr}.exp-item{grid-template-columns:10px minmax(90px,1fr) 48px 82px}}
-@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.grid,.mid,.bottom{grid-template-columns:1fr}} 
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.grid,.mid,.bottom,.main-finance-grid.all-markets .right-stack{grid-template-columns:1fr}} 
 </style>
 </head>
 <body>
@@ -69,7 +69,7 @@
 
   <div class="kpis" id="kpis"></div>
 
-  <div class="grid main-finance-grid">
+  <div class="grid main-finance-grid" id="mainFinanceGrid">
     <div class="card finance-card">
       <h2>Финансовая воронка</h2><div class="sub">По маркетплейсам и итого. Проценты — от валовых продаж.</div>
       <div class="market-tabs" id="marketQuick"></div>
@@ -297,6 +297,8 @@ function render(){
     </div>`).join("")}</div>`;
 
  const availableMarkets=[...new Set(D.sku.map(x=>String(x.marketplace||"OZON").toUpperCase()))].sort();
+ const financeGrid=document.querySelector("#mainFinanceGrid");
+ if(financeGrid)financeGrid.classList.toggle("all-markets",marketSel==="ALL"&&availableMarkets.length>1);
  document.querySelector("#marketQuick").innerHTML=["ALL",...availableMarkets].map(mk=>{
    const cls=mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":mk==="WB"?"wb":"";
    const label=mk==="ALL"?"Все":mk==="YANDEX"?"Яндекс":mk==="OZON"?"Ozon":mk;
