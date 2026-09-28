@@ -13,7 +13,7 @@
 .updated{color:var(--muted);font-size:12px;text-align:right}
 .filters{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin-bottom:16px}.f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.f label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:4px}.f select{width:100%;border:0;background:transparent;font:inherit;font-weight:700;outline:none}
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
-.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{grid-template-columns:1.12fr 1.48fr}.secondary-grid{grid-template-columns:1.05fr 1.55fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
+.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{grid-template-columns:1.05fr 1.55fr;align-items:start}.right-stack{display:grid;gap:16px;align-content:start}.secondary-grid{grid-template-columns:1.05fr 1.55fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
 .funnel .row{display:grid;grid-template-columns:1.5fr .8fr .55fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f7}.funnel .row:last-child{border-bottom:0}.funnel .amt,.funnel .pct{text-align:right;font-variant-numeric:tabular-nums}.funnel .final{background:#eefaf5;margin:8px -10px -6px;padding:12px 10px;border-radius:10px;font-weight:850}.expense{color:var(--red)}.income{color:var(--green)}
 .trend-wrap{overflow-x:auto}
 .trend-table{width:100%;border-collapse:collapse;min-width:860px}
@@ -70,7 +70,7 @@
   <div class="kpis" id="kpis"></div>
 
   <div class="grid main-finance-grid">
-    <div class="card">
+    <div class="card finance-card">
       <h2>Финансовая воронка</h2><div class="sub">По маркетплейсам и итого. Проценты — от валовых продаж.</div>
       <div class="market-tabs" id="marketQuick"></div>
       <div class="trend-wrap"><table class="market-table finance-matrix">
@@ -78,20 +78,26 @@
         <tbody id="market"></tbody>
       </table></div>
     </div>
-    <div class="card">
-      <h2>Динамика 4 месяца</h2><div class="sub">Три последних полных месяца + текущий. Проценты — от валовых продаж.</div>
-      <div class="trend-wrap"><table class="trend-table">
-        <thead><tr>
-          <th>Месяц</th>
-          <th>Продажи</th>
-          <th>Возвраты<br>% от продаж</th>
-          <th>Прямые расходы<br>% от продаж</th>
-          <th>Распределённые<br>% от продаж</th>
-          <th>Получено с маркета</th>
-          <th>Результат после МП<br>% от продаж</th>
-        </tr></thead>
-        <tbody id="trend"></tbody>
-      </table></div>
+    <div class="right-stack">
+      <div class="card">
+        <h2>Динамика 4 месяца</h2><div class="sub">Три последних полных месяца + текущий. Проценты — от валовых продаж.</div>
+        <div class="trend-wrap"><table class="trend-table">
+          <thead><tr>
+            <th>Месяц</th>
+            <th>Продажи</th>
+            <th>Возвраты<br>% от продаж</th>
+            <th>Прямые расходы<br>% от продаж</th>
+            <th>Распределённые<br>% от продаж</th>
+            <th>Получено с маркета</th>
+            <th>Результат после МП<br>% от продаж</th>
+          </tr></thead>
+          <tbody id="trend"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h2>Категории: вклад в продажи и расходы</h2><div class="sub">Продажи, расходы и результат в одном масштабе внутри каждого показателя. Фильтры сверху применяются ко всему блоку.</div>
+        <table class="cat-table"><thead><tr><th>Категория</th><th>Продажи</th><th>Расходы</th><th>Результат</th><th>Доля продаж</th></tr></thead><tbody id="cats"></tbody></table>
+      </div>
     </div>
   </div>
 
@@ -101,8 +107,14 @@
       <div class="expense-list" id="expenses"></div>
     </div>
     <div class="card">
-      <h2>Категории: вклад в продажи и расходы</h2><div class="sub">Продажи, расходы и результат в одном масштабе внутри каждого показателя. Фильтры сверху применяются ко всему блоку.</div>
-      <table class="cat-table"><thead><tr><th>Категория</th><th>Продажи</th><th>Расходы</th><th>Результат</th><th>Доля продаж</th></tr></thead><tbody id="cats"></tbody></table>
+      <h2>Капитал / дополнительные расходы</h2><div class="sub">Следующий слой P&L</div>
+      <div class="stockgrid">
+        <div class="mini"><div class="l">OPEX</div><div class="v" id="opex">—</div></div>
+        <div class="mini"><div class="l">Материалы</div><div class="v" id="materials">—</div></div>
+        <div class="mini"><div class="l">Внешняя логистика</div><div class="v" id="extlog">—</div></div>
+        <div class="mini"><div class="l">Себестоимость</div><div class="v" id="cogs">—</div></div>
+      </div>
+      <div class="sub" style="margin-top:14px">Эти статьи пока не включены в результат SKU, пока не определим правила их распределения.</div>
     </div>
   </div>
 
@@ -113,16 +125,6 @@
     </div>
     <div>
       <div id="skuDetail" class="card detail-panel"><div class="sub" style="margin:0">Выбери SKU слева.</div></div>
-      <div class="card" style="margin-top:16px">
-        <h2>Капитал / дополнительные расходы</h2><div class="sub">Следующий слой P&L</div>
-        <div class="stockgrid">
-          <div class="mini"><div class="l">OPEX</div><div class="v" id="opex">—</div></div>
-          <div class="mini"><div class="l">Материалы</div><div class="v" id="materials">—</div></div>
-          <div class="mini"><div class="l">Внешняя логистика</div><div class="v" id="extlog">—</div></div>
-          <div class="mini"><div class="l">Себестоимость</div><div class="v" id="cogs">—</div></div>
-        </div>
-        <div class="sub" style="margin-top:14px">Эти статьи пока не включены в результат SKU, пока не определим правила их распределения.</div>
-      </div>
     </div>
   </div>
 </div>
