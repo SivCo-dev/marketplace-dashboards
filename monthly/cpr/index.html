@@ -40,7 +40,7 @@
     <div class="f"><label>Период</label><select id="month"></select></div>
     <div class="f"><label>Сравнение</label><select id="compare"></select></div>
     <div class="f"><label>Организация</label><select><option>CPR</option></select></div>
-    <div class="f"><label>Маркет</label><select><option>Ozon</option></select></div>
+    <div class="f"><label>Маркет</label><select id="marketFilter"><option value="ALL">Все</option></select></div>
     <div class="f"><label>Категория</label><select id="category"><option value="">Все</option></select></div>
   </div>
 
@@ -50,29 +50,31 @@
 
   <div class="grid">
     <div class="card">
-      <h2>Финансовая воронка</h2><div class="sub">Сумма и доля от чистых продаж</div>
-      <div class="funnel" id="funnel"></div>
+      <h2>Маркетплейсы</h2><div class="sub">Клик по маркету применяет тот же глобальный фильтр ко всему отчёту.</div>
+      <div class="market-tabs" id="marketQuick"></div>
+      <table class="market-table"><thead><tr><th>Показатель</th><th>Выбранный маркет</th><th>Итого</th></tr></thead><tbody id="market"></tbody></table>
     </div>
-    <div>
-      <div class="card" style="margin-bottom:16px">
-        <h2>Продажи и результат Ozon по месяцам</h2><div class="sub">Закрытые месяцы + текущий месяц</div>
-        <div class="chartbox"><div class="bars" id="trend"></div></div>
-      </div>
-      <div class="card">
-        <h2>Структура расходов</h2><div class="sub">Доля основных расходов от чистых продаж</div>
-        <div class="expense-list" id="expenses"></div>
-      </div>
+    <div class="card">
+      <h2>Финансовая воронка</h2><div class="sub">Проценты — от валовых продаж выбранного среза</div>
+      <div class="funnel" id="funnel"></div>
     </div>
   </div>
 
-  <div class="mid">
+  <div class="grid section">
     <div class="card">
-      <h2>Маркетплейсы</h2><div class="sub">Архитектура уже multi-market; в CPR сейчас только Ozon</div>
-      <table class="market-table"><thead><tr><th>Показатель</th><th>Ozon</th><th>Итого</th></tr></thead><tbody id="market"></tbody></table>
+      <h2>Структура расходов</h2><div class="sub">Сумма и доля от валовых продаж</div>
+      <div class="expense-list" id="expenses"></div>
     </div>
     <div class="card">
-      <h2>Категории: вклад в продажи и расходы</h2><div class="sub">Категория берётся из товарного справочника Ozon. Для CPR текущая категория — «Мебель для ванной».</div>
-      <table class="cat-table"><thead><tr><th>Категория</th><th>Продажи</th><th>Расходы</th><th>Результат Ozon</th><th>Доля</th></tr></thead><tbody id="cats"></tbody></table>
+      <h2>Продажи и результат по месяцам</h2><div class="sub">Три последних полных месяца + текущий</div>
+      <div class="chartbox"><div class="bars" id="trend"></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <h2>Категории: вклад в продажи и расходы</h2><div class="sub">Глобальные фильтры сверху применяются и к этому блоку.</div>
+      <table class="cat-table"><thead><tr><th>Категория</th><th>Продажи</th><th>Расходы</th><th>Результат</th><th>Доля</th></tr></thead><tbody id="cats"></tbody></table>
     </div>
   </div>
 
@@ -104,7 +106,21 @@ const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽",
 const pct=(v,b)=>b?Math.abs(N(v))/Math.abs(N(b))*100:0;
 const monthName=m=>new Date(m+"T00:00:00").toLocaleDateString("ru-RU",{month:"short",year:"2-digit"});
 const getMonth=m=>D.months.find(x=>String(x.month).slice(0,7)===m)||{};
-const filtSku=m=>D.sku.filter(x=>String(x.month).slice(0,7)===m && (!document.querySelector("#category").value || x.master_category===document.querySelector("#category").value));
+const filtSku=m=>{
+ const category=document.querySelector("#category").value;
+ const market=document.querySelector("#marketFilter").value||"ALL";
+ return D.sku.filter(x=>String(x.month).slice(0,7)===m
+   && (!category || x.master_category===category)
+   && (market==="ALL" || String(x.marketplace||"OZON").toUpperCase()===market));
+};
+const filtSkuAllMarkets=m=>{
+ const category=document.querySelector("#category").value;
+ return D.sku.filter(x=>String(x.month).slice(0,7)===m && (!category || x.master_category===category));
+};
+function setMarketFilter(mk){
+ document.querySelector("#marketFilter").value=mk;
+ render();
+}
 const agg=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales","sold_units","commission","logistics","storage","promotion","other","net_compensation_amount","preliminary_compensation","final_with_compensation"])a[k]=(a[k]||0)+N(x[k]);return a},{});
 const delta=(a,b)=>N(b)!==0?(N(a)/N(b)-1)*100:null;
 const dhtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>=0?'pos':'neg'}">${d>=0?'+':''}${d.toFixed(1)}%</span>`;
@@ -116,7 +132,7 @@ function render(){
  const comp=N(a.net_compensation_amount);
  const expenses=Math.abs(N(a.commission))+Math.abs(N(a.logistics))+Math.abs(N(a.storage))+Math.abs(N(a.promotion))+Math.abs(N(a.other));
  const result=N(a.final_with_compensation);
- const rate=N(a.net_sales)?result/N(a.net_sales)*100:0;
+ const rate=N(a.sales)?result/N(a.sales)*100:0;
  const k=[
   ["Продажи",RUB(a.net_sales),delta(a.net_sales,b.net_sales)],
   ["Продано",NUM(a.sold_units)+" шт",delta(a.sold_units,b.sold_units)],
@@ -131,19 +147,48 @@ function render(){
   ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],["Комиссия",a.commission,"expense"],["Логистика",a.logistics,"expense"],
   ["Хранение",a.storage,"expense"],["Продвижение",a.promotion,"expense"],["Прочее",a.other,"expense"],["Компенсации",comp,"income"]
  ];
- document.querySelector("#funnel").innerHTML=rows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],a.net_sales).toFixed(1)}%</div></div>`).join("")+
+ document.querySelector("#funnel").innerHTML=rows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],a.sales).toFixed(1)}%</div></div>`).join("")+
   `<div class="row final"><div>Результат после Ozon</div><div class="amt income">${RUB(result)}</div><div class="pct">${rate.toFixed(1)}%</div></div>`;
 
  const exp=[["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Хранение",a.storage],["Прочее",a.other]];
  const max=Math.max(1,...exp.map(x=>Math.abs(N(x[1]))));
- document.querySelector("#expenses").innerHTML=exp.map(x=>`<div class="exp-row"><span>${x[0]}</span><div class="track"><div class="fill" style="width:${Math.abs(N(x[1]))/max*100}%"></div></div><b style="text-align:right">${pct(x[1],a.net_sales).toFixed(1)}%</b></div>`).join("");
+ document.querySelector("#expenses").innerHTML=exp.map(x=>`<div class="exp-row"><span>${x[0]}</span><div class="track"><div class="fill" style="width:${Math.abs(N(x[1]))/max*100}%"></div></div><b style="text-align:right">${RUB(x[1])} · ${pct(x[1],a.sales).toFixed(1)}%</b></div>`).join("");
 
- const market=[["Продажи",a.net_sales],["Возвраты",a.returns],["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Компенсации",comp],["Результат Ozon",result]];
- document.querySelector("#market").innerHTML=market.map(x=>`<tr><td>${x[0]}</td><td>${RUB(x[1])}</td><td>${RUB(x[1])}</td></tr>`).join("");
+ const marketSel=document.querySelector("#marketFilter").value||"ALL";
+ const availableMarkets=[...new Set(D.sku.map(x=>String(x.marketplace||"OZON").toUpperCase()))].sort();
+ document.querySelector("#marketQuick").innerHTML=["ALL",...availableMarkets].map(mk=>{
+   const cls=mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":mk==="WB"?"wb":"";
+   const label=mk==="ALL"?"Все":mk==="YANDEX"?"Яндекс":mk==="OZON"?"Ozon":mk;
+   return `<button class="market-tab ${cls} ${marketSel===mk?'active':''}" onclick="setMarketFilter('${mk}')">${label}</button>`;
+ }).join("");
 
- const cats=D.categories.filter(x=>String(x.month).slice(0,7)===m);
+ const selected=a;
+ const total=agg(filtSkuAllMarkets(m));
+ const selectedComp=N(selected.net_compensation_amount),totalComp=N(total.net_compensation_amount);
+ const marketRows=[
+   ["Продажи",selected.net_sales,total.net_sales],
+   ["Возвраты",selected.returns,total.returns],
+   ["Комиссия",selected.commission,total.commission],
+   ["Логистика",selected.logistics,total.logistics],
+   ["Продвижение",selected.promotion,total.promotion],
+   ["Компенсации",selectedComp,totalComp],
+   ["Результат",selected.final_with_compensation,total.final_with_compensation]
+ ];
+ document.querySelector("#market").innerHTML=marketRows.map(x=>`<tr><td>${x[0]}</td><td>${RUB(x[1])}</td><td>${RUB(x[2])}</td></tr>`).join("");
+
+ const catRows=filtSku(m);
+ const catMap=new Map();
+ for(const x of catRows){
+   const key=x.master_category||"Без категории";
+   const z=catMap.get(key)||{master_category:key,sales:0,expenses:0,result:0};
+   z.sales+=N(x.net_sales);
+   z.expenses+=Math.abs(N(x.commission))+Math.abs(N(x.logistics))+Math.abs(N(x.storage))+Math.abs(N(x.promotion))+Math.abs(N(x.other))+Math.abs(N(x.allocated_logistics))+Math.abs(N(x.allocated_promotion))+Math.abs(N(x.allocated_other));
+   z.result+=N(x.final_with_compensation);
+   catMap.set(key,z);
+ }
+ const cats=[...catMap.values()].sort((x,y)=>y.sales-x.sales);
  const totalCats=cats.reduce((s,x)=>s+N(x.sales),0);
- document.querySelector("#cats").innerHTML=cats.length?cats.map(x=>`<tr><td>${x.master_category}</td><td>${RUB(x.sales)}</td><td>${RUB(x.expenses)}</td><td>${RUB(x.ozon_result)}</td><td>${(totalCats?N(x.sales)/totalCats*100:0).toFixed(1)}%</td></tr>`).join(""):'<tr><td colspan="5" class="empty">Нет данных</td></tr>';
+ document.querySelector("#cats").innerHTML=cats.length?cats.map(x=>`<tr><td>${x.master_category}</td><td>${RUB(x.sales)}</td><td>${RUB(x.expenses)}</td><td>${RUB(x.result)}</td><td>${(totalCats?N(x.sales)/totalCats*100:0).toFixed(1)}%</td></tr>`).join(""):'<tr><td colspan="5" class="empty">Нет данных</td></tr>';
 
  const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
  document.querySelector("#sku").innerHTML=sku.map(x=>`<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(x.commission)}</td><td>${RUB(N(x.logistics)+N(x.allocated_logistics))}</td><td>${RUB(N(x.net_compensation_amount)+N(x.preliminary_compensation))}</td><td><b>${RUB(x.final_with_compensation)}</b></td></tr>`).join("");
@@ -301,9 +346,10 @@ function renderSkuDetail(){
 }
 
 function renderTrend(){
- const months=D.months.map(x=>String(x.month).slice(0,7));
- const vals=months.map(m=>getMonth(m)),max=Math.max(1,...vals.map(x=>N(x.net_sales)));
- document.querySelector("#trend").innerHTML=vals.map((x,i)=>`<div class="barcol"><div class="bar sales" style="height:${Math.max(3,N(x.net_sales)/max*100)}%" title="${RUB(x.net_sales)}"></div><div class="bar profit" style="height:${Math.max(3,N(x.ozon_result)/max*100)}%" title="${RUB(x.ozon_result)}"></div><div class="mlabel">${monthName(String(x.month).slice(0,10))}</div></div>`).join("");
+ const months=[...new Set(D.sku.map(x=>String(x.month).slice(0,7)))].sort().slice(-4);
+ const vals=months.map(m=>({month:m,...selectedAgg(m)}));
+ const max=Math.max(1,...vals.map(x=>N(x.net_sales)));
+ document.querySelector("#trend").innerHTML=vals.map(x=>`<div class="barcol"><div class="bar sales" style="height:${Math.max(3,N(x.net_sales)/max*100)}%" title="Продажи: ${RUB(x.net_sales)}"></div><div class="bar profit" style="height:${Math.max(3,N(x.final_with_compensation)/max*100)}%" title="Результат: ${RUB(x.final_with_compensation)}"></div><div class="mlabel">${monthName(x.month+"-01")}</div></div>`).join("");
 }
 function renderManual(m){
  const rows=D.manual_expenses.filter(x=>String(x.month).slice(0,7)===m);
@@ -320,9 +366,11 @@ fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);re
  document.querySelector("#compare").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
  document.querySelector("#month").value=months[months.length-1]||"";
  document.querySelector("#compare").value=months[Math.max(0,months.length-2)]||"";
- const cats=[...new Set(D.categories.map(x=>x.master_category))].sort();
+ const cats=[...new Set(D.sku.map(x=>x.master_category).filter(Boolean))].sort();
  document.querySelector("#category").innerHTML='<option value="">Все</option>'+cats.map(c=>`<option>${c}</option>`).join("");
- document.querySelector("#month").onchange=render;document.querySelector("#compare").onchange=render;document.querySelector("#category").onchange=render;
+ const markets=[...new Set(D.sku.map(x=>String(x.marketplace||"OZON").toUpperCase()))].sort();
+ document.querySelector("#marketFilter").innerHTML='<option value="ALL">Все</option>'+markets.map(m=>`<option value="${m}">${m==="YANDEX"?"Яндекс":m==="OZON"?"Ozon":m}</option>`).join("");
+ document.querySelector("#month").onchange=render;document.querySelector("#compare").onchange=render;document.querySelector("#category").onchange=render;document.querySelector("#marketFilter").onchange=render;
  const liveMin=x.meta?.live_min_date,liveMax=x.meta?.live_max_date;
  document.querySelector("#notice").textContent=`Важно: июнь–август — закрытые данные из старого SKU Monthly. Текущий месяц пока собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
  document.querySelector("#updated").textContent="Обновлено "+new Date(x.meta?.generated_at||Date.now()).toLocaleString("ru-RU");
