@@ -13,7 +13,7 @@
 .updated{color:var(--muted);font-size:12px;text-align:right}
 .filters{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin-bottom:16px}.f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.f label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:4px}.f select{width:100%;border:0;background:transparent;font:inherit;font-weight:700;outline:none}
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
-.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
+.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{grid-template-columns:1.12fr 1.48fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
 .funnel .row{display:grid;grid-template-columns:1.5fr .8fr .55fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f7}.funnel .row:last-child{border-bottom:0}.funnel .amt,.funnel .pct{text-align:right;font-variant-numeric:tabular-nums}.funnel .final{background:#eefaf5;margin:8px -10px -6px;padding:12px 10px;border-radius:10px;font-weight:850}.expense{color:var(--red)}.income{color:var(--green)}
 .trend-wrap{overflow-x:auto}
 .trend-table{width:100%;border-collapse:collapse;min-width:860px}
@@ -69,22 +69,14 @@
 
   <div class="kpis" id="kpis"></div>
 
-  <div class="grid">
+  <div class="grid main-finance-grid">
     <div class="card">
-      <h2>Маркетплейсы</h2><div class="sub">Клик по маркету применяет тот же глобальный фильтр ко всему отчёту.</div>
+      <h2>Финансовая воронка</h2><div class="sub">По маркетплейсам и итого. Проценты — от валовых продаж.</div>
       <div class="market-tabs" id="marketQuick"></div>
-      <table class="market-table"><thead><tr><th>Показатель</th><th style="color:var(--market-accent)">Выбранный маркет</th><th>Итого</th></tr></thead><tbody id="market"></tbody></table>
-    </div>
-    <div class="card">
-      <h2>Финансовая воронка</h2><div class="sub">Проценты — от валовых продаж выбранного среза</div>
-      <div class="funnel" id="funnel"></div>
-    </div>
-  </div>
-
-  <div class="grid section">
-    <div class="card">
-      <h2>Структура расходов</h2><div class="sub">Сумма и доля от валовых продаж</div>
-      <div class="expense-list" id="expenses"></div>
+      <div class="trend-wrap"><table class="market-table finance-matrix">
+        <thead id="financeHead"></thead>
+        <tbody id="market"></tbody>
+      </table></div>
     </div>
     <div class="card">
       <h2>Динамика 4 месяца</h2><div class="sub">Три последних полных месяца + текущий. Проценты — от валовых продаж.</div>
@@ -100,6 +92,13 @@
         </tr></thead>
         <tbody id="trend"></tbody>
       </table></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="card">
+      <h2>Структура расходов</h2><div class="sub">Сумма и доля от валовых продаж</div>
+      <div class="expense-list" id="expenses"></div>
     </div>
   </div>
 
@@ -256,14 +255,7 @@ function render(){
  ];
  document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="delta">${dhtml(x[2])}</div></div>`).join("");
 
- const rows=[
-  ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],
-  ["Комиссия",a.commission,"expense"],["Логистика",a.logistics,"expense"],["Эквайринг",a.acquiring,"expense"],
-  ["FBO",a.fbo,"expense"],["Партнёрские услуги",a.partner,"expense"],["Продвижение",a.promotion,"expense"],
-  ["Прочее",a.other,"expense"],["Компенсации",comp,"income"]
- ];
- document.querySelector("#funnel").innerHTML=rows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],a.sales).toFixed(1)}%</div></div>`).join("")+
-  `<div class="row final"><div>Результат после Ozon</div><div class="amt income">${RUB(result)}</div><div class="pct">${rate.toFixed(1)}%</div></div>`;
+
 
  const exp=[
    ["Комиссия",a.commission],["Логистика",a.logistics],["Эквайринг",a.acquiring],["FBO",a.fbo],
@@ -302,22 +294,38 @@ function render(){
    return `<button class="market-tab ${cls} ${marketSel===mk?'active':''}" onclick="setMarketFilter('${mk}')">${label}</button>`;
  }).join("");
 
- const selected=a;
- const totalRows=filtSkuAllMarkets(m), total=aggregateUnified(totalRows);
- const marketRows=[
-   ["Продажи",selected.net_sales,total.net_sales],
-   ["Возвраты",selected.returns,total.returns],
-   ["Комиссия",selected.commission,total.commission],
-   ["Логистика",selected.logistics,total.logistics],
-   ["Эквайринг",selected.acquiring,total.acquiring],
-   ["FBO",selected.fbo,total.fbo],
-   ["Партнёрские услуги",selected.partner,total.partner],
-   ["Продвижение",selected.promotion,total.promotion],
-   ["Прочее",selected.other,total.other],
-   ["Компенсации",selected.compensation,total.compensation],
-   ["Результат",selected.result,total.result]
+ const marketStats={};
+ for(const mk of availableMarkets){
+   const rows=filtSkuAllMarkets(m).filter(r=>String(r.marketplace||"OZON").toUpperCase()===mk);
+   marketStats[mk]=aggregateUnified(rows);
+ }
+ const total=aggregateUnified(filtSkuAllMarkets(m));
+ const displayMarkets=marketSel==="ALL"?availableMarkets:availableMarkets.filter(mk=>mk===marketSel);
+ const financeCols=[...displayMarkets.map(mk=>({key:mk,label:mk==="YANDEX"?"Яндекс":mk==="OZON"?"Ozon":mk})),{key:"TOTAL",label:"Итого"}];
+ document.querySelector("#financeHead").innerHTML=`<tr><th>Показатель</th>${financeCols.map(x=>`<th>${x.label}</th>`).join("")}</tr>`;
+ const valueFor=(stat,key)=>key==="TOTAL"?total[key]:stat[key];
+ const statFor=col=>col.key==="TOTAL"?total:marketStats[col.key]||{};
+ const finRows=[
+   ["Продажи","sales","money"],
+   ["Возвраты","returns","pctmoney"],
+   ["Чистые продажи","net_sales","money"],
+   ["Комиссия","commission","pctmoney"],
+   ["Логистика","logistics","pctmoney"],
+   ["Эквайринг","acquiring","pctmoney"],
+   ["FBO","fbo","pctmoney"],
+   ["Партнёрские услуги","partner","pctmoney"],
+   ["Продвижение","promotion","pctmoney"],
+   ["Прочее","other","pctmoney"],
+   ["Компенсации","compensation","pctmoney"],
+   ["Результат после МП","result","result"]
  ];
- document.querySelector("#market").innerHTML=marketRows.map(x=>`<tr><td>${x[0]}</td><td>${RUB(x[1])}</td><td>${RUB(x[2])}</td></tr>`).join("");
+ const cell=(stat,key,kind)=>{
+   const v=N(stat[key]), gross=Math.abs(N(stat.sales));
+   if(kind==="money")return `<b>${RUB(v)}</b>`;
+   if(kind==="pctmoney")return `${RUB(v)} <span class="sub">(${gross?pct(v,gross).toFixed(1):"0.0"}%)</span>`;
+   return `<b>${RUB(v)}</b> <span class="sub">(${gross?(v/gross*100).toFixed(1):"0.0"}%)</span>`;
+ };
+ document.querySelector("#market").innerHTML=finRows.map(r=>`<tr><td><b>${r[0]}</b></td>${financeCols.map(col=>`<td>${cell(statFor(col),r[1],r[2])}</td>`).join("")}</tr>`).join("");
 
  const catRows=filtSku(m);
  const catMap=new Map();
