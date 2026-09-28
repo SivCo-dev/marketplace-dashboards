@@ -196,8 +196,43 @@ function renderSkuDetail(){
    return `<button class="market-tab ${cls} ${skuDetailMarket===mk?'active':''}" onclick="setSkuDetailMarket('${mk}')">${mk==="ALL"?"Все":mk==="YANDEX"?"Яндекс":mk}</button>`
  }).join("");
  const noData=skuDetailMarket!=="ALL"&&!stats.has(skuDetailMarket);
- const directComm=N(x.commission),allocComm=N(x.allocated_commission),directDel=N(x.logistics),allocDel=N(x.allocated_logistics),directStorage=N(x.storage),allocStorage=N(x.allocated_storage),directPromo=N(x.promotion),allocPromo=N(x.allocated_promotion),directOther=N(x.other),allocOther=N(x.allocated_other);
- const received=N(x.result),unitBase=N(x.economic_units)||N(x.sold_units),perUnit=unitBase?received/unitBase:0;
+
+ const directComm=N(x.commission),allocComm=N(x.allocated_commission),
+       directDel=N(x.logistics),allocDel=N(x.allocated_logistics),
+       directStorage=N(x.storage),allocStorage=N(x.allocated_storage),
+       directPromo=N(x.promotion),allocPromo=N(x.allocated_promotion),
+       directOther=N(x.other),allocOther=N(x.allocated_other);
+
+ const received=N(x.result);
+ const unitBase=N(x.economic_units)||N(x.sold_units);
+ const perUnit=unitBase?received/unitBase:0;
+
+ // Бизнес-расходы: пока tenant-level. Распределяем только в режиме "Все"
+ // по доле положительных чистых продаж SKU в месяце. Когда появятся прямые
+ // SKU-себестоимость/материалы — они заменят распределённую оценку.
+ const month=String(base.month).slice(0,7);
+ const skuKey=String(base.article||base.sku||"").trim().toLowerCase();
+ const monthRows=D.sku.filter(r=>String(r.month).slice(0,7)===month);
+ const monthNetBase=monthRows.reduce((s,r)=>s+Math.max(N(r.net_sales),0),0);
+ const skuNetAll=monthRows.filter(r=>String(r.article||r.sku||"").trim().toLowerCase()===skuKey)
+   .reduce((s,r)=>s+Math.max(N(r.net_sales),0),0);
+ const share=monthNetBase>0?skuNetAll/monthNetBase:0;
+ const manualRows=D.manual_expenses.filter(r=>String(r.month).slice(0,7)===month);
+ const manualBy={};
+ for(const r of manualRows) manualBy[String(r.expense_type||"").toLowerCase()]=(manualBy[String(r.expense_type||"").toLowerCase()]||0)+N(r.amount);
+ const allocManual=type=>skuDetailMarket==="ALL"&&manualBy[type]!=null?-Math.abs(manualBy[type]*share):null;
+ const businessRows=[
+   ["Себестоимость",allocManual("cogs")],
+   ["OPEX",allocManual("opex")],
+   ["Внешняя логистика",allocManual("external_logistics")],
+   ["Материалы",allocManual("materials")],
+   ["Прочие бизнес-расходы",allocManual("other")]
+ ];
+ const businessLoaded=businessRows.some(r=>r[1]!==null);
+ const businessTotal=businessRows.reduce((s,r)=>s+(r[1]===null?0:N(r[1])),0);
+ const finalAfterBusiness=received+businessTotal;
+ const finalPerUnit=unitBase?finalAfterBusiness/unitBase:0;
+
  const expenseRows=[
    ["Комиссия",directComm,allocComm],
    ["Доставка",directDel,allocDel],
@@ -205,6 +240,9 @@ function renderSkuDetail(){
    ["Продвижение",directPromo,allocPromo],
    ["Прочее",directOther,allocOther]
  ];
+
+ const fmtMaybe=v=>v===null?"—":RUB(v);
+
  box.innerHTML=
  `<div class="sku-head">
     <div class="sku-photo">Фото товара<br>подключим позже</div>
@@ -216,14 +254,25 @@ function renderSkuDetail(){
      <div class="sku-kpi"><div class="l">Продано</div><div class="v">${NUM(x.sold_units)} шт</div></div>
      <div class="sku-kpi"><div class="l">Продажи</div><div class="v">${RUB(x.sales)}</div></div>
      <div class="sku-kpi"><div class="l">Чистые продажи</div><div class="v">${RUB(x.net_sales)}</div></div>
-     <div class="sku-kpi"><div class="l">Реально получено</div><div class="v">${RUB(received)}</div><div class="s">${perUnit?RUB(perUnit)+" / ед.":""}</div></div>
+     <div class="sku-kpi"><div class="l">После маркета / шт</div><div class="v">${RUB(perUnit)}</div><div class="s">после всех расходов маркетплейса</div></div>
    </div>
-   <table class="econ-table"><thead><tr><th>Расход</th><th>Прямой</th><th>Распределённый</th><th>Итого</th></tr></thead><tbody>
-   ${expenseRows.map(r=>`<tr><td>${r[0]}</td><td>${RUB(r[1])}</td><td>${RUB(r[2])}</td><td><b>${RUB(N(r[1])+N(r[2]))}</b></td></tr>`).join("")}
-   <tr><td>Компенсации</td><td colspan="2"></td><td><b>${RUB(x.compensation)}</b></td></tr>
-   <tr class="total-row"><td>Реально получено после расходов</td><td colspan="2"></td><td>${RUB(received)}</td></tr>
-   </tbody></table>
-   <div class="source-note">Как в ежедневной карточке: сверху переключатель маркетов, ниже единая экономика SKU. Для CPR сейчас фактически заполнен Ozon; Яндекс и WB уже заложены в интерфейс и начнут показываться без переделки карточки, когда появятся месячные данные этих маркетов.</div>`}
+   <table class="econ-table">
+     <thead><tr><th>Показатель</th><th>Прямой</th><th>Распределённый</th><th>Итого</th></tr></thead>
+     <tbody>
+       <tr><td><b>Продажи</b></td><td colspan="2"></td><td><b>${RUB(x.sales)}</b></td></tr>
+       <tr><td>Возвраты</td><td colspan="2"></td><td>${RUB(x.returns)}</td></tr>
+       <tr><td><b>Чистые продажи</b></td><td colspan="2"></td><td><b>${RUB(x.net_sales)}</b></td></tr>
+       ${expenseRows.map(r=>`<tr><td>${r[0]}</td><td>${RUB(r[1])}</td><td>${RUB(r[2])}</td><td><b>${RUB(N(r[1])+N(r[2]))}</b></td></tr>`).join("")}
+       <tr><td>Компенсации</td><td colspan="2"></td><td><b>${RUB(x.compensation)}</b></td></tr>
+       <tr class="total-row"><td>Итого после расходов маркетплейса</td><td colspan="2"></td><td>${RUB(received)}</td></tr>
+       <tr class="total-row"><td>Итого после расходов маркетплейса / шт</td><td colspan="2"></td><td>${RUB(perUnit)}</td></tr>
+       <tr><td colspan="4" style="padding-top:16px"><b>Расходы бизнеса</b></td></tr>
+       ${businessRows.map(r=>`<tr><td>${r[0]}</td><td>—</td><td>${fmtMaybe(r[1])}</td><td><b>${fmtMaybe(r[1])}</b></td></tr>`).join("")}
+       <tr class="total-row"><td>Итого после всех расходов</td><td colspan="2"></td><td>${businessLoaded?RUB(finalAfterBusiness):"—"}</td></tr>
+       <tr class="total-row"><td>Итого после всех расходов / шт</td><td colspan="2"></td><td>${businessLoaded?RUB(finalPerUnit):"—"}</td></tr>
+     </tbody>
+   </table>
+   <div class="source-note">Верхняя часть — фактическая экономика маркетплейса. Расходы бизнеса показываются отдельно и только в режиме «Все»: пока это общие расходы месяца, распределённые по доле чистых продаж SKU. Для себестоимости и материалов позже лучше подключить прямые SKU-данные, а не оставлять распределение по обороту.</div>`}
  `;
 }
 
