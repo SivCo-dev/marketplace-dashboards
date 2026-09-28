@@ -44,7 +44,7 @@
 
   <div class="grid">
     <div class="card">
-      <h2>Финансовая воронка Ozon</h2><div class="sub">Официальная структура расходов Ozon, если есть сверенная сводка за месяц</div>
+      <h2>Финансовая воронка</h2><div class="sub">Сумма и доля от чистых продаж</div>
       <div class="funnel" id="funnel"></div>
     </div>
     <div>
@@ -53,7 +53,7 @@
         <div class="chartbox"><div class="bars" id="trend"></div></div>
       </div>
       <div class="card">
-        <h2>Структура расходов Ozon</h2><div class="sub">Категории как в финансовом отчёте Ozon</div>
+        <h2>Структура расходов</h2><div class="sub">Доля основных расходов от чистых продаж</div>
         <div class="expense-list" id="expenses"></div>
       </div>
     </div>
@@ -61,7 +61,7 @@
 
   <div class="mid">
     <div class="card">
-      <h2>Маркетплейсы</h2><div class="sub">Для Ozon показываем официальную расходную классификацию</div>
+      <h2>Маркетплейсы</h2><div class="sub">Архитектура уже multi-market; в CPR сейчас только Ozon</div>
       <table class="market-table"><thead><tr><th>Показатель</th><th>Ozon</th><th>Итого</th></tr></thead><tbody id="market"></tbody></table>
     </div>
     <div class="card">
@@ -89,8 +89,7 @@
 </div>
 <script>
 const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
-let D={months:[],official_ozon:[],categories:[],sku:[],manual_expenses:[]};
-const getOfficial=m=>D.official_ozon.find(x=>String(x.month).slice(0,7)===m)||null;
+let D={months:[],categories:[],sku:[],manual_expenses:[]};
 const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽", NUM=v=>Math.round(N(v)).toLocaleString("ru-RU");
 const pct=(v,b)=>b?Math.abs(N(v))/Math.abs(N(b))*100:0;
 const monthName=m=>new Date(m+"T00:00:00").toLocaleDateString("ru-RU",{month:"short",year:"2-digit"});
@@ -104,63 +103,32 @@ function selectedAgg(month){return agg(filtSku(month))}
 function render(){
  const m=document.querySelector("#month").value,c=document.querySelector("#compare").value;
  const a=selectedAgg(m),b=selectedAgg(c);
- const off=getOfficial(m), offCmp=getOfficial(c);
- const comp=off?N(off.compensation_net):(N(a.net_compensation_amount)+N(a.preliminary_compensation));
- const result=off?N(off.payout_total):N(a.final_with_compensation);
+ const comp=N(a.net_compensation_amount)+N(a.preliminary_compensation);
+ const expenses=Math.abs(N(a.commission))+Math.abs(N(a.logistics))+Math.abs(N(a.storage))+Math.abs(N(a.promotion))+Math.abs(N(a.other));
+ const result=N(a.final_with_compensation);
  const rate=N(a.net_sales)?result/N(a.net_sales)*100:0;
  const k=[
   ["Продажи",RUB(a.net_sales),delta(a.net_sales,b.net_sales)],
   ["Продано",NUM(a.sold_units)+" шт",delta(a.sold_units,b.sold_units)],
-  ["К выплате Ozon",RUB(result),delta(result,offCmp?N(offCmp.payout_total):b.final_with_compensation)],
-  ["Доля к выплате",rate.toFixed(1)+"%",null],
+  ["Результат Ozon",RUB(result),delta(result,b.final_with_compensation)],
+  ["Ozon-маржа",rate.toFixed(1)+"%",null],
   ["Возвраты",RUB(Math.abs(N(a.returns))),delta(Math.abs(N(a.returns)),Math.abs(N(b.returns)))],
-  ["Компенсации",RUB(comp),delta(comp,offCmp?N(offCmp.compensation_net):(N(b.net_compensation_amount)+N(b.preliminary_compensation)))]
+  ["Компенсации",RUB(comp),delta(comp,N(b.net_compensation_amount)+N(b.preliminary_compensation))]
  ];
  document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="delta">${dhtml(x[2])}</div></div>`).join("");
 
- const financeRows=off?[
-  ["Продажи",N(off.sales),"income"],
-  ["Возвраты",N(off.returns),"expense"],
-  ["Вознаграждение Ozon",N(off.reward_ozon),"expense"],
-  ["Услуги доставки",N(off.delivery_services),"expense"],
-  ["Услуги партнёров",N(off.partner_services),"expense"],
-  ["Услуги FBO",N(off.fbo_services),"expense"],
-  ["Продвижение и реклама",N(off.promotion_ads),"expense"],
-  ["Другие услуги и штрафы",N(off.other_services_penalties),"expense"],
-  ["Компенсации и декомпенсации",N(off.compensation_net),"income"]
- ]:[
-  ["Чистые продажи",a.net_sales,"income"],
-  ["Комиссия",a.commission,"expense"],
-  ["Логистика",a.logistics,"expense"],
-  ["Хранение",a.storage,"expense"],
-  ["Продвижение",a.promotion,"expense"],
-  ["Прочее",a.other,"expense"],
-  ["Компенсации",comp,"income"]
+ const rows=[
+  ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],["Комиссия",a.commission,"expense"],["Логистика",a.logistics,"expense"],
+  ["Хранение",a.storage,"expense"],["Продвижение",a.promotion,"expense"],["Прочее",a.other,"expense"],["Компенсации",comp,"income"]
  ];
- const pctBase=off?N(off.sales):N(a.net_sales);
- document.querySelector("#funnel").innerHTML=financeRows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],pctBase).toFixed(1)}%</div></div>`).join("")+
-  `<div class="row final"><div>Всего к выплате за период</div><div class="amt income">${RUB(result)}</div><div class="pct">${rate.toFixed(1)}%</div></div>`;
+ document.querySelector("#funnel").innerHTML=rows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],a.net_sales).toFixed(1)}%</div></div>`).join("")+
+  `<div class="row final"><div>Результат после Ozon</div><div class="amt income">${RUB(result)}</div><div class="pct">${rate.toFixed(1)}%</div></div>`;
 
- const exp=off?[
-   ["Вознаграждение Ozon",off.reward_ozon],
-   ["Услуги доставки",off.delivery_services],
-   ["Услуги партнёров",off.partner_services],
-   ["Услуги FBO",off.fbo_services],
-   ["Продвижение и реклама",off.promotion_ads],
-   ["Другие услуги и штрафы",off.other_services_penalties]
- ]:[
-   ["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Хранение",a.storage],["Прочее",a.other]
- ];
+ const exp=[["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Хранение",a.storage],["Прочее",a.other]];
  const max=Math.max(1,...exp.map(x=>Math.abs(N(x[1]))));
- document.querySelector("#expenses").innerHTML=exp.map(x=>`<div class="exp-row"><span>${x[0]}</span><div class="track"><div class="fill" style="width:${Math.abs(N(x[1]))/max*100}%"></div></div><b style="text-align:right">${pct(x[1],pctBase).toFixed(1)}%</b></div>`).join("");
+ document.querySelector("#expenses").innerHTML=exp.map(x=>`<div class="exp-row"><span>${x[0]}</span><div class="track"><div class="fill" style="width:${Math.abs(N(x[1]))/max*100}%"></div></div><b style="text-align:right">${pct(x[1],a.net_sales).toFixed(1)}%</b></div>`).join("");
 
- const market=off?[
-   ["Продажи",off.sales],["Возвраты",off.returns],["Вознаграждение Ozon",off.reward_ozon],["Услуги доставки",off.delivery_services],
-   ["Услуги партнёров",off.partner_services],["Услуги FBO",off.fbo_services],["Продвижение и реклама",off.promotion_ads],
-   ["Другие услуги и штрафы",off.other_services_penalties],["Компенсации",off.compensation_net],["К выплате",off.payout_total]
- ]:[
-   ["Продажи",a.net_sales],["Возвраты",a.returns],["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Компенсации",comp],["Результат Ozon",result]
- ];
+ const market=[["Продажи",a.net_sales],["Возвраты",a.returns],["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Компенсации",comp],["Результат Ozon",result]];
  document.querySelector("#market").innerHTML=market.map(x=>`<tr><td>${x[0]}</td><td>${RUB(x[1])}</td><td>${RUB(x[1])}</td></tr>`).join("");
 
  const cats=D.categories.filter(x=>String(x.month).slice(0,7)===m);
@@ -197,7 +165,7 @@ fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);re
  document.querySelector("#category").innerHTML='<option value="">Все</option>'+cats.map(c=>`<option>${c}</option>`).join("");
  document.querySelector("#month").onchange=render;document.querySelector("#compare").onchange=render;document.querySelector("#category").onchange=render;
  const liveMin=x.meta?.live_min_date,liveMax=x.meta?.live_max_date;
- document.querySelector("#notice").textContent=`Август: расходная часть сверена с официальной сводкой Ozon и показывается в тех же категориях. Июнь/июль пока используют старую классификацию. Текущий месяц собирается из Finance SQL (${liveMin||"—"} — ${liveMax||"—"}) и предварительный.`;
+ document.querySelector("#notice").textContent=`Важно: июнь–август — закрытые данные из старого SKU Monthly. Текущий месяц пока собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
  document.querySelector("#updated").textContent="Обновлено "+new Date(x.meta?.generated_at||Date.now()).toLocaleString("ru-RU");
  render();
 }).catch(e=>{document.querySelector("#notice").textContent="Ошибка загрузки: "+e.message});
