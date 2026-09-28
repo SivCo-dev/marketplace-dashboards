@@ -28,9 +28,9 @@
 .stockgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.mini{border:1px solid var(--line);border-radius:12px;padding:14px}.mini .l{color:var(--muted);font-size:11px}.mini .v{font-size:19px;font-weight:800;margin-top:4px}
 .section{margin-top:16px}.scroll{max-height:410px;overflow:auto}.empty{color:var(--muted);padding:20px;text-align:center}
 .sku-table tbody tr{cursor:pointer}.sku-table tbody tr:hover,.sku-table tbody tr.active-row{background:#f4f7ff}
-.detail-panel{position:sticky;top:18px}.sku-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}.sku-photo{width:86px;height:86px;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:11px;background:#fafbfc;flex:0 0 auto}.sku-title{font-size:21px;font-weight:850}.sku-name{color:var(--muted);margin-top:3px}.sku-meta{font-size:12px;color:var(--muted);margin-top:8px}
+.detail-panel{position:sticky;top:18px;max-height:calc(100vh - 36px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.sku-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}.sku-photo{width:86px;height:86px;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:11px;background:#fafbfc;flex:0 0 auto}.sku-title{font-size:21px;font-weight:850}.sku-name{color:var(--muted);margin-top:3px}.sku-meta{font-size:12px;color:var(--muted);margin-top:8px}
 .market-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0 14px;border-top:1px solid var(--line)}.market-toolbar .section-title{font-size:12px;font-weight:800}.market-tabs{display:flex;gap:6px;flex-wrap:wrap}.market-tab{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 11px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}.market-tab.active{background:var(--market-accent);color:#fff;border-color:var(--market-accent)}.market-tab.ozon.active{background:#005bff;border-color:#005bff}.market-tab.yandex.active{background:#ffcc00;color:#111827;border-color:#ffcc00}.market-tab.wb.active{background:#c627b6;border-color:#c627b6}
-.sku-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px}.sku-kpi{border:1px solid var(--line);border-radius:11px;padding:12px}.sku-kpi .l{font-size:10px;color:var(--muted);font-weight:750;text-transform:uppercase}.sku-kpi .v{font-size:18px;font-weight:850;margin-top:5px}.sku-kpi .s{font-size:11px;color:var(--muted);margin-top:4px}
+.sku-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}.sku-kpi{border:1px solid var(--line);border-radius:11px;padding:12px}.sku-kpi .l{font-size:10px;color:var(--muted);font-weight:750;text-transform:uppercase}.sku-kpi .v{font-size:18px;font-weight:850;margin-top:5px}.sku-kpi .s{font-size:11px;color:var(--muted);margin-top:4px}
 .econ-table{width:100%;border-collapse:collapse}.econ-table th,.econ-table td{padding:9px 7px;border-bottom:1px solid #eef1f5;text-align:right}.econ-table th:first-child,.econ-table td:first-child{text-align:left}.econ-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.total-row td{font-weight:850;background:#f5faf7}.source-note{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.45}
 @media(max-width:760px){.sku-kpis{grid-template-columns:repeat(2,1fr)}.market-toolbar{align-items:flex-start;flex-direction:column}.expense-list{grid-template-columns:1fr}.exp-item{grid-template-columns:10px minmax(90px,1fr) 48px 82px}}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.grid,.mid,.bottom{grid-template-columns:1fr}} 
@@ -88,7 +88,7 @@
   <div class="bottom">
     <div class="card">
       <h2>SKU — экономика месяца</h2><div class="sub">Нажми на SKU — карточка откроется справа, как в ежедневном дашборде.</div>
-      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Шт</th><th>Комиссия</th><th>Логистика</th><th>Компенсации</th><th>Результат</th></tr></thead><tbody id="sku"></tbody></table></div>
+      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Шт</th><th>Комиссия</th><th>Логистика</th><th>Компенсации</th><th>Результат</th><th>Получаем/шт</th></tr></thead><tbody id="sku"></tbody></table></div>
     </div>
     <div>
       <div id="skuDetail" class="card detail-panel"><div class="sub" style="margin:0">Выбери SKU слева.</div></div>
@@ -167,10 +167,15 @@ function rowTypedEconomics(r){
    const commission=N(r.commission),logistics=N(r.logistics)+N(r.allocated_logistics),
          partner=N(r.storage),promotion=N(r.promotion)+N(r.allocated_promotion),
          other=N(r.other)+N(r.allocated_other),compensation=N(r.net_compensation_amount);
+   const directSubtotal=N(r.net_sales)+commission+N(r.logistics)+N(r.storage)+N(r.promotion)+N(r.other)+compensation;
+   const unitBase=N(r.economic_units)||N(r.sold_units);
+   const result=N(r.final_with_compensation);
    return {
      typed:false,commission,logistics,acquiring:0,fbo:0,partner,promotion,other,compensation,
      expenseTotal:commission+logistics+partner+promotion+other,
-     result:N(r.final_with_compensation)
+     directSubtotal,result,
+     directPerUnit:unitBase?directSubtotal/unitBase:0,
+     perUnit:unitBase?result/unitBase:0
    };
  }
  const z={};
@@ -184,9 +189,14 @@ function rowTypedEconomics(r){
        other=N(z.other_direct)+N(z.other_allocated),
        compensation=N(z.compensation);
  const expenseTotal=commission+logistics+acquiring+fbo+partner+promotion+other;
+ const directSubtotal=N(r.net_sales)+N(z.commission_direct)+N(z.delivery_direct)+N(z.partner_direct)+N(z.promotion_direct)+N(z.other_direct)+compensation;
+ const result=N(r.net_sales)+expenseTotal+compensation;
+ const unitBase=N(r.economic_units)||N(r.sold_units);
  return {
    typed:true,commission,logistics,acquiring,fbo,partner,promotion,other,compensation,expenseTotal,
-   result:N(r.net_sales)+expenseTotal+compensation
+   directSubtotal,result,
+   directPerUnit:unitBase?directSubtotal/unitBase:0,
+   perUnit:unitBase?result/unitBase:0
  };
 }
 function aggregateUnified(rows){
@@ -298,7 +308,7 @@ function render(){
  const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
  document.querySelector("#sku").innerHTML=sku.map(x=>{
    const e=rowTypedEconomics(x);
-   return `<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(e.commission)}</td><td>${RUB(e.logistics)}</td><td>${RUB(e.compensation)}</td><td><b>${RUB(e.result)}</b></td></tr>`;
+   return `<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(e.commission)}</td><td>${RUB(e.logistics)}</td><td>${RUB(e.compensation)}</td><td><b>${RUB(e.result)}</b></td><td><b>${RUB(e.perUnit)}</b></td></tr>`;
  }).join("");
 
  renderTrend();
@@ -374,6 +384,7 @@ function renderSkuDetail(){
  const unexplainedShared=hasTyped?0:(Math.abs((received-(directSubtotal+knownAllocated)))>1 ? received-(directSubtotal+knownAllocated) : 0);
 
  const unitBase=N(x.economic_units)||N(x.sold_units);
+ const directPerUnit=unitBase?directSubtotal/unitBase:0;
  const perUnit=unitBase?received/unitBase:0;
 
  const month=String(base.month).slice(0,7);
@@ -414,6 +425,7 @@ function renderSkuDetail(){
      <div class="sku-kpi"><div class="l">Продано</div><div class="v">${NUM(x.sold_units)} шт</div></div>
      <div class="sku-kpi"><div class="l">Продажи</div><div class="v">${RUB(x.sales)}</div></div>
      <div class="sku-kpi"><div class="l">Чистые продажи</div><div class="v">${RUB(x.net_sales)}</div></div>
+     <div class="sku-kpi"><div class="l">После прямых / шт</div><div class="v">${RUB(directPerUnit)}</div><div class="s">до распределённых расходов</div></div>
      <div class="sku-kpi"><div class="l">После маркета / шт</div><div class="v">${RUB(perUnit)}</div><div class="s">после всех расходов маркетплейса</div></div>
    </div>
    <table class="econ-table">
@@ -431,6 +443,7 @@ function renderSkuDetail(){
        <tr><td>Прочее <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directOther)}</b></td></tr>
        <tr><td>Компенсации <span class="sub">(по SKU)</span></td><td><b>${moneyPct(compensation)}</b></td></tr>
        <tr class="total-row"><td>Подытог после прямых расходов</td><td>${moneyPct(directSubtotal,true)}</td></tr>
+       <tr class="total-row"><td>После прямых расходов / шт</td><td>${RUB(directPerUnit)}</td></tr>
 
        <tr><td colspan="2" style="padding-top:16px"><b>Распределённые расходы маркетплейса</b></td></tr>
        <tr><td>Эквайринг <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedAcquiring)}</b></td></tr>
