@@ -20,6 +20,14 @@
 .bottom{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}.notice{margin-bottom:16px;background:#fff8e8;border:1px solid #ffe3a8;color:#8a5a00;border-radius:12px;padding:11px 14px;font-size:12px}
 .stockgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.mini{border:1px solid var(--line);border-radius:12px;padding:14px}.mini .l{color:var(--muted);font-size:11px}.mini .v{font-size:19px;font-weight:800;margin-top:4px}
 .section{margin-top:16px}.scroll{max-height:410px;overflow:auto}.empty{color:var(--muted);padding:20px;text-align:center}
+.sku-table tbody tr{cursor:pointer}.sku-table tbody tr:hover{background:#f8faff}
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.44);display:none;align-items:center;justify-content:center;padding:24px;z-index:50}
+.modal-backdrop.open{display:flex}.modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 28px 90px rgba(15,23,42,.28);border:1px solid var(--line)}
+.modal-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:20px 22px;border-bottom:1px solid var(--line)}.modal-head h3{margin:0;font-size:22px}.modal-head .sub{margin:4px 0 0}
+.close{border:0;background:#f2f4f7;width:36px;height:36px;border-radius:10px;font-size:22px;cursor:pointer}
+.modal-body{padding:20px 22px}.sku-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.sku-kpi{border:1px solid var(--line);border-radius:12px;padding:13px}.sku-kpi .l{font-size:11px;color:var(--muted);font-weight:700}.sku-kpi .v{font-size:19px;font-weight:850;margin-top:5px}
+.econ-table{width:100%;border-collapse:collapse}.econ-table th,.econ-table td{padding:10px 8px;border-bottom:1px solid #eef1f5;text-align:right}.econ-table th:first-child,.econ-table td:first-child{text-align:left}.econ-table th{font-size:11px;color:var(--muted);text-transform:uppercase}.total-row td{font-weight:850;background:#f6fbf8}.muted-row td{color:var(--muted)}
+@media(max-width:760px){.sku-kpis{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.grid,.mid,.bottom{grid-template-columns:1fr}} 
 </style>
 </head>
@@ -87,6 +95,15 @@
     </div>
   </div>
 </div>
+<div class="modal-backdrop" id="skuModal" onclick="if(event.target===this)closeSkuCard()">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3 id="skuTitle">SKU</h3><div class="sub" id="skuSubtitle"></div></div>
+      <button class="close" onclick="closeSkuCard()" aria-label="Закрыть">×</button>
+    </div>
+    <div class="modal-body" id="skuCardBody"></div>
+  </div>
+</div>
 <script>
 const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
 let D={months:[],categories:[],sku:[],manual_expenses:[]};
@@ -136,11 +153,63 @@ function render(){
  document.querySelector("#cats").innerHTML=cats.length?cats.map(x=>`<tr><td>${x.master_category}</td><td>${RUB(x.sales)}</td><td>${RUB(x.expenses)}</td><td>${RUB(x.ozon_result)}</td><td>${(totalCats?N(x.sales)/totalCats*100:0).toFixed(1)}%</td></tr>`).join(""):'<tr><td colspan="5" class="empty">Нет данных</td></tr>';
 
  const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
- document.querySelector("#sku").innerHTML=sku.map(x=>`<tr><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(x.commission)}</td><td>${RUB(N(x.logistics)+N(x.allocated_logistics))}</td><td>${RUB(N(x.net_compensation_amount)+N(x.preliminary_compensation))}</td><td><b>${RUB(x.final_with_compensation)}</b></td></tr>`).join("");
+ document.querySelector("#sku").innerHTML=sku.map(x=>`<tr onclick="openSkuCard('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(x.commission)}</td><td>${RUB(N(x.logistics)+N(x.allocated_logistics))}</td><td>${RUB(N(x.net_compensation_amount)+N(x.preliminary_compensation))}</td><td><b>${RUB(x.final_with_compensation)}</b></td></tr>`).join("");
 
  renderTrend();
  renderManual(m);
 }
+
+function openSkuCard(monthSku){
+ const x=D.sku.find(r=>String(r.month_sku)===String(monthSku)); if(!x)return;
+ const direct={
+   commission:N(x.commission),
+   delivery:N(x.logistics),
+   storage:N(x.storage),
+   promotion:N(x.promotion),
+   other:N(x.other)
+ };
+ const allocated={
+   commission:N(x.allocated_commission),
+   delivery:N(x.allocated_logistics),
+   storage:N(x.allocated_storage),
+   promotion:N(x.allocated_promotion),
+   other:N(x.allocated_other)
+ };
+ const compensation=N(x.net_compensation_amount)+N(x.preliminary_compensation);
+ const received=N(x.final_with_compensation);
+ const perUnit=N(x.economic_units)?received/N(x.economic_units):(N(x.sold_units)?received/N(x.sold_units):0);
+ document.querySelector("#skuTitle").textContent=x.article||x.sku;
+ document.querySelector("#skuSubtitle").textContent=[x.product_name||"", "SKU "+x.sku, monthName(String(x.month).slice(0,10))].filter(Boolean).join(" • ");
+ const expenseRows=[
+   ["Комиссия",direct.commission,allocated.commission],
+   ["Доставка",direct.delivery,allocated.delivery],
+   ["Хранение / партнёрские услуги",direct.storage,allocated.storage],
+   ["Продвижение",direct.promotion,allocated.promotion],
+   ["Прочее",direct.other,allocated.other]
+ ];
+ const rowsHtml=expenseRows.map(r=>`<tr><td>${r[0]}</td><td>${RUB(r[1])}</td><td>${RUB(r[2])}</td><td><b>${RUB(N(r[1])+N(r[2]))}</b></td></tr>`).join("");
+ document.querySelector("#skuCardBody").innerHTML=
+   `<div class="sku-kpis">
+      <div class="sku-kpi"><div class="l">Продажи</div><div class="v">${RUB(x.sales)}</div></div>
+      <div class="sku-kpi"><div class="l">Возвраты</div><div class="v">${RUB(x.returns)}</div></div>
+      <div class="sku-kpi"><div class="l">Чистые продажи</div><div class="v">${RUB(x.net_sales)}</div></div>
+      <div class="sku-kpi"><div class="l">Продано</div><div class="v">${NUM(x.sold_units)} шт</div></div>
+    </div>
+    <table class="econ-table">
+      <thead><tr><th>Расход</th><th>Прямой на SKU</th><th>Распределённый</th><th>Итого</th></tr></thead>
+      <tbody>
+        ${rowsHtml}
+        <tr class="muted-row"><td>Компенсации</td><td colspan="2"></td><td><b>${RUB(compensation)}</b></td></tr>
+        <tr class="total-row"><td>Реально получено после расходов Ozon</td><td colspan="2"></td><td>${RUB(received)}</td></tr>
+        <tr class="total-row"><td>Получено на экономическую единицу</td><td colspan="2"></td><td>${RUB(perUnit)}</td></tr>
+      </tbody>
+    </table>
+    <div class="sub" style="margin-top:12px">Прямой расход — Ozon уже привязал его к SKU. Распределённый — общий расход месяца, распределённый по утверждённой базе. Карточка будет расширяться по мере выделения FBO, эквайринга и остальных партнёрских расходов в отдельные SQL-поля.</div>`;
+ document.querySelector("#skuModal").classList.add("open");
+}
+function closeSkuCard(){document.querySelector("#skuModal").classList.remove("open")}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSkuCard()});
+
 function renderTrend(){
  const months=D.months.map(x=>String(x.month).slice(0,7));
  const vals=months.map(m=>getMonth(m)),max=Math.max(1,...vals.map(x=>N(x.net_sales)));
