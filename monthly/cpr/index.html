@@ -145,7 +145,7 @@
 </div>
 <script>
 const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
-let D={months:[],categories:[],sku:[],expense_detail:[],manual_expenses:[]};
+let D={months:[],categories:[],sku:[],expense_detail:[],manual_expenses:[],unit_costs:[]};
 let selectedSku=null,skuDetailMarket="ALL";
 const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽", NUM=v=>Math.round(N(v)).toLocaleString("ru-RU");
 const pct=(v,b)=>b?Math.abs(N(v))/Math.abs(N(b))*100:0;
@@ -185,10 +185,20 @@ function businessExpenseSlice(month){
  const rows=(D.manual_expenses||[]).filter(r=>String(r.month).slice(0,7)===month);
  const selected=filtSku(month);
  const selectedKeys=new Set(selected.map(r=>String(r.month_sku)));
+ const costMap=new Map((D.unit_costs||[]).map(x=>[String(x.article||""),N(x.unit_cost)]));
  const out={cogs:0,opex:0,external_logistics:0,materials:0,tax:0,business_other:0,loaded:false};
+
+ // Себестоимость — напрямую по модели × экономические единицы.
+ out.cogs=selected.reduce((s,x)=>{
+   const unitCost=costMap.get(String(x.article||""))||0;
+   const units=N(x.economic_units)||N(x.sold_units);
+   return s+unitCost*units;
+ },0);
+ if(out.cogs>0)out.loaded=true;
+
  for(const r of rows){
    const type=String(r.expense_type||"").toLowerCase();
-   if(!(type in out))continue;
+   if(!(type in out) || type==="cogs")continue;
    let base=D.sku.filter(x=>String(x.month).slice(0,7)===month);
    if(r.marketplace)base=base.filter(x=>String(x.marketplace||"").toUpperCase()===String(r.marketplace).toUpperCase());
    if(r.account_id)base=base.filter(x=>String(x.account_id||"")===String(r.account_id));
