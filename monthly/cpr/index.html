@@ -143,13 +143,32 @@ const delta=(a,b)=>N(b)!==0?(N(a)/N(b)-1)*100:null;
 const dhtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>=0?'pos':'neg'}">${d>=0?'+':''}${d.toFixed(1)}%</span>`;
 
 function selectedAgg(month){return agg(filtSku(month))}
+function typedExpenseAgg(month, rows){
+ const keys=new Set(rows.map(r=>String(r.month_sku)));
+ const detail=(D.expense_detail||[]).filter(r=>String(r.month).slice(0,7)===month && keys.has(String(r.month_sku)));
+ if(!detail.length)return null;
+ const z={};
+ for(const r of detail)z[r.expense_code]=(z[r.expense_code]||0)+N(r.amount);
+ return {
+   commission:N(z.commission_direct),
+   logistics:N(z.delivery_direct)+N(z.delivery_allocated),
+   acquiring:N(z.acquiring_allocated),
+   fbo:N(z.fbo_allocated),
+   partner:N(z.partner_direct)+N(z.partner_allocated),
+   promotion:N(z.promotion_direct)+N(z.promotion_allocated),
+   other:N(z.other_direct)+N(z.other_allocated),
+   compensation:N(z.compensation),
+   total:Object.values(z).reduce((s,v)=>s+N(v),0)
+ };
+}
 function render(){
  const m=document.querySelector("#month").value,c=document.querySelector("#compare").value;
  const marketSel=document.querySelector("#marketFilter").value||"ALL";
  applyMarketTheme(marketSel);
  const a=selectedAgg(m),b=selectedAgg(c);
- const comp=N(a.net_compensation_amount);
- const expenses=Math.abs(N(a.commission))+Math.abs(N(a.logistics))+Math.abs(N(a.storage))+Math.abs(N(a.promotion))+Math.abs(N(a.other));
+ const selectedRows=filtSku(m), compareRows=filtSku(c);
+ const typed=typedExpenseAgg(m,selectedRows), typedCmp=typedExpenseAgg(c,compareRows);
+ const comp=typed?N(typed.compensation):N(a.net_compensation_amount);
  const result=N(a.final_with_compensation);
  const rate=N(a.sales)?result/N(a.sales)*100:0;
  const k=[
@@ -162,15 +181,23 @@ function render(){
  ];
  document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="delta">${dhtml(x[2])}</div></div>`).join("");
 
- const rows=[
+ const rows=typed?[
+  ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],
+  ["Комиссия",typed.commission,"expense"],["Логистика",typed.logistics,"expense"],["Эквайринг",typed.acquiring,"expense"],
+  ["FBO",typed.fbo,"expense"],["Партнёрские услуги",typed.partner,"expense"],["Продвижение",typed.promotion,"expense"],
+  ["Прочее",typed.other,"expense"],["Компенсации",typed.compensation,"income"]
+ ]:[
   ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],["Комиссия",a.commission,"expense"],["Логистика",a.logistics,"expense"],
   ["Хранение",a.storage,"expense"],["Продвижение",a.promotion,"expense"],["Прочее",a.other,"expense"],["Компенсации",comp,"income"]
  ];
  document.querySelector("#funnel").innerHTML=rows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],a.sales).toFixed(1)}%</div></div>`).join("")+
   `<div class="row final"><div>Результат после Ozon</div><div class="amt income">${RUB(result)}</div><div class="pct">${rate.toFixed(1)}%</div></div>`;
 
- const exp=[["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Хранение",a.storage],["Прочее",a.other]];
- const expColors=["#e86b75","#6f8fee","#f1bf4b","#8b72d6","#58bfa0"];
+ const exp=typed?[
+   ["Комиссия",typed.commission],["Логистика",typed.logistics],["Эквайринг",typed.acquiring],["FBO",typed.fbo],
+   ["Партнёрские",typed.partner],["Продвижение",typed.promotion],["Прочее",typed.other]
+ ]:[["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Хранение",a.storage],["Прочее",a.other]];
+ const expColors=["#e86b75","#6f8fee","#f1bf4b","#8b72d6","#58bfa0","#ef9f64","#a16fd1"];
  const expAbs=exp.map(x=>Math.abs(N(x[1])));
  const expTotal=expAbs.reduce((s,v)=>s+v,0);
  let cursor=0;
@@ -204,9 +231,23 @@ function render(){
  }).join("");
 
  const selected=a;
- const total=agg(filtSkuAllMarkets(m));
- const selectedComp=N(selected.net_compensation_amount),totalComp=N(total.net_compensation_amount);
- const marketRows=[
+ const totalRows=filtSkuAllMarkets(m), total=agg(totalRows);
+ const selectedTyped=typedExpenseAgg(m,selectedRows), totalTyped=typedExpenseAgg(m,totalRows);
+ const selectedComp=selectedTyped?N(selectedTyped.compensation):N(selected.net_compensation_amount);
+ const totalComp=totalTyped?N(totalTyped.compensation):N(total.net_compensation_amount);
+ const marketRows=selectedTyped&&totalTyped?[
+   ["Продажи",selected.net_sales,total.net_sales],
+   ["Возвраты",selected.returns,total.returns],
+   ["Комиссия",selectedTyped.commission,totalTyped.commission],
+   ["Логистика",selectedTyped.logistics,totalTyped.logistics],
+   ["Эквайринг",selectedTyped.acquiring,totalTyped.acquiring],
+   ["FBO",selectedTyped.fbo,totalTyped.fbo],
+   ["Партнёрские услуги",selectedTyped.partner,totalTyped.partner],
+   ["Продвижение",selectedTyped.promotion,totalTyped.promotion],
+   ["Прочее",selectedTyped.other,totalTyped.other],
+   ["Компенсации",selectedComp,totalComp],
+   ["Результат",selected.final_with_compensation,total.final_with_compensation]
+ ]:[
    ["Продажи",selected.net_sales,total.net_sales],
    ["Возвраты",selected.returns,total.returns],
    ["Комиссия",selected.commission,total.commission],
