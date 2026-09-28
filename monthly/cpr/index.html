@@ -98,7 +98,7 @@
 </div>
 <script>
 const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
-let D={months:[],categories:[],sku:[],manual_expenses:[]};
+let D={months:[],categories:[],sku:[],expense_detail:[],manual_expenses:[]};
 let selectedSku=null,skuDetailMarket="ALL";
 const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽", NUM=v=>Math.round(N(v)).toLocaleString("ru-RU");
 const pct=(v,b)=>b?Math.abs(N(v))/Math.abs(N(b))*100:0;
@@ -113,7 +113,7 @@ function selectedAgg(month){return agg(filtSku(month))}
 function render(){
  const m=document.querySelector("#month").value,c=document.querySelector("#compare").value;
  const a=selectedAgg(m),b=selectedAgg(c);
- const comp=N(a.net_compensation_amount)+N(a.preliminary_compensation);
+ const comp=N(a.net_compensation_amount);
  const expenses=Math.abs(N(a.commission))+Math.abs(N(a.logistics))+Math.abs(N(a.storage))+Math.abs(N(a.promotion))+Math.abs(N(a.other));
  const result=N(a.final_with_compensation);
  const rate=N(a.net_sales)?result/N(a.net_sales)*100:0;
@@ -123,7 +123,7 @@ function render(){
   ["Результат Ozon",RUB(result),delta(result,b.final_with_compensation)],
   ["Ozon-маржа",rate.toFixed(1)+"%",null],
   ["Возвраты",RUB(Math.abs(N(a.returns))),delta(Math.abs(N(a.returns)),Math.abs(N(b.returns)))],
-  ["Компенсации",RUB(comp),delta(comp,N(b.net_compensation_amount)+N(b.preliminary_compensation))]
+  ["Компенсации",RUB(comp),delta(comp,N(b.net_compensation_amount))]
  ];
  document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="delta">${dhtml(x[2])}</div></div>`).join("");
 
@@ -197,23 +197,28 @@ function renderSkuDetail(){
  }).join("");
  const noData=skuDetailMarket!=="ALL"&&!stats.has(skuDetailMarket);
 
- const directCommission=N(x.commission);
- const directDelivery=N(x.logistics);
- const directStorage=N(x.storage);
- const directPromotion=N(x.promotion);
- const directOther=N(x.other);
- const compensation=N(x.compensation);
+ const typedRows=(D.expense_detail||[]).filter(r=>String(r.month_sku)===String(base.month_sku) && (skuDetailMarket==="ALL"||String(r.marketplace||"OZON").toUpperCase()===skuDetailMarket));
+ const typed=Object.fromEntries(typedRows.map(r=>[r.expense_code,N(r.amount)]));
+ const hasTyped=typedRows.length>0;
 
- const allocatedCommission=N(x.allocated_commission);
- const allocatedDelivery=N(x.allocated_logistics);
- const allocatedPartner=N(x.allocated_storage);
- const allocatedPromotion=N(x.allocated_promotion);
- const allocatedOther=N(x.allocated_other);
+ const directCommission=hasTyped?N(typed.commission_direct):N(x.commission);
+ const directDelivery=hasTyped?N(typed.delivery_direct):N(x.logistics);
+ const directPartner=hasTyped?N(typed.partner_direct):N(x.storage);
+ const directPromotion=hasTyped?N(typed.promotion_direct):N(x.promotion);
+ const directOther=hasTyped?N(typed.other_direct):N(x.other);
+ const compensation=hasTyped?N(typed.compensation):N(x.compensation);
 
- const directSubtotal=N(x.net_sales)+directCommission+directDelivery+directStorage+directPromotion+directOther+compensation;
- const knownAllocated=allocatedCommission+allocatedDelivery+allocatedPartner+allocatedPromotion+allocatedOther;
- const received=N(x.result);
- const unexplainedShared=Math.abs((received-(directSubtotal+knownAllocated)))>1 ? received-(directSubtotal+knownAllocated) : 0;
+ const allocatedAcquiring=hasTyped?N(typed.acquiring_allocated):N(x.allocated_commission);
+ const allocatedDelivery=hasTyped?N(typed.delivery_allocated):N(x.allocated_logistics);
+ const allocatedFbo=hasTyped?N(typed.fbo_allocated):0;
+ const allocatedPartner=hasTyped?N(typed.partner_allocated):N(x.allocated_storage);
+ const allocatedPromotion=hasTyped?N(typed.promotion_allocated):N(x.allocated_promotion);
+ const allocatedOther=hasTyped?N(typed.other_allocated):N(x.allocated_other);
+
+ const directSubtotal=N(x.net_sales)+directCommission+directDelivery+directPartner+directPromotion+directOther+compensation;
+ const knownAllocated=allocatedAcquiring+allocatedDelivery+allocatedFbo+allocatedPartner+allocatedPromotion+allocatedOther;
+ const received=hasTyped?directSubtotal+knownAllocated:N(x.result);
+ const unexplainedShared=hasTyped?0:(Math.abs((received-(directSubtotal+knownAllocated)))>1 ? received-(directSubtotal+knownAllocated) : 0);
 
  const unitBase=N(x.economic_units)||N(x.sold_units);
  const perUnit=unitBase?received/unitBase:0;
@@ -265,17 +270,17 @@ function renderSkuDetail(){
        <tr><td colspan="4" style="padding-top:16px"><b>Прямые расходы SKU</b></td></tr>
        <tr><td>Комиссия</td><td>по SKU</td><td></td><td><b>${RUB(directCommission)}</b></td></tr>
        <tr><td>Доставка</td><td>по SKU</td><td></td><td><b>${RUB(directDelivery)}</b></td></tr>
-       <tr><td>Хранение / партнёрские услуги</td><td>по SKU</td><td></td><td><b>${RUB(directStorage)}</b></td></tr>
+       <tr><td>Партнёрские услуги</td><td>по SKU</td><td></td><td><b>${RUB(directPartner)}</b></td></tr>
        <tr><td>Продвижение</td><td>по SKU</td><td></td><td><b>${RUB(directPromotion)}</b></td></tr>
        <tr><td>Прочее</td><td>по SKU</td><td></td><td><b>${RUB(directOther)}</b></td></tr>
        <tr><td>Компенсации</td><td>по SKU</td><td></td><td><b>${RUB(compensation)}</b></td></tr>
        <tr class="total-row"><td>Подытог после прямых расходов</td><td colspan="2"></td><td>${RUB(directSubtotal)}</td></tr>
 
        <tr><td colspan="4" style="padding-top:16px"><b>Распределённые расходы маркетплейса</b></td></tr>
-       <tr><td>Эквайринг</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedCommission)}</b></td></tr>
+       <tr><td>Эквайринг</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedAcquiring)}</b></td></tr>
        <tr><td>Доставка</td><td>по типу расхода</td><td></td><td><b>${RUB(allocatedDelivery)}</b></td></tr>
-       <tr><td>FBO</td><td>по чистым продажам</td><td></td><td><b>—</b></td></tr>
-       <tr><td>Хранение / партнёрские услуги</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedPartner)}</b></td></tr>
+       <tr><td>FBO</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedFbo)}</b></td></tr>
+       <tr><td>Партнёрские услуги</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedPartner)}</b></td></tr>
        <tr><td>Продвижение</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedPromotion)}</b></td></tr>
        <tr><td>Прочее</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedOther)}</b></td></tr>
        ${unexplainedShared?`<tr><td>Пока не разнесено по модели</td><td>контрольный остаток</td><td></td><td><b>${RUB(unexplainedShared)}</b></td></tr>`:""}
@@ -288,7 +293,7 @@ function renderSkuDetail(){
        <tr class="total-row"><td>Итого после всех расходов бизнеса / шт</td><td colspan="2"></td><td>${businessLoaded?RUB(finalPerUnit):"—"}</td></tr>
      </tbody>
    </table>
-   <div class="source-note">Структура зафиксирована: сначала прямые расходы SKU и подытог, затем shared-расходы по утверждённой базе распределения. Эквайринг и FBO уже вынесены отдельными строками модели; исторические данные ещё нужно типизировать, поэтому до полного разнесения может показываться контрольный остаток.</div>`}
+   <div class="source-note">Для августа 2026 типизация построена по фактическим type_id Ozon Finance API. Доставка 32/59/98 идёт напрямую по SKU; FBO 12/77/71, эквайринг 1, страхование 76, продвижение 41/52 и прочее 15 распределяются по утверждённой модели. Контрольный остаток для типизированного месяца равен нулю.</div>`}
  `;
 }
 
