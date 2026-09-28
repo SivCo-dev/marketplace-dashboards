@@ -15,7 +15,17 @@
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
 .grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
 .funnel .row{display:grid;grid-template-columns:1.5fr .8fr .55fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f7}.funnel .row:last-child{border-bottom:0}.funnel .amt,.funnel .pct{text-align:right;font-variant-numeric:tabular-nums}.funnel .final{background:#eefaf5;margin:8px -10px -6px;padding:12px 10px;border-radius:10px;font-weight:850}.expense{color:var(--red)}.income{color:var(--green)}
-.chartbox{height:245px;position:relative}.bars{height:100%;display:flex;align-items:flex-end;gap:18px;padding:12px 12px 28px;border-bottom:1px solid var(--line)}.barcol{flex:1;display:flex;gap:5px;align-items:flex-end;height:100%;position:relative}.bar{border-radius:6px 6px 0 0;min-width:18px}.sales{background:var(--market-accent);width:62%}.profit{background:#73c9a5;width:34%}.mlabel{position:absolute;bottom:-24px;width:100%;text-align:center;font-size:11px;color:var(--muted)}
+.trend-wrap{overflow-x:auto}
+.trend-table{width:100%;border-collapse:collapse;min-width:860px}
+.trend-table th,.trend-table td{padding:10px 8px;border-bottom:1px solid #eef1f5;text-align:right;font-variant-numeric:tabular-nums}
+.trend-table th:first-child,.trend-table td:first-child{text-align:left}
+.trend-table th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.025em;vertical-align:bottom}
+.trend-table tbody tr.live{background:var(--market-accent-soft)}
+.trend-month{font-weight:800;white-space:nowrap}.live-badge{display:inline-block;margin-left:7px;padding:3px 7px;border-radius:999px;background:var(--market-accent);color:#fff;font-size:9px;font-weight:850}
+.mini-metric{display:grid;grid-template-columns:minmax(54px,1fr) 58px;gap:7px;align-items:center}
+.mini-track{height:8px;background:#edf0f5;border-radius:7px;overflow:hidden}.mini-track span{display:block;height:100%;border-radius:7px}
+.mini-track.sales span{background:var(--market-accent)}.mini-track.returns span{background:#aeb7c7}.mini-track.direct span{background:#e88992}.mini-track.allocated span{background:#f0b45d}.mini-track.result span{background:#71bf98}
+.mini-num{text-align:right;font-weight:750;white-space:nowrap}.trend-money{font-weight:800;white-space:nowrap}
 .mid{display:grid;grid-template-columns:.8fr 1.2fr;gap:16px;margin-bottom:16px}
 .expense-list{display:grid;grid-template-columns:190px 1fr;gap:18px;align-items:center;min-height:250px}
 .exp-donut-wrap{display:flex;justify-content:center;align-items:center}
@@ -77,8 +87,19 @@
       <div class="expense-list" id="expenses"></div>
     </div>
     <div class="card">
-      <h2>Продажи и результат по месяцам</h2><div class="sub">Три последних полных месяца + текущий</div>
-      <div class="chartbox"><div class="bars" id="trend"></div></div>
+      <h2>Динамика 4 месяца</h2><div class="sub">Три последних полных месяца + текущий. Проценты — от валовых продаж.</div>
+      <div class="trend-wrap"><table class="trend-table">
+        <thead><tr>
+          <th>Месяц</th>
+          <th>Продажи</th>
+          <th>Возвраты<br>% от продаж</th>
+          <th>Прямые расходы<br>% от продаж</th>
+          <th>Распределённые<br>% от продаж</th>
+          <th>Получено с маркета</th>
+          <th>Результат после МП<br>% от продаж</th>
+        </tr></thead>
+        <tbody id="trend"></tbody>
+      </table></div>
     </div>
   </div>
 
@@ -171,12 +192,14 @@ function rowTypedEconomics(r){
    const commission=N(r.commission),logistics=N(r.logistics)+N(r.allocated_logistics),
          partner=N(r.storage),promotion=N(r.promotion)+N(r.allocated_promotion),
          other=N(r.other)+N(r.allocated_other),compensation=N(r.net_compensation_amount);
-   const directSubtotal=N(r.net_sales)+commission+N(r.logistics)+N(r.storage)+N(r.promotion)+N(r.other)+compensation;
+   const directExpense=commission+N(r.logistics)+N(r.storage)+N(r.promotion)+N(r.other);
+   const allocatedExpense=N(r.allocated_logistics)+N(r.allocated_storage)+N(r.allocated_promotion)+N(r.allocated_other)+N(r.allocated_commission);
+   const directSubtotal=N(r.net_sales)+directExpense+compensation;
    const unitBase=N(r.economic_units)||N(r.sold_units);
    const result=N(r.final_with_compensation);
    return {
      typed:false,commission,logistics,acquiring:0,fbo:0,partner,promotion,other,compensation,
-     expenseTotal:commission+logistics+partner+promotion+other,
+     expenseTotal:directExpense+allocatedExpense,directExpense,allocatedExpense,
      directSubtotal,result,
      directPerUnit:unitBase?directSubtotal/unitBase:0,
      perUnit:unitBase?result/unitBase:0
@@ -192,23 +215,25 @@ function rowTypedEconomics(r){
        promotion=N(z.promotion_direct)+N(z.promotion_allocated),
        other=N(z.other_direct)+N(z.other_allocated),
        compensation=N(z.compensation);
- const expenseTotal=commission+logistics+acquiring+fbo+partner+promotion+other;
- const directSubtotal=N(r.net_sales)+N(z.commission_direct)+N(z.delivery_direct)+N(z.partner_direct)+N(z.promotion_direct)+N(z.other_direct)+compensation;
+ const directExpense=N(z.commission_direct)+N(z.delivery_direct)+N(z.partner_direct)+N(z.promotion_direct)+N(z.other_direct);
+ const allocatedExpense=N(z.acquiring_allocated)+N(z.delivery_allocated)+N(z.fbo_allocated)+N(z.partner_allocated)+N(z.promotion_allocated)+N(z.other_allocated);
+ const expenseTotal=directExpense+allocatedExpense;
+ const directSubtotal=N(r.net_sales)+directExpense+compensation;
  const result=N(r.net_sales)+expenseTotal+compensation;
  const unitBase=N(r.economic_units)||N(r.sold_units);
  return {
-   typed:true,commission,logistics,acquiring,fbo,partner,promotion,other,compensation,expenseTotal,
+   typed:true,commission,logistics,acquiring,fbo,partner,promotion,other,compensation,expenseTotal,directExpense,allocatedExpense,
    directSubtotal,result,
    directPerUnit:unitBase?directSubtotal/unitBase:0,
    perUnit:unitBase?result/unitBase:0
  };
 }
 function aggregateUnified(rows){
- const z={sales:0,returns:0,net_sales:0,sold_units:0,commission:0,logistics:0,acquiring:0,fbo:0,partner:0,promotion:0,other:0,compensation:0,result:0};
+ const z={sales:0,returns:0,net_sales:0,sold_units:0,commission:0,logistics:0,acquiring:0,fbo:0,partner:0,promotion:0,other:0,compensation:0,result:0,directExpense:0,allocatedExpense:0};
  for(const r of rows){
    const e=rowTypedEconomics(r);
    z.sales+=N(r.sales); z.returns+=N(r.returns); z.net_sales+=N(r.net_sales); z.sold_units+=N(r.sold_units);
-   for(const k of ["commission","logistics","acquiring","fbo","partner","promotion","other","compensation","result"])z[k]+=N(e[k]);
+   for(const k of ["commission","logistics","acquiring","fbo","partner","promotion","other","compensation","result","directExpense","allocatedExpense"])z[k]+=N(e[k]);
  }
  return z;
 }
@@ -483,8 +508,30 @@ function renderSkuDetail(){
 function renderTrend(){
  const months=[...new Set(D.sku.map(x=>String(x.month).slice(0,7)))].sort().slice(-4);
  const vals=months.map(m=>({month:m,...selectedAgg(m)}));
- const max=Math.max(1,...vals.map(x=>N(x.net_sales)));
- document.querySelector("#trend").innerHTML=vals.map(x=>`<div class="barcol"><div class="bar sales" style="height:${Math.max(3,N(x.net_sales)/max*100)}%" title="Продажи: ${RUB(x.net_sales)}"></div><div class="bar profit" style="height:${Math.max(3,N(x.result)/max*100)}%" title="Результат: ${RUB(x.result)}"></div><div class="mlabel">${monthName(x.month+"-01")}</div></div>`).join("");
+ const current=months[months.length-1]||"";
+ const maxSales=Math.max(1,...vals.map(x=>Math.abs(N(x.sales))));
+ const metric=(value,max,cls,suffix="%")=>`<div class="mini-metric"><div class="mini-track ${cls}"><span style="width:${Math.min(100,Math.abs(N(value))/Math.max(1,max)*100)}%"></span></div><div class="mini-num">${N(value).toFixed(1)}${suffix}</div></div>`;
+ const rows=vals.map(x=>{
+   const gross=Math.abs(N(x.sales));
+   const returnsPct=gross?Math.abs(N(x.returns))/gross*100:0;
+   const directPct=gross?Math.abs(N(x.directExpense))/gross*100:0;
+   const allocatedPct=gross?Math.abs(N(x.allocatedExpense))/gross*100:0;
+   const resultPct=gross?N(x.result)/gross*100:0;
+   return {...x,returnsPct,directPct,allocatedPct,resultPct};
+ });
+ const maxReturns=Math.max(1,...rows.map(x=>x.returnsPct));
+ const maxDirect=Math.max(1,...rows.map(x=>x.directPct));
+ const maxAllocated=Math.max(1,...rows.map(x=>x.allocatedPct));
+ const maxResult=Math.max(1,...rows.map(x=>Math.abs(x.resultPct)));
+ document.querySelector("#trend").innerHTML=rows.map(x=>`<tr class="${x.month===current?'live':''}">
+   <td><span class="trend-month">${monthName(x.month+"-01")}</span>${x.month===current?'<span class="live-badge">LIVE</span>':''}</td>
+   <td><div class="mini-metric"><div class="mini-track sales"><span style="width:${Math.min(100,Math.abs(N(x.sales))/maxSales*100)}%"></span></div><div class="mini-num">${RUB(x.sales)}</div></div></td>
+   <td>${metric(x.returnsPct,maxReturns,"returns")}</td>
+   <td>${metric(x.directPct,maxDirect,"direct")}</td>
+   <td>${metric(x.allocatedPct,maxAllocated,"allocated")}</td>
+   <td class="trend-money">${RUB(x.result)}</td>
+   <td>${metric(x.resultPct,maxResult,"result")}</td>
+ </tr>`).join("");
 }
 function renderManual(m){
  const rows=D.manual_expenses.filter(x=>String(x.month).slice(0,7)===m);
