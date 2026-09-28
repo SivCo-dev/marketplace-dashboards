@@ -11,6 +11,16 @@
 .top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.title h1{margin:0;font-size:30px}.title p{margin:5px 0 0;color:var(--muted)}
 .dev{display:flex;align-items:center;gap:12px}.badge{background:#fff3e8;color:#c85b12;border:1px solid #ffd8b7;padding:7px 12px;border-radius:999px;font-weight:800;font-size:12px}
 .updated{color:var(--muted);font-size:12px;text-align:right}
+.import-btn{border:1px solid var(--market-accent);background:var(--market-accent);color:#fff;border-radius:10px;padding:9px 12px;font:inherit;font-weight:800;cursor:pointer}
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.42);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000}.modal-backdrop.open{display:flex}
+.import-modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.18);padding:18px}
+.import-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.import-head h2{margin:0}.icon-btn{border:0;background:#f3f5f8;border-radius:9px;padding:7px 10px;font-size:18px;cursor:pointer}
+.import-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.import-field label{display:block;color:var(--muted);font-size:11px;font-weight:750;margin-bottom:5px}.import-field input,.import-field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font:inherit;background:#fff}
+.import-drop{margin-top:12px;border:1.5px dashed #bdc5d1;border-radius:12px;padding:18px;text-align:center;background:#fafbfc}.import-drop input{max-width:100%}
+.import-status{margin-top:12px;padding:10px 12px;border-radius:10px;background:#f7f8fb;color:var(--muted);font-size:12px}
+.mapping-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.mapping-grid .import-field{min-width:0}
+.preview-wrap{margin-top:12px;overflow:auto;max-height:300px;border:1px solid var(--line);border-radius:10px}.preview-wrap table{width:100%;border-collapse:collapse;font-size:12px}.preview-wrap th,.preview-wrap td{padding:7px 9px;border-bottom:1px solid #eef1f5;white-space:nowrap;text-align:right}.preview-wrap th:first-child,.preview-wrap td:first-child{text-align:left}
+.import-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.import-actions button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font:inherit;font-weight:800;cursor:pointer}.import-actions .primary{background:var(--market-accent);border-color:var(--market-accent);color:#fff}.import-actions button:disabled{opacity:.45;cursor:not-allowed}
 .filters{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin-bottom:16px}.f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.f label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:4px}.f select{width:100%;border:0;background:transparent;font:inherit;font-weight:700;outline:none}
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
 .grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{grid-template-columns:1.05fr 1.55fr;align-items:start}.right-stack{display:grid;gap:16px;align-content:start}.main-finance-grid.all-markets{grid-template-columns:1fr}.main-finance-grid.all-markets .finance-card{width:100%}.main-finance-grid.all-markets .right-stack{grid-template-columns:1.35fr .85fr;align-items:start}.secondary-grid{grid-template-columns:1.05fr 1.55fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
@@ -54,7 +64,7 @@
 <div class="wrap">
   <div class="top">
     <div class="title"><h1>CPR Monthly Report</h1><p>Финансовые результаты Ozon • новая версия, старый отчёт не изменён</p></div>
-    <div class="dev"><span class="badge">MONTHLY V1 DEV</span><div class="updated" id="updated">Загрузка…</div></div>
+    <div class="dev"><button class="import-btn" type="button" onclick="openImportCenter()">Загрузить данные</button><span class="badge">MONTHLY V1 DEV</span><div class="updated" id="updated">Загрузка…</div></div>
   </div>
 
   <div class="filters">
@@ -143,8 +153,33 @@
     </div>
   </div>
 </div>
+<div id="importModal" class="modal-backdrop" onclick="if(event.target===this)closeImportCenter()">
+  <div class="import-modal">
+    <div class="import-head"><div><h2>Импорт данных</h2><div class="sub" style="margin:3px 0 0">Исходный файл без предварительной обработки → проверка → запись в SQL.</div></div><button class="icon-btn" onclick="closeImportCenter()">×</button></div>
+    <div class="import-grid">
+      <div class="import-field"><label>Организация</label><select id="importTenant"><option value="CPR">CPR</option><option value="W" disabled>W — позже</option><option value="ORANGE" disabled>Orange — проверим следующим</option></select></div>
+      <div class="import-field"><label>Тип файла</label><select id="importType"><option value="compensation">Компенсации Ozon</option></select></div>
+      <div class="import-field"><label>Месяц</label><select id="importMonth"></select></div>
+      <div class="import-field"><label>PIN импорта</label><input id="importPin" type="password" autocomplete="off" placeholder="Введите PIN"></div>
+    </div>
+    <div class="import-drop"><input id="importFile" type="file" accept=".xlsx,.xls,.csv"><div class="sub" style="margin:8px 0 0">Можно загружать исходный XLSX/XLS/CSV Ozon как есть.</div></div>
+    <div id="importStatus" class="import-status">Файл ещё не выбран.</div>
+    <div id="mappingBlock" style="display:none">
+      <div class="sub" style="margin:12px 0 4px"><b>Сопоставление колонок</b> — система заполнит автоматически, при необходимости можно поправить.</div>
+      <div id="mappingGrid" class="mapping-grid"></div>
+      <div id="preview" class="preview-wrap"></div>
+    </div>
+    <div class="import-actions">
+      <button onclick="closeImportCenter()">Отмена</button>
+      <button id="prepareImportBtn" onclick="prepareImportPreview()" disabled>Проверить</button>
+      <button id="applyImportBtn" class="primary" onclick="applyImport()" disabled>Записать в SQL</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
+const IMPORT_API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-import-v1";
 let D={months:[],categories:[],sku:[],expense_detail:[],manual_expenses:[],unit_costs:[]};
 let selectedSku=null,skuDetailMarket="ALL";
 const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽", NUM=v=>Math.round(N(v)).toLocaleString("ru-RU");
@@ -654,10 +689,131 @@ function renderManual(m){
     <div class="sum-card"><div class="l">Загруженные бизнес-расходы</div><div class="v">${b.loaded?RUB(-b.total):"—"}</div></div>
     <div class="sum-card"><div class="l">${resultLabel}</div><div class="v">${afterLoaded==null?"—":RUB(afterLoaded)}</div><div class="sub" style="margin:3px 0 0">${resultNote}</div></div>`;
 }
+
+let IMPORT_RAW=null,IMPORT_HEADERS=[],IMPORT_ROWS=[],IMPORT_NORMALIZED=[];
+const importFields=[
+ ["article","Артикул продавца / модель"],
+ ["sku","SKU Ozon"],
+ ["compensated_units","Компенсировано, шт"],
+ ["compensation_amount","Сумма компенсации"],
+ ["decompensation_amount","Декомпенсация"],
+ ["disposal_units","Утиль, шт"],
+ ["returns_without_compensation","Возврат без компенсации, шт"]
+];
+function openImportCenter(){
+ document.querySelector("#importModal").classList.add("open");
+ const pin=sessionStorage.getItem("monthlyImportPin")||"";
+ document.querySelector("#importPin").value=pin;
+}
+function closeImportCenter(){document.querySelector("#importModal").classList.remove("open")}
+function normH(v){return String(v??"").trim().toLowerCase().replace(/ё/g,"е").replace(/\s+/g," ")}
+function guessColumn(key,headers){
+ const rules={
+  article:[/артикул.*продав/,/^артикул$/, /offer.?id/,/offer id/],
+  sku:[/^sku$/, /sku.*ozon/,/ozon.*sku/,/идентификатор.*товар/],
+  compensated_units:[/компенс.*(шт|кол)/,/(шт|кол).*компенс/],
+  compensation_amount:[/сум.*компенс/,/компенс.*сум/,/размер.*компенс/],
+  decompensation_amount:[/декомпенс/,/удержан.*компенс/],
+  disposal_units:[/(утилиз|утил).*(шт|кол)/,/(шт|кол).*(утилиз|утил)/],
+  returns_without_compensation:[/возврат.*без.*компенс/,/без.*компенс.*возврат/]
+ };
+ const hs=headers.map(normH);
+ for(const re of rules[key]||[]){const i=hs.findIndex(x=>re.test(x));if(i>=0)return headers[i]}
+ return "";
+}
+function mappingSelect(key,label){
+ const guessed=guessColumn(key,IMPORT_HEADERS);
+ return `<div class="import-field"><label>${label}</label><select id="map_${key}"><option value="">— не использовать —</option>${IMPORT_HEADERS.map(h=>`<option value="${String(h).replace(/"/g,"&quot;")}" ${h===guessed?"selected":""}>${h}</option>`).join("")}</select></div>`;
+}
+async function readImportFile(file){
+ if(!file)return;
+ const status=document.querySelector("#importStatus");
+ status.textContent="Читаю файл…";
+ try{
+  const data=await file.arrayBuffer();
+  const wb=XLSX.read(data,{type:"array",cellDates:true});
+  let best=null;
+  for(const sheetName of wb.SheetNames){
+   const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:"",raw:false});
+   for(let r=0;r<Math.min(40,matrix.length);r++){
+    const headers=(matrix[r]||[]).map(x=>String(x).trim()).filter(Boolean);
+    const score=importFields.reduce((s,[k])=>s+(guessColumn(k,headers)?1:0),0);
+    if(!best||score>best.score)best={sheetName,matrix,row:r,headers,score};
+   }
+  }
+  if(!best||best.headers.length<2)throw Error("Не удалось найти таблицу в файле");
+  IMPORT_HEADERS=best.headers;
+  const rows=best.matrix.slice(best.row+1).filter(row=>row.some(v=>String(v).trim()!==""));
+  IMPORT_ROWS=rows.map(row=>Object.fromEntries(IMPORT_HEADERS.map((h,i)=>[h,row[i]??""])));
+  IMPORT_RAW={file,sheetName:best.sheetName,headerRow:best.row+1,score:best.score};
+  document.querySelector("#mappingGrid").innerHTML=importFields.map(([k,l])=>mappingSelect(k,l)).join("");
+  document.querySelector("#mappingBlock").style.display="";
+  document.querySelector("#prepareImportBtn").disabled=false;
+  document.querySelector("#applyImportBtn").disabled=true;
+  status.textContent=`Найден лист «${best.sheetName}», строк данных: ${IMPORT_ROWS.length}. Автоопределено полей: ${best.score} из ${importFields.length}.`;
+ }catch(e){
+  IMPORT_RAW=null;IMPORT_ROWS=[];IMPORT_HEADERS=[];
+  document.querySelector("#mappingBlock").style.display="none";
+  document.querySelector("#prepareImportBtn").disabled=true;
+  document.querySelector("#applyImportBtn").disabled=true;
+  status.textContent="Ошибка чтения: "+e.message;
+ }
+}
+function numImport(v){
+ if(v==null||v==="")return null;
+ const s=String(v).replace(/\s/g,"").replace(",",".").replace(/[^0-9.\-]/g,"");
+ if(!s)return null;const n=Number(s);return Number.isFinite(n)?n:null;
+}
+function prepareImportPreview(){
+ const map=Object.fromEntries(importFields.map(([k])=>[k,document.querySelector("#map_"+k).value]));
+ if(!map.article&&!map.sku){document.querySelector("#importStatus").textContent="Нужно сопоставить Артикул или SKU.";return}
+ const grouped=new Map();
+ for(const row of IMPORT_ROWS){
+  const article=map.article?String(row[map.article]||"").trim():"";
+  const sku=map.sku?String(row[map.sku]||"").trim():"";
+  if(!article&&!sku)continue;
+  const key=sku||article;
+  const z=grouped.get(key)||{article:article||null,sku:sku||null};
+  for(const k of ["compensated_units","compensation_amount","decompensation_amount","disposal_units","returns_without_compensation"]){
+    if(!map[k])continue;
+    const n=numImport(row[map[k]]);
+    if(n!=null)z[k]=(z[k]??0)+n;
+  }
+  grouped.set(key,z);
+ }
+ IMPORT_NORMALIZED=[...grouped.values()];
+ const sums=IMPORT_NORMALIZED.reduce((a,x)=>{for(const k of ["compensated_units","compensation_amount","decompensation_amount","disposal_units","returns_without_compensation"])if(x[k]!=null)a[k]=(a[k]||0)+N(x[k]);return a},{});
+ const cols=["SKU / артикул","Компенс., шт","Компенсация","Декомпенсация","Утиль","Возврат без комп."];
+ document.querySelector("#preview").innerHTML=`<table><thead><tr>${cols.map(x=>"<th>"+x+"</th>").join("")}</tr></thead><tbody>${IMPORT_NORMALIZED.slice(0,100).map(x=>`<tr><td>${x.article||x.sku||""}</td><td>${x.compensated_units??"—"}</td><td>${x.compensation_amount==null?"—":RUB(x.compensation_amount)}</td><td>${x.decompensation_amount==null?"—":RUB(x.decompensation_amount)}</td><td>${x.disposal_units??"—"}</td><td>${x.returns_without_compensation??"—"}</td></tr>`).join("")}</tbody></table>`;
+ document.querySelector("#importStatus").innerHTML=`К записи: <b>${IMPORT_NORMALIZED.length}</b> SKU • компенсации: <b>${sums.compensated_units||0} шт / ${RUB(sums.compensation_amount||0)}</b> • декомпенсации: <b>${RUB(sums.decompensation_amount||0)}</b> • утиль: <b>${sums.disposal_units||0} шт</b> • возвраты без компенсации: <b>${sums.returns_without_compensation||0} шт</b>.`;
+ document.querySelector("#applyImportBtn").disabled=IMPORT_NORMALIZED.length===0;
+}
+async function applyImport(){
+ if(!IMPORT_NORMALIZED.length||!IMPORT_RAW)return;
+ const pin=document.querySelector("#importPin").value.trim();
+ if(!pin){document.querySelector("#importStatus").textContent="Введите PIN импорта.";return}
+ sessionStorage.setItem("monthlyImportPin",pin);
+ const month=document.querySelector("#importMonth").value;
+ const btn=document.querySelector("#applyImportBtn");btn.disabled=true;
+ document.querySelector("#importStatus").textContent="Записываю в SQL…";
+ try{
+  const res=await fetch(IMPORT_API,{method:"POST",headers:{"Content-Type":"application/json","x-import-pin":pin},body:JSON.stringify({
+   type:"compensation",tenant:"CPR",month,marketplace:"OZON",account_id:"ozon_cpr",filename:IMPORT_RAW.file.name,rows:IMPORT_NORMALIZED
+  })});
+  const out=await res.json();
+  if(!res.ok)throw Error(out.error||("HTTP "+res.status));
+  document.querySelector("#importStatus").innerHTML=`Готово. Пакет <b>${out.batch_id}</b>, записано SKU: <b>${out.rows}</b>. Обновляю отчёт…`;
+  setTimeout(()=>location.reload(),900);
+ }catch(e){document.querySelector("#importStatus").textContent="Ошибка импорта: "+e.message;btn.disabled=false}
+}
+document.addEventListener("DOMContentLoaded",()=>{
+ const file=document.querySelector("#importFile");if(file)file.onchange=()=>readImportFile(file.files?.[0]);
+});
+
 fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(x=>{
  D=x;
  const months=D.months.map(x=>String(x.month).slice(0,7));
- document.querySelector("#month").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
+ document.querySelector("#month").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");document.querySelector("#importMonth").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
  document.querySelector("#compare").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
  document.querySelector("#month").value=months[months.length-1]||"";
  document.querySelector("#compare").value=months[Math.max(0,months.length-2)]||"";
