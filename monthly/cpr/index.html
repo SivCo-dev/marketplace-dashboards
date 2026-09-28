@@ -181,6 +181,28 @@ const delta=(a,b)=>N(b)!==0?(N(a)/N(b)-1)*100:null;
 const dhtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>=0?'pos':'neg'}">${d>=0?'+':''}${d.toFixed(1)}%</span>`;
 
 function selectedAgg(month){return aggregateUnified(filtSku(month))}
+function businessExpenseSlice(month){
+ const rows=(D.manual_expenses||[]).filter(r=>String(r.month).slice(0,7)===month);
+ const selected=filtSku(month);
+ const selectedKeys=new Set(selected.map(r=>String(r.month_sku)));
+ const out={cogs:0,opex:0,external_logistics:0,materials:0,tax:0,business_other:0,loaded:false};
+ for(const r of rows){
+   const type=String(r.expense_type||"").toLowerCase();
+   if(!(type in out))continue;
+   let base=D.sku.filter(x=>String(x.month).slice(0,7)===month);
+   if(r.marketplace)base=base.filter(x=>String(x.marketplace||"").toUpperCase()===String(r.marketplace).toUpperCase());
+   if(r.account_id)base=base.filter(x=>String(x.account_id||"")===String(r.account_id));
+   if(r.master_category)base=base.filter(x=>String(x.master_category||"")===String(r.master_category));
+   const denom=base.reduce((s,x)=>s+Math.max(0,N(x.net_sales)),0);
+   const numer=base.filter(x=>selectedKeys.has(String(x.month_sku))).reduce((s,x)=>s+Math.max(0,N(x.net_sales)),0);
+   const share=denom>0?numer/denom:(selected.length?1:0);
+   out[type]+=Math.abs(N(r.amount))*share;
+   out.loaded=true;
+ }
+ out.total=out.cogs+out.opex+out.external_logistics+out.materials+out.tax+out.business_other;
+ return out;
+}
+
 function typedExpenseAgg(month, rows){
  const keys=new Set(rows.map(r=>String(r.month_sku)));
  const detail=(D.expense_detail||[]).filter(r=>String(r.month).slice(0,7)===month && keys.has(String(r.month_sku)));
@@ -607,12 +629,17 @@ function renderTrend(){
  </tr>`).join("");
 }
 function renderManual(m){
- const rows=D.manual_expenses.filter(x=>String(x.month).slice(0,7)===m);
- const by=Object.fromEntries(rows.map(x=>[x.expense_type,N(x.amount)]));
- document.querySelector("#opex").textContent=by.opex!=null?RUB(by.opex):"—";
- document.querySelector("#materials").textContent=by.materials!=null?RUB(by.materials):"—";
- document.querySelector("#extlog").textContent=by.external_logistics!=null?RUB(by.external_logistics):"—";
- document.querySelector("#cogs").textContent=by.cogs!=null?RUB(by.cogs):"—";
+ const b=businessExpenseSlice(m);
+ const set=(id,v)=>document.querySelector(id).textContent=b.loaded?RUB(-Math.abs(v)):"—";
+ set("#cogs",b.cogs);set("#opex",b.opex);set("#extlog",b.external_logistics);set("#materials",b.materials);set("#tax",b.tax);set("#businessOther",b.business_other);
+ const market=selectedAgg(m);
+ const gross=Math.abs(N(market.sales));
+ const netProfit=b.loaded?N(market.result)-b.total:null;
+ const margin=netProfit==null||!gross?null:netProfit/gross*100;
+ document.querySelector("#businessSummary").innerHTML=
+   `<div class="sum-card"><div class="l">Результат после МП</div><div class="v">${RUB(market.result)}</div></div>
+    <div class="sum-card"><div class="l">Бизнес-расходы</div><div class="v">${b.loaded?RUB(-b.total):"—"}</div></div>
+    <div class="sum-card"><div class="l">Чистая прибыль</div><div class="v">${netProfit==null?"—":RUB(netProfit)}</div><div class="sub" style="margin:3px 0 0">${margin==null?"":margin.toFixed(1)+"% от продаж"}</div></div>`;
 }
 fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(x=>{
  D=x;
