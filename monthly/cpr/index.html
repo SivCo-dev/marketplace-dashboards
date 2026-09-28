@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CPR Monthly Report</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--line:#e7ebf2;--text:#111827;--muted:#667085;--blue:#3765df;--green:#16a36a;--red:#e24b5b;--orange:#f47b20;--shadow:0 8px 24px rgba(16,24,40,.05)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.35 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial}
+.wrap{max-width:1560px;margin:0 auto;padding:24px}
+.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.title h1{margin:0;font-size:30px}.title p{margin:5px 0 0;color:var(--muted)}
+.dev{display:flex;align-items:center;gap:12px}.badge{background:#fff3e8;color:#c85b12;border:1px solid #ffd8b7;padding:7px 12px;border-radius:999px;font-weight:800;font-size:12px}
+.updated{color:var(--muted);font-size:12px;text-align:right}
+.filters{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin-bottom:16px}.f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.f label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:4px}.f select{width:100%;border:0;background:transparent;font:inherit;font-weight:700;outline:none}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
+.funnel .row{display:grid;grid-template-columns:1.5fr .8fr .55fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f7}.funnel .row:last-child{border-bottom:0}.funnel .amt,.funnel .pct{text-align:right;font-variant-numeric:tabular-nums}.funnel .final{background:#eefaf5;margin:8px -10px -6px;padding:12px 10px;border-radius:10px;font-weight:850}.expense{color:var(--red)}.income{color:var(--green)}
+.chartbox{height:245px;position:relative}.bars{height:100%;display:flex;align-items:flex-end;gap:18px;padding:12px 12px 28px;border-bottom:1px solid var(--line)}.barcol{flex:1;display:flex;gap:5px;align-items:flex-end;height:100%;position:relative}.bar{border-radius:6px 6px 0 0;min-width:18px}.sales{background:#6f8fee;width:62%}.profit{background:#73c9a5;width:34%}.mlabel{position:absolute;bottom:-24px;width:100%;text-align:center;font-size:11px;color:var(--muted)}
+.mid{display:grid;grid-template-columns:.8fr 1.2fr;gap:16px;margin-bottom:16px}.expense-list{display:grid;gap:9px}.exp-row{display:grid;grid-template-columns:120px 1fr 80px;gap:10px;align-items:center}.track{height:9px;background:#eef1f6;border-radius:8px;overflow:hidden}.fill{height:100%;border-radius:8px;background:#e99098}.cat-table,.market-table,.sku-table{width:100%;border-collapse:collapse}.cat-table th,.cat-table td,.market-table th,.market-table td,.sku-table th,.sku-table td{padding:10px 8px;border-bottom:1px solid #eef1f5;text-align:right;font-variant-numeric:tabular-nums}.cat-table th:first-child,.cat-table td:first-child,.market-table th:first-child,.market-table td:first-child,.sku-table th:first-child,.sku-table td:first-child{text-align:left}.cat-table th,.market-table th,.sku-table th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bottom{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}.notice{margin-bottom:16px;background:#fff8e8;border:1px solid #ffe3a8;color:#8a5a00;border-radius:12px;padding:11px 14px;font-size:12px}
+.stockgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.mini{border:1px solid var(--line);border-radius:12px;padding:14px}.mini .l{color:var(--muted);font-size:11px}.mini .v{font-size:19px;font-weight:800;margin-top:4px}
+.section{margin-top:16px}.scroll{max-height:410px;overflow:auto}.empty{color:var(--muted);padding:20px;text-align:center}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.grid,.mid,.bottom{grid-template-columns:1fr}} 
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title"><h1>CPR Monthly Report</h1><p>Финансовые результаты Ozon • новая версия, старый отчёт не изменён</p></div>
+    <div class="dev"><span class="badge">MONTHLY V1 DEV</span><div class="updated" id="updated">Загрузка…</div></div>
+  </div>
+
+  <div class="filters">
+    <div class="f"><label>Период</label><select id="month"></select></div>
+    <div class="f"><label>Сравнение</label><select id="compare"></select></div>
+    <div class="f"><label>Организация</label><select><option>CPR</option></select></div>
+    <div class="f"><label>Маркет</label><select><option>Ozon</option></select></div>
+    <div class="f"><label>Категория</label><select id="category"><option value="">Все</option></select></div>
+  </div>
+
+  <div class="notice" id="notice">Подготавливаем данные…</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Финансовая воронка</h2><div class="sub">Сумма и доля от чистых продаж</div>
+      <div class="funnel" id="funnel"></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <h2>Продажи и результат Ozon по месяцам</h2><div class="sub">Закрытые месяцы + текущий месяц</div>
+        <div class="chartbox"><div class="bars" id="trend"></div></div>
+      </div>
+      <div class="card">
+        <h2>Структура расходов</h2><div class="sub">Доля основных расходов от чистых продаж</div>
+        <div class="expense-list" id="expenses"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mid">
+    <div class="card">
+      <h2>Маркетплейсы</h2><div class="sub">Архитектура уже multi-market; в CPR сейчас только Ozon</div>
+      <table class="market-table"><thead><tr><th>Показатель</th><th>Ozon</th><th>Итого</th></tr></thead><tbody id="market"></tbody></table>
+    </div>
+    <div class="card">
+      <h2>Категории: вклад в продажи и расходы</h2><div class="sub">Подготовлено под master-category. Пока категории CPR ещё не размечены.</div>
+      <table class="cat-table"><thead><tr><th>Категория</th><th>Продажи</th><th>Расходы</th><th>Результат Ozon</th><th>Доля</th></tr></thead><tbody id="cats"></tbody></table>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="card">
+      <h2>SKU — экономика месяца</h2><div class="sub">Без отдельной карточки SKU на этом этапе</div>
+      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Шт</th><th>Комиссия</th><th>Логистика</th><th>Компенсации</th><th>Результат Ozon</th></tr></thead><tbody id="sku"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h2>Капитал / дополнительные расходы</h2><div class="sub">Следующий слой P&L</div>
+      <div class="stockgrid">
+        <div class="mini"><div class="l">OPEX</div><div class="v" id="opex">—</div></div>
+        <div class="mini"><div class="l">Материалы</div><div class="v" id="materials">—</div></div>
+        <div class="mini"><div class="l">Внешняя логистика</div><div class="v" id="extlog">—</div></div>
+        <div class="mini"><div class="l">Себестоимость</div><div class="v" id="cogs">—</div></div>
+      </div>
+      <div class="sub" style="margin-top:14px">Эти статьи специально не подменяем нулями в «чистую прибыль». Пока они не загружены, верхний KPI показывает результат после Ozon, а не чистую прибыль бизнеса.</div>
+    </div>
+  </div>
+</div>
+<script>
+const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
+let D={months:[],categories:[],sku:[],manual_expenses:[]};
+const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽", NUM=v=>Math.round(N(v)).toLocaleString("ru-RU");
+const pct=(v,b)=>b?Math.abs(N(v))/Math.abs(N(b))*100:0;
+const monthName=m=>new Date(m+"T00:00:00").toLocaleDateString("ru-RU",{month:"short",year:"2-digit"});
+const getMonth=m=>D.months.find(x=>String(x.month).slice(0,7)===m)||{};
+const filtSku=m=>D.sku.filter(x=>String(x.month).slice(0,7)===m && (!document.querySelector("#category").value || x.master_category===document.querySelector("#category").value));
+const agg=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales","sold_units","commission","logistics","storage","promotion","other","net_compensation_amount","preliminary_compensation","final_with_compensation"])a[k]=(a[k]||0)+N(x[k]);return a},{});
+const delta=(a,b)=>N(b)!==0?(N(a)/N(b)-1)*100:null;
+const dhtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>=0?'pos':'neg'}">${d>=0?'+':''}${d.toFixed(1)}%</span>`;
+
+function selectedAgg(month){return agg(filtSku(month))}
+function render(){
+ const m=document.querySelector("#month").value,c=document.querySelector("#compare").value;
+ const a=selectedAgg(m),b=selectedAgg(c);
+ const comp=N(a.net_compensation_amount)+N(a.preliminary_compensation);
+ const expenses=Math.abs(N(a.commission))+Math.abs(N(a.logistics))+Math.abs(N(a.storage))+Math.abs(N(a.promotion))+Math.abs(N(a.other));
+ const result=N(a.final_with_compensation);
+ const rate=N(a.net_sales)?result/N(a.net_sales)*100:0;
+ const k=[
+  ["Продажи",RUB(a.net_sales),delta(a.net_sales,b.net_sales)],
+  ["Продано",NUM(a.sold_units)+" шт",delta(a.sold_units,b.sold_units)],
+  ["Результат Ozon",RUB(result),delta(result,b.final_with_compensation)],
+  ["Ozon-маржа",rate.toFixed(1)+"%",null],
+  ["Возвраты",RUB(Math.abs(N(a.returns))),delta(Math.abs(N(a.returns)),Math.abs(N(b.returns)))],
+  ["Компенсации",RUB(comp),delta(comp,N(b.net_compensation_amount)+N(b.preliminary_compensation))]
+ ];
+ document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="delta">${dhtml(x[2])}</div></div>`).join("");
+
+ const rows=[
+  ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],["Комиссия",a.commission,"expense"],["Логистика",a.logistics,"expense"],
+  ["Хранение",a.storage,"expense"],["Продвижение",a.promotion,"expense"],["Прочее",a.other,"expense"],["Компенсации",comp,"income"]
+ ];
+ document.querySelector("#funnel").innerHTML=rows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],a.net_sales).toFixed(1)}%</div></div>`).join("")+
+  `<div class="row final"><div>Результат после Ozon</div><div class="amt income">${RUB(result)}</div><div class="pct">${rate.toFixed(1)}%</div></div>`;
+
+ const exp=[["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Хранение",a.storage],["Прочее",a.other]];
+ const max=Math.max(1,...exp.map(x=>Math.abs(N(x[1]))));
+ document.querySelector("#expenses").innerHTML=exp.map(x=>`<div class="exp-row"><span>${x[0]}</span><div class="track"><div class="fill" style="width:${Math.abs(N(x[1]))/max*100}%"></div></div><b style="text-align:right">${pct(x[1],a.net_sales).toFixed(1)}%</b></div>`).join("");
+
+ const market=[["Продажи",a.net_sales],["Возвраты",a.returns],["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Компенсации",comp],["Результат Ozon",result]];
+ document.querySelector("#market").innerHTML=market.map(x=>`<tr><td>${x[0]}</td><td>${RUB(x[1])}</td><td>${RUB(x[1])}</td></tr>`).join("");
+
+ const cats=D.categories.filter(x=>String(x.month).slice(0,7)===m);
+ const totalCats=cats.reduce((s,x)=>s+N(x.sales),0);
+ document.querySelector("#cats").innerHTML=cats.length?cats.map(x=>`<tr><td>${x.master_category}</td><td>${RUB(x.sales)}</td><td>${RUB(x.expenses)}</td><td>${RUB(x.ozon_result)}</td><td>${(totalCats?N(x.sales)/totalCats*100:0).toFixed(1)}%</td></tr>`).join(""):'<tr><td colspan="5" class="empty">Нет данных</td></tr>';
+
+ const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
+ document.querySelector("#sku").innerHTML=sku.map(x=>`<tr><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(x.commission)}</td><td>${RUB(N(x.logistics)+N(x.allocated_logistics))}</td><td>${RUB(N(x.net_compensation_amount)+N(x.preliminary_compensation))}</td><td><b>${RUB(x.final_with_compensation)}</b></td></tr>`).join("");
+
+ renderTrend();
+ renderManual(m);
+}
+function renderTrend(){
+ const months=D.months.map(x=>String(x.month).slice(0,7));
+ const vals=months.map(m=>getMonth(m)),max=Math.max(1,...vals.map(x=>N(x.net_sales)));
+ document.querySelector("#trend").innerHTML=vals.map((x,i)=>`<div class="barcol"><div class="bar sales" style="height:${Math.max(3,N(x.net_sales)/max*100)}%" title="${RUB(x.net_sales)}"></div><div class="bar profit" style="height:${Math.max(3,N(x.ozon_result)/max*100)}%" title="${RUB(x.ozon_result)}"></div><div class="mlabel">${monthName(String(x.month).slice(0,10))}</div></div>`).join("");
+}
+function renderManual(m){
+ const rows=D.manual_expenses.filter(x=>String(x.month).slice(0,7)===m);
+ const by=Object.fromEntries(rows.map(x=>[x.expense_type,N(x.amount)]));
+ document.querySelector("#opex").textContent=by.opex!=null?RUB(by.opex):"—";
+ document.querySelector("#materials").textContent=by.materials!=null?RUB(by.materials):"—";
+ document.querySelector("#extlog").textContent=by.external_logistics!=null?RUB(by.external_logistics):"—";
+ document.querySelector("#cogs").textContent=by.cogs!=null?RUB(by.cogs):"—";
+}
+fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(x=>{
+ D=x;
+ const months=D.months.map(x=>String(x.month).slice(0,7));
+ document.querySelector("#month").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
+ document.querySelector("#compare").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
+ document.querySelector("#month").value=months[months.length-1]||"";
+ document.querySelector("#compare").value=months[Math.max(0,months.length-2)]||"";
+ const cats=[...new Set(D.categories.map(x=>x.master_category))].sort();
+ document.querySelector("#category").innerHTML='<option value="">Все</option>'+cats.map(c=>`<option>${c}</option>`).join("");
+ document.querySelector("#month").onchange=render;document.querySelector("#compare").onchange=render;document.querySelector("#category").onchange=render;
+ const liveMin=x.meta?.live_min_date,liveMax=x.meta?.live_max_date;
+ document.querySelector("#notice").textContent=`Важно: июнь–август — закрытые данные из старого SKU Monthly. Текущий месяц пока собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
+ document.querySelector("#updated").textContent="Обновлено "+new Date(x.meta?.generated_at||Date.now()).toLocaleString("ru-RU");
+ render();
+}).catch(e=>{document.querySelector("#notice").textContent="Ошибка загрузки: "+e.message});
+</script>
+</body></html>
