@@ -142,7 +142,7 @@ const agg=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales
 const delta=(a,b)=>N(b)!==0?(N(a)/N(b)-1)*100:null;
 const dhtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>=0?'pos':'neg'}">${d>=0?'+':''}${d.toFixed(1)}%</span>`;
 
-function selectedAgg(month){return agg(filtSku(month))}
+function selectedAgg(month){return aggregateUnified(filtSku(month))}
 function typedExpenseAgg(month, rows){
  const keys=new Set(rows.map(r=>String(r.month_sku)));
  const detail=(D.expense_detail||[]).filter(r=>String(r.month).slice(0,7)===month && keys.has(String(r.month_sku)));
@@ -161,42 +161,75 @@ function typedExpenseAgg(month, rows){
    total:Object.values(z).reduce((s,v)=>s+N(v),0)
  };
 }
+function rowTypedEconomics(r){
+ const detail=(D.expense_detail||[]).filter(x=>String(x.month_sku)===String(r.month_sku));
+ if(!detail.length){
+   const commission=N(r.commission),logistics=N(r.logistics)+N(r.allocated_logistics),
+         partner=N(r.storage),promotion=N(r.promotion)+N(r.allocated_promotion),
+         other=N(r.other)+N(r.allocated_other),compensation=N(r.net_compensation_amount);
+   return {
+     typed:false,commission,logistics,acquiring:0,fbo:0,partner,promotion,other,compensation,
+     expenseTotal:commission+logistics+partner+promotion+other,
+     result:N(r.final_with_compensation)
+   };
+ }
+ const z={};
+ for(const x of detail)z[x.expense_code]=(z[x.expense_code]||0)+N(x.amount);
+ const commission=N(z.commission_direct),
+       logistics=N(z.delivery_direct)+N(z.delivery_allocated),
+       acquiring=N(z.acquiring_allocated),
+       fbo=N(z.fbo_allocated),
+       partner=N(z.partner_direct)+N(z.partner_allocated),
+       promotion=N(z.promotion_direct)+N(z.promotion_allocated),
+       other=N(z.other_direct)+N(z.other_allocated),
+       compensation=N(z.compensation);
+ const expenseTotal=commission+logistics+acquiring+fbo+partner+promotion+other;
+ return {
+   typed:true,commission,logistics,acquiring,fbo,partner,promotion,other,compensation,expenseTotal,
+   result:N(r.net_sales)+expenseTotal+compensation
+ };
+}
+function aggregateUnified(rows){
+ const z={sales:0,returns:0,net_sales:0,sold_units:0,commission:0,logistics:0,acquiring:0,fbo:0,partner:0,promotion:0,other:0,compensation:0,result:0};
+ for(const r of rows){
+   const e=rowTypedEconomics(r);
+   z.sales+=N(r.sales); z.returns+=N(r.returns); z.net_sales+=N(r.net_sales); z.sold_units+=N(r.sold_units);
+   for(const k of ["commission","logistics","acquiring","fbo","partner","promotion","other","compensation","result"])z[k]+=N(e[k]);
+ }
+ return z;
+}
 function render(){
  const m=document.querySelector("#month").value,c=document.querySelector("#compare").value;
  const marketSel=document.querySelector("#marketFilter").value||"ALL";
  applyMarketTheme(marketSel);
  const a=selectedAgg(m),b=selectedAgg(c);
  const selectedRows=filtSku(m), compareRows=filtSku(c);
- const typed=typedExpenseAgg(m,selectedRows), typedCmp=typedExpenseAgg(c,compareRows);
- const comp=typed?N(typed.compensation):N(a.net_compensation_amount);
- const result=N(a.final_with_compensation);
+ const comp=N(a.compensation);
+ const result=N(a.result);
  const rate=N(a.sales)?result/N(a.sales)*100:0;
  const k=[
   ["Продажи",RUB(a.net_sales),delta(a.net_sales,b.net_sales)],
   ["Продано",NUM(a.sold_units)+" шт",delta(a.sold_units,b.sold_units)],
-  ["Результат Ozon",RUB(result),delta(result,b.final_with_compensation)],
+  ["Результат Ozon",RUB(result),delta(result,b.result)],
   ["Ozon-маржа",rate.toFixed(1)+"%",null],
   ["Возвраты",RUB(Math.abs(N(a.returns))),delta(Math.abs(N(a.returns)),Math.abs(N(b.returns)))],
-  ["Компенсации",RUB(comp),delta(comp,N(b.net_compensation_amount))]
+  ["Компенсации",RUB(comp),delta(comp,N(b.compensation))]
  ];
  document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="delta">${dhtml(x[2])}</div></div>`).join("");
 
- const rows=typed?[
+ const rows=[
   ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],
-  ["Комиссия",typed.commission,"expense"],["Логистика",typed.logistics,"expense"],["Эквайринг",typed.acquiring,"expense"],
-  ["FBO",typed.fbo,"expense"],["Партнёрские услуги",typed.partner,"expense"],["Продвижение",typed.promotion,"expense"],
-  ["Прочее",typed.other,"expense"],["Компенсации",typed.compensation,"income"]
- ]:[
-  ["Чистые продажи",a.net_sales,"income"],["Возвраты",a.returns,"expense"],["Комиссия",a.commission,"expense"],["Логистика",a.logistics,"expense"],
-  ["Хранение",a.storage,"expense"],["Продвижение",a.promotion,"expense"],["Прочее",a.other,"expense"],["Компенсации",comp,"income"]
+  ["Комиссия",a.commission,"expense"],["Логистика",a.logistics,"expense"],["Эквайринг",a.acquiring,"expense"],
+  ["FBO",a.fbo,"expense"],["Партнёрские услуги",a.partner,"expense"],["Продвижение",a.promotion,"expense"],
+  ["Прочее",a.other,"expense"],["Компенсации",comp,"income"]
  ];
  document.querySelector("#funnel").innerHTML=rows.map(r=>`<div class="row"><div>${r[0]}</div><div class="amt ${r[2]}">${RUB(r[1])}</div><div class="pct">${pct(r[1],a.sales).toFixed(1)}%</div></div>`).join("")+
   `<div class="row final"><div>Результат после Ozon</div><div class="amt income">${RUB(result)}</div><div class="pct">${rate.toFixed(1)}%</div></div>`;
 
- const exp=typed?[
-   ["Комиссия",typed.commission],["Логистика",typed.logistics],["Эквайринг",typed.acquiring],["FBO",typed.fbo],
-   ["Партнёрские",typed.partner],["Продвижение",typed.promotion],["Прочее",typed.other]
- ]:[["Комиссия",a.commission],["Логистика",a.logistics],["Продвижение",a.promotion],["Хранение",a.storage],["Прочее",a.other]];
+ const exp=[
+   ["Комиссия",a.commission],["Логистика",a.logistics],["Эквайринг",a.acquiring],["FBO",a.fbo],
+   ["Партнёрские",a.partner],["Продвижение",a.promotion],["Прочее",a.other]
+ ];
  const expColors=["#e86b75","#6f8fee","#f1bf4b","#8b72d6","#58bfa0","#ef9f64","#a16fd1"];
  const expAbs=exp.map(x=>Math.abs(N(x[1])));
  const expTotal=expAbs.reduce((s,v)=>s+v,0);
@@ -231,30 +264,19 @@ function render(){
  }).join("");
 
  const selected=a;
- const totalRows=filtSkuAllMarkets(m), total=agg(totalRows);
- const selectedTyped=typedExpenseAgg(m,selectedRows), totalTyped=typedExpenseAgg(m,totalRows);
- const selectedComp=selectedTyped?N(selectedTyped.compensation):N(selected.net_compensation_amount);
- const totalComp=totalTyped?N(totalTyped.compensation):N(total.net_compensation_amount);
- const marketRows=selectedTyped&&totalTyped?[
-   ["Продажи",selected.net_sales,total.net_sales],
-   ["Возвраты",selected.returns,total.returns],
-   ["Комиссия",selectedTyped.commission,totalTyped.commission],
-   ["Логистика",selectedTyped.logistics,totalTyped.logistics],
-   ["Эквайринг",selectedTyped.acquiring,totalTyped.acquiring],
-   ["FBO",selectedTyped.fbo,totalTyped.fbo],
-   ["Партнёрские услуги",selectedTyped.partner,totalTyped.partner],
-   ["Продвижение",selectedTyped.promotion,totalTyped.promotion],
-   ["Прочее",selectedTyped.other,totalTyped.other],
-   ["Компенсации",selectedComp,totalComp],
-   ["Результат",selected.final_with_compensation,total.final_with_compensation]
- ]:[
+ const totalRows=filtSkuAllMarkets(m), total=aggregateUnified(totalRows);
+ const marketRows=[
    ["Продажи",selected.net_sales,total.net_sales],
    ["Возвраты",selected.returns,total.returns],
    ["Комиссия",selected.commission,total.commission],
    ["Логистика",selected.logistics,total.logistics],
+   ["Эквайринг",selected.acquiring,total.acquiring],
+   ["FBO",selected.fbo,total.fbo],
+   ["Партнёрские услуги",selected.partner,total.partner],
    ["Продвижение",selected.promotion,total.promotion],
-   ["Компенсации",selectedComp,totalComp],
-   ["Результат",selected.final_with_compensation,total.final_with_compensation]
+   ["Прочее",selected.other,total.other],
+   ["Компенсации",selected.compensation,total.compensation],
+   ["Результат",selected.result,total.result]
  ];
  document.querySelector("#market").innerHTML=marketRows.map(x=>`<tr><td>${x[0]}</td><td>${RUB(x[1])}</td><td>${RUB(x[2])}</td></tr>`).join("");
 
@@ -262,10 +284,11 @@ function render(){
  const catMap=new Map();
  for(const x of catRows){
    const key=x.master_category||"Без категории";
+   const e=rowTypedEconomics(x);
    const z=catMap.get(key)||{master_category:key,sales:0,expenses:0,result:0};
    z.sales+=N(x.net_sales);
-   z.expenses+=Math.abs(N(x.commission))+Math.abs(N(x.logistics))+Math.abs(N(x.storage))+Math.abs(N(x.promotion))+Math.abs(N(x.other))+Math.abs(N(x.allocated_logistics))+Math.abs(N(x.allocated_promotion))+Math.abs(N(x.allocated_other));
-   z.result+=N(x.final_with_compensation);
+   z.expenses+=Math.abs(N(e.commission))+Math.abs(N(e.logistics))+Math.abs(N(e.acquiring))+Math.abs(N(e.fbo))+Math.abs(N(e.partner))+Math.abs(N(e.promotion))+Math.abs(N(e.other));
+   z.result+=N(e.result);
    catMap.set(key,z);
  }
  const cats=[...catMap.values()].sort((x,y)=>y.sales-x.sales);
@@ -273,7 +296,10 @@ function render(){
  document.querySelector("#cats").innerHTML=cats.length?cats.map(x=>`<tr><td>${x.master_category}</td><td>${RUB(x.sales)}</td><td>${RUB(x.expenses)}</td><td>${RUB(x.result)}</td><td>${(totalCats?N(x.sales)/totalCats*100:0).toFixed(1)}%</td></tr>`).join(""):'<tr><td colspan="5" class="empty">Нет данных</td></tr>';
 
  const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
- document.querySelector("#sku").innerHTML=sku.map(x=>`<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(x.commission)}</td><td>${RUB(N(x.logistics)+N(x.allocated_logistics))}</td><td>${RUB(N(x.net_compensation_amount)+N(x.preliminary_compensation))}</td><td><b>${RUB(x.final_with_compensation)}</b></td></tr>`).join("");
+ document.querySelector("#sku").innerHTML=sku.map(x=>{
+   const e=rowTypedEconomics(x);
+   return `<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(e.commission)}</td><td>${RUB(e.logistics)}</td><td>${RUB(e.compensation)}</td><td><b>${RUB(e.result)}</b></td></tr>`;
+ }).join("");
 
  renderTrend();
  renderManual(m);
@@ -431,7 +457,7 @@ function renderTrend(){
  const months=[...new Set(D.sku.map(x=>String(x.month).slice(0,7)))].sort().slice(-4);
  const vals=months.map(m=>({month:m,...selectedAgg(m)}));
  const max=Math.max(1,...vals.map(x=>N(x.net_sales)));
- document.querySelector("#trend").innerHTML=vals.map(x=>`<div class="barcol"><div class="bar sales" style="height:${Math.max(3,N(x.net_sales)/max*100)}%" title="Продажи: ${RUB(x.net_sales)}"></div><div class="bar profit" style="height:${Math.max(3,N(x.final_with_compensation)/max*100)}%" title="Результат: ${RUB(x.final_with_compensation)}"></div><div class="mlabel">${monthName(x.month+"-01")}</div></div>`).join("");
+ document.querySelector("#trend").innerHTML=vals.map(x=>`<div class="barcol"><div class="bar sales" style="height:${Math.max(3,N(x.net_sales)/max*100)}%" title="Продажи: ${RUB(x.net_sales)}"></div><div class="bar profit" style="height:${Math.max(3,N(x.result)/max*100)}%" title="Результат: ${RUB(x.result)}"></div><div class="mlabel">${monthName(x.month+"-01")}</div></div>`).join("");
 }
 function renderManual(m){
  const rows=D.manual_expenses.filter(x=>String(x.month).slice(0,7)===m);
