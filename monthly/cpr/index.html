@@ -20,14 +20,12 @@
 .bottom{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}.notice{margin-bottom:16px;background:#fff8e8;border:1px solid #ffe3a8;color:#8a5a00;border-radius:12px;padding:11px 14px;font-size:12px}
 .stockgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.mini{border:1px solid var(--line);border-radius:12px;padding:14px}.mini .l{color:var(--muted);font-size:11px}.mini .v{font-size:19px;font-weight:800;margin-top:4px}
 .section{margin-top:16px}.scroll{max-height:410px;overflow:auto}.empty{color:var(--muted);padding:20px;text-align:center}
-.sku-table tbody tr{cursor:pointer}.sku-table tbody tr:hover{background:#f8faff}
-.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.44);display:none;align-items:center;justify-content:center;padding:24px;z-index:50}
-.modal-backdrop.open{display:flex}.modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 28px 90px rgba(15,23,42,.28);border:1px solid var(--line)}
-.modal-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:20px 22px;border-bottom:1px solid var(--line)}.modal-head h3{margin:0;font-size:22px}.modal-head .sub{margin:4px 0 0}
-.close{border:0;background:#f2f4f7;width:36px;height:36px;border-radius:10px;font-size:22px;cursor:pointer}
-.modal-body{padding:20px 22px}.sku-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.sku-kpi{border:1px solid var(--line);border-radius:12px;padding:13px}.sku-kpi .l{font-size:11px;color:var(--muted);font-weight:700}.sku-kpi .v{font-size:19px;font-weight:850;margin-top:5px}
-.econ-table{width:100%;border-collapse:collapse}.econ-table th,.econ-table td{padding:10px 8px;border-bottom:1px solid #eef1f5;text-align:right}.econ-table th:first-child,.econ-table td:first-child{text-align:left}.econ-table th{font-size:11px;color:var(--muted);text-transform:uppercase}.total-row td{font-weight:850;background:#f6fbf8}.muted-row td{color:var(--muted)}
-@media(max-width:760px){.sku-kpis{grid-template-columns:repeat(2,1fr)}}
+.sku-table tbody tr{cursor:pointer}.sku-table tbody tr:hover,.sku-table tbody tr.active-row{background:#f4f7ff}
+.detail-panel{position:sticky;top:18px}.sku-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}.sku-photo{width:86px;height:86px;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:11px;background:#fafbfc;flex:0 0 auto}.sku-title{font-size:21px;font-weight:850}.sku-name{color:var(--muted);margin-top:3px}.sku-meta{font-size:12px;color:var(--muted);margin-top:8px}
+.market-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0 14px;border-top:1px solid var(--line)}.market-toolbar .section-title{font-size:12px;font-weight:800}.market-tabs{display:flex;gap:6px;flex-wrap:wrap}.market-tab{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 11px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}.market-tab.active{background:#111827;color:#fff;border-color:#111827}.market-tab.ozon.active{background:#005bff;border-color:#005bff}.market-tab.yandex.active{background:#ffcc00;color:#111827;border-color:#ffcc00}.market-tab.wb.active{background:#c627b6;border-color:#c627b6}
+.sku-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px}.sku-kpi{border:1px solid var(--line);border-radius:11px;padding:12px}.sku-kpi .l{font-size:10px;color:var(--muted);font-weight:750;text-transform:uppercase}.sku-kpi .v{font-size:18px;font-weight:850;margin-top:5px}.sku-kpi .s{font-size:11px;color:var(--muted);margin-top:4px}
+.econ-table{width:100%;border-collapse:collapse}.econ-table th,.econ-table td{padding:9px 7px;border-bottom:1px solid #eef1f5;text-align:right}.econ-table th:first-child,.econ-table td:first-child{text-align:left}.econ-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.total-row td{font-weight:850;background:#f5faf7}.source-note{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.45}
+@media(max-width:760px){.sku-kpis{grid-template-columns:repeat(2,1fr)}.market-toolbar{align-items:flex-start;flex-direction:column}}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.grid,.mid,.bottom{grid-template-columns:1fr}} 
 </style>
 </head>
@@ -80,33 +78,28 @@
 
   <div class="bottom">
     <div class="card">
-      <h2>SKU — экономика месяца</h2><div class="sub">Без отдельной карточки SKU на этом этапе</div>
-      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Шт</th><th>Комиссия</th><th>Логистика</th><th>Компенсации</th><th>Результат Ozon</th></tr></thead><tbody id="sku"></tbody></table></div>
+      <h2>SKU — экономика месяца</h2><div class="sub">Нажми на SKU — карточка откроется справа, как в ежедневном дашборде.</div>
+      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Шт</th><th>Комиссия</th><th>Логистика</th><th>Компенсации</th><th>Результат</th></tr></thead><tbody id="sku"></tbody></table></div>
     </div>
-    <div class="card">
-      <h2>Капитал / дополнительные расходы</h2><div class="sub">Следующий слой P&L</div>
-      <div class="stockgrid">
-        <div class="mini"><div class="l">OPEX</div><div class="v" id="opex">—</div></div>
-        <div class="mini"><div class="l">Материалы</div><div class="v" id="materials">—</div></div>
-        <div class="mini"><div class="l">Внешняя логистика</div><div class="v" id="extlog">—</div></div>
-        <div class="mini"><div class="l">Себестоимость</div><div class="v" id="cogs">—</div></div>
+    <div>
+      <div id="skuDetail" class="card detail-panel"><div class="sub" style="margin:0">Выбери SKU слева.</div></div>
+      <div class="card" style="margin-top:16px">
+        <h2>Капитал / дополнительные расходы</h2><div class="sub">Следующий слой P&L</div>
+        <div class="stockgrid">
+          <div class="mini"><div class="l">OPEX</div><div class="v" id="opex">—</div></div>
+          <div class="mini"><div class="l">Материалы</div><div class="v" id="materials">—</div></div>
+          <div class="mini"><div class="l">Внешняя логистика</div><div class="v" id="extlog">—</div></div>
+          <div class="mini"><div class="l">Себестоимость</div><div class="v" id="cogs">—</div></div>
+        </div>
+        <div class="sub" style="margin-top:14px">Эти статьи пока не включены в результат SKU, пока не определим правила их распределения.</div>
       </div>
-      <div class="sub" style="margin-top:14px">Эти статьи специально не подменяем нулями в «чистую прибыль». Пока они не загружены, верхний KPI показывает результат после Ozon, а не чистую прибыль бизнеса.</div>
     </div>
-  </div>
-</div>
-<div class="modal-backdrop" id="skuModal" onclick="if(event.target===this)closeSkuCard()">
-  <div class="modal">
-    <div class="modal-head">
-      <div><h3 id="skuTitle">SKU</h3><div class="sub" id="skuSubtitle"></div></div>
-      <button class="close" onclick="closeSkuCard()" aria-label="Закрыть">×</button>
-    </div>
-    <div class="modal-body" id="skuCardBody"></div>
   </div>
 </div>
 <script>
 const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
 let D={months:[],categories:[],sku:[],manual_expenses:[]};
+let selectedSku=null,skuDetailMarket="ALL";
 const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽", NUM=v=>Math.round(N(v)).toLocaleString("ru-RU");
 const pct=(v,b)=>b?Math.abs(N(v))/Math.abs(N(b))*100:0;
 const monthName=m=>new Date(m+"T00:00:00").toLocaleDateString("ru-RU",{month:"short",year:"2-digit"});
@@ -153,62 +146,86 @@ function render(){
  document.querySelector("#cats").innerHTML=cats.length?cats.map(x=>`<tr><td>${x.master_category}</td><td>${RUB(x.sales)}</td><td>${RUB(x.expenses)}</td><td>${RUB(x.ozon_result)}</td><td>${(totalCats?N(x.sales)/totalCats*100:0).toFixed(1)}%</td></tr>`).join(""):'<tr><td colspan="5" class="empty">Нет данных</td></tr>';
 
  const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
- document.querySelector("#sku").innerHTML=sku.map(x=>`<tr onclick="openSkuCard('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(x.commission)}</td><td>${RUB(N(x.logistics)+N(x.allocated_logistics))}</td><td>${RUB(N(x.net_compensation_amount)+N(x.preliminary_compensation))}</td><td><b>${RUB(x.final_with_compensation)}</b></td></tr>`).join("");
+ document.querySelector("#sku").innerHTML=sku.map(x=>`<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(x.commission)}</td><td>${RUB(N(x.logistics)+N(x.allocated_logistics))}</td><td>${RUB(N(x.net_compensation_amount)+N(x.preliminary_compensation))}</td><td><b>${RUB(x.final_with_compensation)}</b></td></tr>`).join("");
 
  renderTrend();
  renderManual(m);
+ if(selectedSku)renderSkuDetail();
 }
 
-function openSkuCard(monthSku){
- const x=D.sku.find(r=>String(r.month_sku)===String(monthSku)); if(!x)return;
- const direct={
-   commission:N(x.commission),
-   delivery:N(x.logistics),
-   storage:N(x.storage),
-   promotion:N(x.promotion),
-   other:N(x.other)
- };
- const allocated={
-   commission:N(x.allocated_commission),
-   delivery:N(x.allocated_logistics),
-   storage:N(x.allocated_storage),
-   promotion:N(x.allocated_promotion),
-   other:N(x.allocated_other)
- };
- const compensation=N(x.net_compensation_amount)+N(x.preliminary_compensation);
- const received=N(x.final_with_compensation);
- const perUnit=N(x.economic_units)?received/N(x.economic_units):(N(x.sold_units)?received/N(x.sold_units):0);
- document.querySelector("#skuTitle").textContent=x.article||x.sku;
- document.querySelector("#skuSubtitle").textContent=[x.product_name||"", "SKU "+x.sku, monthName(String(x.month).slice(0,10))].filter(Boolean).join(" • ");
- const expenseRows=[
-   ["Комиссия",direct.commission,allocated.commission],
-   ["Доставка",direct.delivery,allocated.delivery],
-   ["Хранение / партнёрские услуги",direct.storage,allocated.storage],
-   ["Продвижение",direct.promotion,allocated.promotion],
-   ["Прочее",direct.other,allocated.other]
- ];
- const rowsHtml=expenseRows.map(r=>`<tr><td>${r[0]}</td><td>${RUB(r[1])}</td><td>${RUB(r[2])}</td><td><b>${RUB(N(r[1])+N(r[2]))}</b></td></tr>`).join("");
- document.querySelector("#skuCardBody").innerHTML=
-   `<div class="sku-kpis">
-      <div class="sku-kpi"><div class="l">Продажи</div><div class="v">${RUB(x.sales)}</div></div>
-      <div class="sku-kpi"><div class="l">Возвраты</div><div class="v">${RUB(x.returns)}</div></div>
-      <div class="sku-kpi"><div class="l">Чистые продажи</div><div class="v">${RUB(x.net_sales)}</div></div>
-      <div class="sku-kpi"><div class="l">Продано</div><div class="v">${NUM(x.sold_units)} шт</div></div>
-    </div>
-    <table class="econ-table">
-      <thead><tr><th>Расход</th><th>Прямой на SKU</th><th>Распределённый</th><th>Итого</th></tr></thead>
-      <tbody>
-        ${rowsHtml}
-        <tr class="muted-row"><td>Компенсации</td><td colspan="2"></td><td><b>${RUB(compensation)}</b></td></tr>
-        <tr class="total-row"><td>Реально получено после расходов Ozon</td><td colspan="2"></td><td>${RUB(received)}</td></tr>
-        <tr class="total-row"><td>Получено на экономическую единицу</td><td colspan="2"></td><td>${RUB(perUnit)}</td></tr>
-      </tbody>
-    </table>
-    <div class="sub" style="margin-top:12px">Прямой расход — Ozon уже привязал его к SKU. Распределённый — общий расход месяца, распределённый по утверждённой базе. Карточка будет расширяться по мере выделения FBO, эквайринга и остальных партнёрских расходов в отдельные SQL-поля.</div>`;
- document.querySelector("#skuModal").classList.add("open");
+
+function monthlyMarketRows(monthSku){
+ const base=D.sku.find(r=>String(r.month_sku)===String(monthSku));
+ if(!base)return new Map();
+ const key=String(base.article||base.sku||"").trim().toLowerCase();
+ const month=String(base.month).slice(0,7);
+ const out=new Map();
+ for(const r of D.sku){
+   if(String(r.month).slice(0,7)!==month)continue;
+   const rk=String(r.article||r.sku||"").trim().toLowerCase();
+   if(rk!==key)continue;
+   const mk=String(r.marketplace||"OZON").toUpperCase();
+   const a=out.get(mk)||{marketplace:mk,article:r.article||"",product_name:r.product_name||"",sku:r.sku||"",sales:0,returns:0,net_sales:0,sold_units:0,commission:0,allocated_commission:0,logistics:0,allocated_logistics:0,storage:0,allocated_storage:0,promotion:0,allocated_promotion:0,other:0,allocated_other:0,compensation:0,result:0,economic_units:0};
+   for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","economic_units"])a[k]+=N(r[k]);
+   a.compensation+=N(r.net_compensation_amount)+N(r.preliminary_compensation);
+   a.result+=N(r.final_with_compensation);
+   out.set(mk,a);
+ }
+ return out;
 }
-function closeSkuCard(){document.querySelector("#skuModal").classList.remove("open")}
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSkuCard()});
+function setSkuDetailMarket(mk){skuDetailMarket=mk;renderSkuDetail()}
+function openSkuDetail(monthSku){
+ selectedSku=monthSku;
+ const base=D.sku.find(r=>String(r.month_sku)===String(monthSku));
+ if(!base)return;
+ const available=[...monthlyMarketRows(monthSku).keys()];
+ skuDetailMarket=available.length>1?"ALL":(available[0]||"ALL");
+ document.querySelectorAll("#sku tr[data-key]").forEach(r=>r.classList.toggle("active-row",r.dataset.key===monthSku));
+ renderSkuDetail();
+}
+function renderSkuDetail(){
+ const box=document.querySelector("#skuDetail");
+ const base=D.sku.find(r=>String(r.month_sku)===String(selectedSku));
+ if(!base){box.innerHTML='<div class="sub" style="margin:0">Выбери SKU слева.</div>';return}
+ const stats=monthlyMarketRows(selectedSku),markets=["OZON","YANDEX","WB"];
+ const all=[...stats.values()];
+ const sum=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","compensation","result","economic_units"])a[k]=(a[k]||0)+N(x[k]);return a},{});
+ const x=skuDetailMarket==="ALL"?sum(all):(stats.get(skuDetailMarket)||{});
+ const tabs=["ALL"].concat(markets).map(mk=>{
+   const cls=mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":mk==="WB"?"wb":"";
+   return `<button class="market-tab ${cls} ${skuDetailMarket===mk?'active':''}" onclick="setSkuDetailMarket('${mk}')">${mk==="ALL"?"Все":mk==="YANDEX"?"Яндекс":mk}</button>`
+ }).join("");
+ const noData=skuDetailMarket!=="ALL"&&!stats.has(skuDetailMarket);
+ const directComm=N(x.commission),allocComm=N(x.allocated_commission),directDel=N(x.logistics),allocDel=N(x.allocated_logistics),directStorage=N(x.storage),allocStorage=N(x.allocated_storage),directPromo=N(x.promotion),allocPromo=N(x.allocated_promotion),directOther=N(x.other),allocOther=N(x.allocated_other);
+ const received=N(x.result),unitBase=N(x.economic_units)||N(x.sold_units),perUnit=unitBase?received/unitBase:0;
+ const expenseRows=[
+   ["Комиссия",directComm,allocComm],
+   ["Доставка",directDel,allocDel],
+   ["Хранение / партнёрские услуги",directStorage,allocStorage],
+   ["Продвижение",directPromo,allocPromo],
+   ["Прочее",directOther,allocOther]
+ ];
+ box.innerHTML=
+ `<div class="sku-head">
+    <div class="sku-photo">Фото товара<br>подключим позже</div>
+    <div><div class="sku-title">${base.article||base.sku}</div><div class="sku-name">${base.product_name||""}</div><div class="sku-meta">SKU: ${base.sku} • ${monthName(String(base.month).slice(0,10))}</div></div>
+  </div>
+  <div class="market-toolbar"><div><div class="section-title">Маркетплейс</div><div class="sub" style="margin:2px 0 0">Карточка независима от фильтра страницы.</div></div><div class="market-tabs">${tabs}</div></div>
+  ${noData?'<div class="empty">По этому SKU на выбранном маркетплейсе данных пока нет.</div>':
+  `<div class="sku-kpis">
+     <div class="sku-kpi"><div class="l">Продано</div><div class="v">${NUM(x.sold_units)} шт</div></div>
+     <div class="sku-kpi"><div class="l">Продажи</div><div class="v">${RUB(x.sales)}</div></div>
+     <div class="sku-kpi"><div class="l">Чистые продажи</div><div class="v">${RUB(x.net_sales)}</div></div>
+     <div class="sku-kpi"><div class="l">Реально получено</div><div class="v">${RUB(received)}</div><div class="s">${perUnit?RUB(perUnit)+" / ед.":""}</div></div>
+   </div>
+   <table class="econ-table"><thead><tr><th>Расход</th><th>Прямой</th><th>Распределённый</th><th>Итого</th></tr></thead><tbody>
+   ${expenseRows.map(r=>`<tr><td>${r[0]}</td><td>${RUB(r[1])}</td><td>${RUB(r[2])}</td><td><b>${RUB(N(r[1])+N(r[2]))}</b></td></tr>`).join("")}
+   <tr><td>Компенсации</td><td colspan="2"></td><td><b>${RUB(x.compensation)}</b></td></tr>
+   <tr class="total-row"><td>Реально получено после расходов</td><td colspan="2"></td><td>${RUB(received)}</td></tr>
+   </tbody></table>
+   <div class="source-note">Как в ежедневной карточке: сверху переключатель маркетов, ниже единая экономика SKU. Для CPR сейчас фактически заполнен Ozon; Яндекс и WB уже заложены в интерфейс и начнут показываться без переделки карточки, когда появятся месячные данные этих маркетов.</div>`}
+ `;
+}
 
 function renderTrend(){
  const months=D.months.map(x=>String(x.month).slice(0,7));
