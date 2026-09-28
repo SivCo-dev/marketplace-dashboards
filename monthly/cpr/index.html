@@ -246,6 +246,9 @@ function renderSkuDetail(){
  const finalAfterBusiness=received+businessTotal;
  const finalPerUnit=unitBase?finalAfterBusiness/unitBase:0;
  const fmtMaybe=v=>v===null?"—":RUB(v);
+ const pctOfSales=v=>N(x.sales)?(Math.abs(N(v))/Math.abs(N(x.sales))*100).toFixed(1)+"%":"—";
+ const pctSignedOfSales=v=>N(x.sales)?(N(v)/Math.abs(N(x.sales))*100).toFixed(1)+"%":"—";
+ const moneyPct=(v,signed=false)=>`${RUB(v)} <span class="sub">(${signed?pctSignedOfSales(v):pctOfSales(v)})</span>`;
 
  box.innerHTML=
  `<div class="sku-head">
@@ -264,36 +267,36 @@ function renderSkuDetail(){
      <thead><tr><th>Показатель</th><th>Итого</th></tr></thead>
      <tbody>
        <tr><td><b>Продажи</b></td><td><b>${RUB(x.sales)}</b></td></tr>
-       <tr><td>Возвраты</td><td>${RUB(x.returns)}</td></tr>
-       <tr><td><b>Чистые продажи</b></td><td><b>${RUB(x.net_sales)}</b></td></tr>
+       <tr><td>Возвраты</td><td>${moneyPct(x.returns)}</td></tr>
+       <tr><td><b>Чистые продажи</b></td><td><b>${moneyPct(x.net_sales,true)}</b></td></tr>
 
        <tr><td colspan="2" style="padding-top:16px"><b>Прямые расходы SKU</b></td></tr>
-       <tr><td>Комиссия <span class="sub">(по SKU)</span></td><td><b>${RUB(directCommission)}</b></td></tr>
-       <tr><td>Логистика <span class="sub">(по SKU)</span></td><td><b>${RUB(directDelivery)}</b></td></tr>
-       <tr><td>Партнёрские услуги <span class="sub">(по SKU)</span></td><td><b>${RUB(directPartner)}</b></td></tr>
-       <tr><td>Продвижение <span class="sub">(по SKU)</span></td><td><b>${RUB(directPromotion)}</b></td></tr>
-       <tr><td>Прочее <span class="sub">(по SKU)</span></td><td><b>${RUB(directOther)}</b></td></tr>
-       <tr><td>Компенсации <span class="sub">(по SKU)</span></td><td><b>${RUB(compensation)}</b></td></tr>
-       <tr class="total-row"><td>Подытог после прямых расходов</td><td>${RUB(directSubtotal)}</td></tr>
+       <tr><td>Комиссия <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directCommission)}</b></td></tr>
+       <tr><td>Логистика <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directDelivery)}</b></td></tr>
+       <tr><td>Партнёрские услуги <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directPartner)}</b></td></tr>
+       <tr><td>Продвижение <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directPromotion)}</b></td></tr>
+       <tr><td>Прочее <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directOther)}</b></td></tr>
+       <tr><td>Компенсации <span class="sub">(по SKU)</span></td><td><b>${moneyPct(compensation)}</b></td></tr>
+       <tr class="total-row"><td>Подытог после прямых расходов</td><td>${moneyPct(directSubtotal,true)}</td></tr>
 
        <tr><td colspan="2" style="padding-top:16px"><b>Распределённые расходы маркетплейса</b></td></tr>
-       <tr><td>Эквайринг <span class="sub">(по чистым продажам)</span></td><td><b>${RUB(allocatedAcquiring)}</b></td></tr>
-       <tr><td>Логистика <span class="sub">(по типу расхода)</span></td><td><b>${RUB(allocatedDelivery)}</b></td></tr>
-       <tr><td>FBO <span class="sub">(по чистым продажам)</span></td><td><b>${RUB(allocatedFbo)}</b></td></tr>
-       <tr><td>Партнёрские услуги <span class="sub">(по чистым продажам)</span></td><td><b>${RUB(allocatedPartner)}</b></td></tr>
-       <tr><td>Продвижение <span class="sub">(по чистым продажам)</span></td><td><b>${RUB(allocatedPromotion)}</b></td></tr>
-       <tr><td>Прочее <span class="sub">(по чистым продажам)</span></td><td><b>${RUB(allocatedOther)}</b></td></tr>
+       <tr><td>Эквайринг <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedAcquiring)}</b></td></tr>
+       <tr><td>Логистика <span class="sub">(по типу расхода)</span></td><td><b>${moneyPct(allocatedDelivery)}</b></td></tr>
+       <tr><td>FBO <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedFbo)}</b></td></tr>
+       <tr><td>Партнёрские услуги <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedPartner)}</b></td></tr>
+       <tr><td>Продвижение <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedPromotion)}</b></td></tr>
+       <tr><td>Прочее <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedOther)}</b></td></tr>
        ${unexplainedShared?`<tr><td>Не разнесено <span class="sub">(контрольный остаток)</span></td><td><b>${RUB(unexplainedShared)}</b></td></tr>`:""}
-       <tr class="total-row"><td>Итого после всех расходов маркетплейса</td><td>${RUB(received)}</td></tr>
+       <tr class="total-row"><td>Итого после всех расходов маркетплейса</td><td>${moneyPct(received,true)}</td></tr>
        <tr class="total-row"><td>Итого после всех расходов маркетплейса / шт</td><td>${RUB(perUnit)}</td></tr>
 
        <tr><td colspan="2" style="padding-top:16px"><b>Расходы бизнеса</b></td></tr>
-       ${businessRows.map(r=>`<tr><td>${r[0]} <span class="sub">(${r[2]})</span></td><td><b>${fmtMaybe(r[1])}</b></td></tr>`).join("")}
-       <tr class="total-row"><td>Итого после всех расходов бизнеса</td><td>${businessLoaded?RUB(finalAfterBusiness):"—"}</td></tr>
+       ${businessRows.map(r=>`<tr><td>${r[0]} <span class="sub">(${r[2]})</span></td><td><b>${r[1]===null?"—":moneyPct(r[1])}</b></td></tr>`).join("")}
+       <tr class="total-row"><td>Итого после всех расходов бизнеса</td><td>${businessLoaded?moneyPct(finalAfterBusiness,true):"—"}</td></tr>
        <tr class="total-row"><td>Итого после всех расходов бизнеса / шт</td><td>${businessLoaded?RUB(finalPerUnit):"—"}</td></tr>
      </tbody>
    </table>
-   <div class="source-note">Для августа 2026 типизация построена по фактическим type_id Ozon Finance API. Доставка 32/59/98 идёт напрямую по SKU; FBO 12/77/71, эквайринг 1, страхование 76, продвижение 41/52 и прочее 15 распределяются по утверждённой модели. Контрольный остаток для типизированного месяца равен нулю.</div>`}
+   <div class="source-note">Проценты в карточке считаются от валовых продаж SKU, как и в финансовой воронке. Для августа 2026 типизация построена по фактическим type_id Ozon Finance API. Доставка 32/59/98 идёт напрямую по SKU; FBO 12/77/71, эквайринг 1, страхование 76, продвижение 41/52 и прочее 15 распределяются по утверждённой модели. Контрольный остаток для типизированного месяца равен нулю.</div>`}
  `;
 }
 
