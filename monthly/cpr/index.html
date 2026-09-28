@@ -630,16 +630,19 @@ function renderTrend(){
 }
 function renderManual(m){
  const b=businessExpenseSlice(m);
- const set=(id,v)=>document.querySelector(id).textContent=b.loaded?RUB(-Math.abs(v)):"—";
+ const set=(id,v)=>document.querySelector(id).textContent=b.loaded&&N(v)!==0?RUB(-Math.abs(v)):"—";
  set("#cogs",b.cogs);set("#opex",b.opex);set("#extlog",b.external_logistics);set("#materials",b.materials);set("#tax",b.tax);set("#businessOther",b.business_other);
  const market=selectedAgg(m);
  const gross=Math.abs(N(market.sales));
- const netProfit=b.loaded?N(market.result)-b.total:null;
- const margin=netProfit==null||!gross?null:netProfit/gross*100;
+ const afterLoaded=b.loaded?N(market.result)-b.total:null;
+ const margin=afterLoaded==null||!gross?null:afterLoaded/gross*100;
+ const hasCogs=N(b.cogs)>0;
+ const resultLabel=hasCogs?"Чистая прибыль":"Промежуточный результат";
+ const resultNote=hasCogs?(margin==null?"":margin.toFixed(1)+"% от продаж"):"без себестоимости";
  document.querySelector("#businessSummary").innerHTML=
    `<div class="sum-card"><div class="l">Результат после МП</div><div class="v">${RUB(market.result)}</div></div>
-    <div class="sum-card"><div class="l">Бизнес-расходы</div><div class="v">${b.loaded?RUB(-b.total):"—"}</div></div>
-    <div class="sum-card"><div class="l">Чистая прибыль</div><div class="v">${netProfit==null?"—":RUB(netProfit)}</div><div class="sub" style="margin:3px 0 0">${margin==null?"":margin.toFixed(1)+"% от продаж"}</div></div>`;
+    <div class="sum-card"><div class="l">Загруженные бизнес-расходы</div><div class="v">${b.loaded?RUB(-b.total):"—"}</div></div>
+    <div class="sum-card"><div class="l">${resultLabel}</div><div class="v">${afterLoaded==null?"—":RUB(afterLoaded)}</div><div class="sub" style="margin:3px 0 0">${resultNote}</div></div>`;
 }
 fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(x=>{
  D=x;
