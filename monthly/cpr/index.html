@@ -197,19 +197,27 @@ function renderSkuDetail(){
  }).join("");
  const noData=skuDetailMarket!=="ALL"&&!stats.has(skuDetailMarket);
 
- const directComm=N(x.commission),allocComm=N(x.allocated_commission),
-       directDel=N(x.logistics),allocDel=N(x.allocated_logistics),
-       directStorage=N(x.storage),allocStorage=N(x.allocated_storage),
-       directPromo=N(x.promotion),allocPromo=N(x.allocated_promotion),
-       directOther=N(x.other),allocOther=N(x.allocated_other);
+ const directCommission=N(x.commission);
+ const directDelivery=N(x.logistics);
+ const directStorage=N(x.storage);
+ const directPromotion=N(x.promotion);
+ const directOther=N(x.other);
+ const compensation=N(x.compensation);
 
+ const allocatedCommission=N(x.allocated_commission);
+ const allocatedDelivery=N(x.allocated_logistics);
+ const allocatedPartner=N(x.allocated_storage);
+ const allocatedPromotion=N(x.allocated_promotion);
+ const allocatedOther=N(x.allocated_other);
+
+ const directSubtotal=N(x.net_sales)+directCommission+directDelivery+directStorage+directPromotion+directOther+compensation;
+ const knownAllocated=allocatedCommission+allocatedDelivery+allocatedPartner+allocatedPromotion+allocatedOther;
  const received=N(x.result);
+ const unexplainedShared=Math.abs((received-(directSubtotal+knownAllocated)))>1 ? received-(directSubtotal+knownAllocated) : 0;
+
  const unitBase=N(x.economic_units)||N(x.sold_units);
  const perUnit=unitBase?received/unitBase:0;
 
- // Бизнес-расходы: пока tenant-level. Распределяем только в режиме "Все"
- // по доле положительных чистых продаж SKU в месяце. Когда появятся прямые
- // SKU-себестоимость/материалы — они заменят распределённую оценку.
  const month=String(base.month).slice(0,7);
  const skuKey=String(base.article||base.sku||"").trim().toLowerCase();
  const monthRows=D.sku.filter(r=>String(r.month).slice(0,7)===month);
@@ -222,25 +230,16 @@ function renderSkuDetail(){
  for(const r of manualRows) manualBy[String(r.expense_type||"").toLowerCase()]=(manualBy[String(r.expense_type||"").toLowerCase()]||0)+N(r.amount);
  const allocManual=type=>skuDetailMarket==="ALL"&&manualBy[type]!=null?-Math.abs(manualBy[type]*share):null;
  const businessRows=[
-   ["Себестоимость",allocManual("cogs")],
-   ["OPEX",allocManual("opex")],
-   ["Внешняя логистика",allocManual("external_logistics")],
-   ["Материалы",allocManual("materials")],
-   ["Прочие бизнес-расходы",allocManual("other")]
+   ["Себестоимость",allocManual("cogs"),"предпочтительно прямой SKU"],
+   ["OPEX",allocManual("opex"),"по чистым продажам"],
+   ["Внешняя логистика",allocManual("external_logistics"),"по чистым продажам"],
+   ["Материалы",allocManual("materials"),"предпочтительно прямой SKU"],
+   ["Прочие бизнес-расходы",allocManual("other"),"по чистым продажам"]
  ];
  const businessLoaded=businessRows.some(r=>r[1]!==null);
  const businessTotal=businessRows.reduce((s,r)=>s+(r[1]===null?0:N(r[1])),0);
  const finalAfterBusiness=received+businessTotal;
  const finalPerUnit=unitBase?finalAfterBusiness/unitBase:0;
-
- const expenseRows=[
-   ["Комиссия",directComm,allocComm],
-   ["Доставка",directDel,allocDel],
-   ["Хранение / партнёрские услуги",directStorage,allocStorage],
-   ["Продвижение",directPromo,allocPromo],
-   ["Прочее",directOther,allocOther]
- ];
-
  const fmtMaybe=v=>v===null?"—":RUB(v);
 
  box.innerHTML=
@@ -257,22 +256,39 @@ function renderSkuDetail(){
      <div class="sku-kpi"><div class="l">После маркета / шт</div><div class="v">${RUB(perUnit)}</div><div class="s">после всех расходов маркетплейса</div></div>
    </div>
    <table class="econ-table">
-     <thead><tr><th>Показатель</th><th>Прямой</th><th>Распределённый</th><th>Итого</th></tr></thead>
+     <thead><tr><th>Показатель</th><th>Метод</th><th></th><th>Итого</th></tr></thead>
      <tbody>
        <tr><td><b>Продажи</b></td><td colspan="2"></td><td><b>${RUB(x.sales)}</b></td></tr>
        <tr><td>Возвраты</td><td colspan="2"></td><td>${RUB(x.returns)}</td></tr>
        <tr><td><b>Чистые продажи</b></td><td colspan="2"></td><td><b>${RUB(x.net_sales)}</b></td></tr>
-       ${expenseRows.map(r=>`<tr><td>${r[0]}</td><td>${RUB(r[1])}</td><td>${RUB(r[2])}</td><td><b>${RUB(N(r[1])+N(r[2]))}</b></td></tr>`).join("")}
-       <tr><td>Компенсации</td><td colspan="2"></td><td><b>${RUB(x.compensation)}</b></td></tr>
-       <tr class="total-row"><td>Итого после расходов маркетплейса</td><td colspan="2"></td><td>${RUB(received)}</td></tr>
-       <tr class="total-row"><td>Итого после расходов маркетплейса / шт</td><td colspan="2"></td><td>${RUB(perUnit)}</td></tr>
+
+       <tr><td colspan="4" style="padding-top:16px"><b>Прямые расходы SKU</b></td></tr>
+       <tr><td>Комиссия</td><td>по SKU</td><td></td><td><b>${RUB(directCommission)}</b></td></tr>
+       <tr><td>Доставка</td><td>по SKU</td><td></td><td><b>${RUB(directDelivery)}</b></td></tr>
+       <tr><td>Хранение / партнёрские услуги</td><td>по SKU</td><td></td><td><b>${RUB(directStorage)}</b></td></tr>
+       <tr><td>Продвижение</td><td>по SKU</td><td></td><td><b>${RUB(directPromotion)}</b></td></tr>
+       <tr><td>Прочее</td><td>по SKU</td><td></td><td><b>${RUB(directOther)}</b></td></tr>
+       <tr><td>Компенсации</td><td>по SKU</td><td></td><td><b>${RUB(compensation)}</b></td></tr>
+       <tr class="total-row"><td>Подытог после прямых расходов</td><td colspan="2"></td><td>${RUB(directSubtotal)}</td></tr>
+
+       <tr><td colspan="4" style="padding-top:16px"><b>Распределённые расходы маркетплейса</b></td></tr>
+       <tr><td>Эквайринг</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedCommission)}</b></td></tr>
+       <tr><td>Доставка</td><td>по типу расхода</td><td></td><td><b>${RUB(allocatedDelivery)}</b></td></tr>
+       <tr><td>FBO</td><td>по чистым продажам</td><td></td><td><b>—</b></td></tr>
+       <tr><td>Хранение / партнёрские услуги</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedPartner)}</b></td></tr>
+       <tr><td>Продвижение</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedPromotion)}</b></td></tr>
+       <tr><td>Прочее</td><td>по чистым продажам</td><td></td><td><b>${RUB(allocatedOther)}</b></td></tr>
+       ${unexplainedShared?`<tr><td>Пока не разнесено по модели</td><td>контрольный остаток</td><td></td><td><b>${RUB(unexplainedShared)}</b></td></tr>`:""}
+       <tr class="total-row"><td>Итого после всех расходов маркетплейса</td><td colspan="2"></td><td>${RUB(received)}</td></tr>
+       <tr class="total-row"><td>Итого после всех расходов маркетплейса / шт</td><td colspan="2"></td><td>${RUB(perUnit)}</td></tr>
+
        <tr><td colspan="4" style="padding-top:16px"><b>Расходы бизнеса</b></td></tr>
-       ${businessRows.map(r=>`<tr><td>${r[0]}</td><td>—</td><td>${fmtMaybe(r[1])}</td><td><b>${fmtMaybe(r[1])}</b></td></tr>`).join("")}
-       <tr class="total-row"><td>Итого после всех расходов</td><td colspan="2"></td><td>${businessLoaded?RUB(finalAfterBusiness):"—"}</td></tr>
-       <tr class="total-row"><td>Итого после всех расходов / шт</td><td colspan="2"></td><td>${businessLoaded?RUB(finalPerUnit):"—"}</td></tr>
+       ${businessRows.map(r=>`<tr><td>${r[0]}</td><td>${r[2]}</td><td></td><td><b>${fmtMaybe(r[1])}</b></td></tr>`).join("")}
+       <tr class="total-row"><td>Итого после всех расходов бизнеса</td><td colspan="2"></td><td>${businessLoaded?RUB(finalAfterBusiness):"—"}</td></tr>
+       <tr class="total-row"><td>Итого после всех расходов бизнеса / шт</td><td colspan="2"></td><td>${businessLoaded?RUB(finalPerUnit):"—"}</td></tr>
      </tbody>
    </table>
-   <div class="source-note">Верхняя часть — фактическая экономика маркетплейса. Расходы бизнеса показываются отдельно и только в режиме «Все»: пока это общие расходы месяца, распределённые по доле чистых продаж SKU. Для себестоимости и материалов позже лучше подключить прямые SKU-данные, а не оставлять распределение по обороту.</div>`}
+   <div class="source-note">Структура зафиксирована: сначала прямые расходы SKU и подытог, затем shared-расходы по утверждённой базе распределения. Эквайринг и FBO уже вынесены отдельными строками модели; исторические данные ещё нужно типизировать, поэтому до полного разнесения может показываться контрольный остаток.</div>`}
  `;
 }
 
