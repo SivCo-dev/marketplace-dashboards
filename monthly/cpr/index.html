@@ -501,8 +501,8 @@ function monthlyMarketRows(monthSku){
    const rk=String(r.article||r.sku||"").trim().toLowerCase();
    if(rk!==key)continue;
    const mk=String(r.marketplace||"OZON").toUpperCase();
-   const a=out.get(mk)||{marketplace:mk,article:r.article||"",product_name:r.product_name||"",sku:r.sku||"",sales:0,returns:0,net_sales:0,sold_units:0,commission:0,allocated_commission:0,logistics:0,allocated_logistics:0,storage:0,allocated_storage:0,promotion:0,allocated_promotion:0,other:0,allocated_other:0,compensation:0,result:0,economic_units:0};
-   for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","economic_units"])a[k]+=N(r[k]);
+   const a=out.get(mk)||{marketplace:mk,article:r.article||"",product_name:r.product_name||"",sku:r.sku||"",sales:0,returns:0,net_sales:0,sold_units:0,commission:0,allocated_commission:0,logistics:0,allocated_logistics:0,storage:0,allocated_storage:0,promotion:0,allocated_promotion:0,other:0,allocated_other:0,compensation:0,result:0,economic_units:0,return_operations:0,disposal_units:0,returns_without_compensation:0,compensated_units:0};
+   for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","economic_units","return_operations","disposal_units","returns_without_compensation","compensated_units"])a[k]+=N(r[k]);
    a.compensation+=N(r.net_compensation_amount);
    a.result+=N(r.final_with_compensation);
    out.set(mk,a);
@@ -567,15 +567,27 @@ function renderSkuDetail(){
  const box=document.querySelector("#skuDetailBody");
  const base=D.sku.find(r=>String(r.month_sku)===String(selectedSku));
  if(!base){box.innerHTML='<div class="sub" style="margin:0">Выбери SKU слева.</div>';return}
- const stats=monthlyMarketRows(selectedSku),markets=["OZON","YANDEX","WB"];
+ const stats=monthlyMarketRows(selectedSku);
+ const marketOrder=["OZON","WB","YANDEX"];
+ const available=marketOrder.filter(mk=>stats.has(mk));
  const all=[...stats.values()];
- const sum=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","compensation","result","economic_units"])a[k]=(a[k]||0)+N(x[k]);return a},{});
- const x=skuDetailMarket==="ALL"?sum(all):(stats.get(skuDetailMarket)||{});
- const tabs=["ALL"].concat(markets).map(mk=>{
+ const sum=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","compensation","result","economic_units","return_operations","disposal_units","returns_without_compensation","compensated_units"])a[k]=(a[k]||0)+N(x[k]);return a},{});
+ const totalStats=sum(all);
+ const x=skuDetailMarket==="ALL"?totalStats:(stats.get(skuDetailMarket)||{});
+ const tabMarkets=available.length>1?["ALL",...available]:available;
+ const tabs=tabMarkets.map(mk=>{
    const cls=mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":mk==="WB"?"wb":"";
    return `<button class="market-tab ${cls} ${skuDetailMarket===mk?'active':''}" onclick="setSkuDetailMarket('${mk}')">${mk==="ALL"?"Все":mk==="YANDEX"?"Яндекс":mk}</button>`
  }).join("");
  const noData=skuDetailMarket!=="ALL"&&!stats.has(skuDetailMarket);
+ const marketCard=(mk,z,isTotal=false)=>{
+   const cls=mk==="OZON"?"ozon":mk==="WB"?"wb":mk==="YANDEX"?"yandex":"total";
+   const label=isTotal?"Итого":mk==="YANDEX"?"Яндекс":mk;
+   const margin=N(z.sales)?N(z.result)/Math.abs(N(z.sales))*100:0;
+   const per=N(z.economic_units)?N(z.result)/N(z.economic_units):0;
+   return `<div class="sku-market-card"><div class="mk ${cls}">${label}</div><div class="main">${RUB(z.net_sales)}</div><div class="minirow"><span>Продано<b>${NUM(z.sold_units)} шт</b></span><span>Результат<b>${RUB(z.result)}</b></span></div><div class="minirow"><span>Маржа<b>${margin.toFixed(1)}%</b></span><span>Получаем/шт<b>${RUB(per)}</b></span></div></div>`;
+ };
+ const marketSummary=available.map(mk=>marketCard(mk,stats.get(mk))).concat(available.length>1?[marketCard("TOTAL",totalStats,true)]:[]).join("");
 
  const typedRows=(D.expense_detail||[]).filter(r=>String(r.month_sku)===String(base.month_sku) && (skuDetailMarket==="ALL"||String(r.marketplace||"OZON").toUpperCase()===skuDetailMarket));
  const typed=Object.fromEntries(typedRows.map(r=>[r.expense_code,N(r.amount)]));
@@ -653,7 +665,8 @@ function renderSkuDetail(){
     <div class="sku-photo">Фото товара<br>подключим позже</div>
     <div><div class="sku-title">${base.article||base.sku}</div><div class="sku-name">${base.product_name||""}</div><div class="sku-meta">SKU: ${base.sku} • ${monthName(String(base.month).slice(0,10))}</div></div>
   </div>
-  <div class="market-toolbar"><div><div class="section-title">Маркетплейс</div><div class="sub" style="margin:2px 0 0">Карточка независима от фильтра страницы.</div></div><div class="market-tabs">${tabs}</div></div>
+  <div class="sku-market-summary">${marketSummary}</div>
+  <div class="market-toolbar"><div><div class="section-title">Детализация</div><div class="sub" style="margin:2px 0 0">Сверху — сравнение маркетов, ниже — подробная экономика выбранного.</div></div><div class="market-tabs">${tabs}</div></div>
   ${noData?'<div class="empty">По этому SKU на выбранном маркетплейсе данных пока нет.</div>':
   `<div class="sku-kpis">
      <div class="sku-kpi"><div class="l">Продано</div><div class="v">${NUM(x.sold_units)} шт</div></div>
