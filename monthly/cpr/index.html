@@ -22,7 +22,7 @@
 .preview-wrap{margin-top:12px;overflow:auto;max-height:300px;border:1px solid var(--line);border-radius:10px}.preview-wrap table{width:100%;border-collapse:collapse;font-size:12px}.preview-wrap th,.preview-wrap td{padding:7px 9px;border-bottom:1px solid #eef1f5;white-space:nowrap;text-align:right}.preview-wrap th:first-child,.preview-wrap td:first-child{text-align:left}
 .import-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.import-actions button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font:inherit;font-weight:800;cursor:pointer}.import-actions .primary{background:var(--market-accent);border-color:var(--market-accent);color:#fff}.import-actions button:disabled{opacity:.45;cursor:not-allowed}
 .filters{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin-bottom:16px}.f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.f label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:4px}.f select{width:100%;border:0;background:transparent;font:inherit;font-weight:700;outline:none}
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.kpi .meta{font-size:12px;color:var(--muted);font-weight:650;line-height:1.35}.kpi .meta .sep{opacity:.55;padding:0 4px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
 .grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{grid-template-columns:1.05fr 1.55fr;align-items:start}.right-stack{display:grid;gap:16px;align-content:start}.main-finance-grid.all-markets{grid-template-columns:1fr}.main-finance-grid.all-markets .finance-card{width:100%}.main-finance-grid.all-markets .right-stack{grid-template-columns:1.35fr .85fr;align-items:start}.secondary-grid{grid-template-columns:1.05fr 1.55fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
 .funnel .row{display:grid;grid-template-columns:1.5fr .8fr .55fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f7}.funnel .row:last-child{border-bottom:0}.funnel .amt,.funnel .pct{text-align:right;font-variant-numeric:tabular-nums}.funnel .final{background:#eefaf5;margin:8px -10px -6px;padding:12px 10px;border-radius:10px;font-weight:850}.expense{color:var(--red)}.income{color:var(--green)}
 .trend-wrap{overflow-x:auto}
@@ -323,18 +323,36 @@ function render(){
  applyMarketTheme(marketSel);
  const a=selectedAgg(m),b=selectedAgg(c);
  const selectedRows=filtSku(m), compareRows=filtSku(c);
- const comp=N(a.compensation);
- const result=N(a.result);
- const rate=N(a.sales)?result/N(a.sales)*100:0;
+ const comp=N(a.compensation),compB=N(b.compensation);
+ const marketExpenses=Math.abs(N(a.directExpense)+N(a.allocatedExpense));
+ const marketExpensesB=Math.abs(N(b.directExpense)+N(b.allocatedExpense));
+ const resultNoComp=N(a.net_sales)+N(a.directExpense)+N(a.allocatedExpense);
+ const resultNoCompB=N(b.net_sales)+N(b.directExpense)+N(b.allocatedExpense);
+ const biz=businessExpenseSlice(m),bizB=businessExpenseSlice(c);
+ const businessExpenses=N(biz.total),businessExpensesB=N(bizB.total);
+ const finalAfterAll=N(a.result)-businessExpenses;
+ const finalAfterAllB=N(b.result)-businessExpensesB;
+ const gross=Math.abs(N(a.sales)),grossB=Math.abs(N(b.sales));
+ const clean=Math.abs(N(a.net_sales)),cleanB=Math.abs(N(b.net_sales));
+ const ratio=(v,d)=>d?N(v)/Math.abs(N(d))*100:null;
+ const pp=(now,prev)=>now==null||prev==null?null:now-prev;
+ const ppHtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>0?'pos':d<0?'neg':'neu'}">${d>0?'+':''}${d.toFixed(1)} п.п.</span>`;
+
+ const marketExpensePct=ratio(marketExpenses,clean),marketExpensePctB=ratio(marketExpensesB,cleanB);
+ const resultNoCompPct=ratio(resultNoComp,gross),resultNoCompPctB=ratio(resultNoCompB,grossB);
+ const compPct=ratio(comp,gross),compPctB=ratio(compB,grossB);
+ const businessPct=ratio(businessExpenses,gross),businessPctB=ratio(businessExpensesB,grossB);
+ const finalPct=ratio(finalAfterAll,gross),finalPctB=ratio(finalAfterAllB,grossB);
+
  const k=[
-  ["Продажи",RUB(a.net_sales),delta(a.net_sales,b.net_sales)],
-  ["Продано",NUM(a.sold_units)+" шт",delta(a.sold_units,b.sold_units)],
-  ["Результат Ozon",RUB(result),delta(result,b.result)],
-  ["Ozon-маржа",rate.toFixed(1)+"%",null],
-  ["Возвраты",RUB(Math.abs(N(a.returns))),delta(Math.abs(N(a.returns)),Math.abs(N(b.returns)))],
-  ["Компенсации",RUB(comp),delta(comp,N(b.compensation))]
+  ["Чистые продажи",RUB(a.net_sales),`${NUM(a.sold_units)} шт`,null],
+  ["Расходы маркетплейса",RUB(-marketExpenses),`${marketExpensePct==null?"—":marketExpensePct.toFixed(1)+"%"} от чистых продаж`,pp(marketExpensePct,marketExpensePctB)],
+  ["Результат Ozon без компенсаций",RUB(resultNoComp),`${resultNoCompPct==null?"—":resultNoCompPct.toFixed(1)+"%"} от GMV`,pp(resultNoCompPct,resultNoCompPctB)],
+  ["Компенсации",RUB(comp),`${compPct==null?"—":compPct.toFixed(1)+"%"} от GMV`,pp(compPct,compPctB)],
+  ["Бизнес-расходы",biz.loaded?RUB(-businessExpenses):"—",biz.loaded?`${businessPct==null?"—":businessPct.toFixed(1)+"%"} от GMV`:"данные не загружены",biz.loaded&&bizB.loaded?pp(businessPct,businessPctB):null],
+  ["Итог после всех расходов",biz.loaded?RUB(finalAfterAll):"—",biz.loaded?`${finalPct==null?"—":finalPct.toFixed(1)+"%"} от GMV`:"после загрузки бизнес-расходов",biz.loaded&&bizB.loaded?pp(finalPct,finalPctB):null]
  ];
- document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="delta">${dhtml(x[2])}</div></div>`).join("");
+ document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="meta">${x[2]}${x[3]===null?"":'<span class="sep">•</span>'+ppHtml(x[3])}</div></div>`).join("");
 
 
 
