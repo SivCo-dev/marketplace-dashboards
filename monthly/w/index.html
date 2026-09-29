@@ -69,7 +69,7 @@
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="title"><h1>W Monthly Report</h1><p>Финансовые результаты маркетплейсов • версия 1.0</p></div>
+    <div class="title"><h1>W Monthly Report</h1><p>Финансовые результаты маркетплейсов • расходы закрытых месяцев из начислений Ozon</p></div>
     <div class="dev"><span class="badge">MONTHLY 1.0</span><div class="updated" id="updated">Загрузка…</div></div>
   </div>
 
@@ -921,7 +921,7 @@ fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);re
  document.querySelector("#marketFilter").innerHTML='<option value="ALL">Все</option>'+markets.map(m=>`<option value="${m}">${m==="YANDEX"?"Яндекс":m==="OZON"?"Ozon":m}</option>`).join("");
  document.querySelector("#month").onchange=render;document.querySelector("#compare").onchange=render;document.querySelector("#category").onchange=render;document.querySelector("#marketFilter").onchange=render;document.querySelector("#skuQuickSearch").onkeydown=e=>{if(e.key==="Enter")openQuickSku()};
  const liveMin=x.meta?.live_min_date,liveMax=x.meta?.live_max_date;
- document.querySelector("#notice").textContent=`Важно: июнь–август — закрытые данные W. Текущий месяц собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
+ document.querySelector("#notice").textContent=`Важно: июнь–август — закрытые данные W. Расходы июля–августа — напрямую из отчёта по начислениям Ozon. Текущий месяц собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
  document.querySelector("#updated").textContent="Обновлено "+new Date(x.meta?.generated_at||Date.now()).toLocaleString("ru-RU");
  toggleSkuSearch(true);
  render();
