@@ -128,7 +128,7 @@
 
   <div class="grid section secondary-grid">
     <div class="card">
-      <h2>Структура расходов</h2><div class="sub">Сумма и доля от валовых продаж</div>
+      <h2>Структура расходов</h2><div class="sub">Комиссия, логистика, эквайринг, партнёрские услуги, продвижение и прочие расходы</div>
       <div class="expense-list" id="expenses"></div>
     </div>
     <div class="card">
@@ -295,16 +295,16 @@ function rowTypedEconomics(r){
  }
  const z={};
  for(const x of detail)z[x.expense_code]=(z[x.expense_code]||0)+N(x.amount);
- const commission=N(z.commission_direct),
+ const commission=N(z.commission_direct)+N(z.commission_allocated),
        logistics=N(z.delivery_direct)+N(z.delivery_allocated),
-       acquiring=N(z.acquiring_allocated),
-       fbo=N(z.fbo_allocated),
+       acquiring=N(z.acquiring_direct)+N(z.acquiring_allocated),
+       fbo=N(z.fbo_direct)+N(z.fbo_allocated),
        partner=N(z.partner_direct)+N(z.partner_allocated),
        promotion=N(z.promotion_direct)+N(z.promotion_allocated),
        other=N(z.other_direct)+N(z.other_allocated),
        compensation=N(z.compensation);
- const directExpense=N(z.commission_direct)+N(z.delivery_direct)+N(z.partner_direct)+N(z.promotion_direct)+N(z.other_direct);
- const allocatedExpense=N(z.acquiring_allocated)+N(z.delivery_allocated)+N(z.fbo_allocated)+N(z.partner_allocated)+N(z.promotion_allocated)+N(z.other_allocated);
+ const directExpense=N(z.commission_direct)+N(z.delivery_direct)+N(z.acquiring_direct)+N(z.fbo_direct)+N(z.partner_direct)+N(z.promotion_direct)+N(z.other_direct);
+ const allocatedExpense=N(z.commission_allocated)+N(z.acquiring_allocated)+N(z.delivery_allocated)+N(z.fbo_allocated)+N(z.partner_allocated)+N(z.promotion_allocated)+N(z.other_allocated);
  const expenseTotal=directExpense+allocatedExpense;
  const directSubtotal=N(r.net_sales)+directExpense+compensation;
  const result=N(r.net_sales)+expenseTotal+compensation;
