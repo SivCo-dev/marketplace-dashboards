@@ -227,7 +227,8 @@ function businessExpenseSlice(month){
  const rows=(D.manual_expenses||[]).filter(r=>String(r.month).slice(0,7)===month);
  const selected=filtSku(month);
  const selectedKeys=new Set(selected.map(r=>String(r.month_sku)));
- const costMap=new Map((D.unit_costs||[]).map(x=>[String(x.article||""),N(x.unit_cost)]));
+ const monthDate=month+"-01";
+ const costMap=new Map((D.unit_costs||[]).filter(x=>(!x.valid_from||monthDate>=String(x.valid_from).slice(0,10))&&(!x.valid_to||monthDate<=String(x.valid_to).slice(0,10))).map(x=>[String(x.article||""),N(x.unit_cost)]));
  const out={cogs:0,opex:0,external_logistics:0,materials:0,tax:0,business_other:0,loaded:false};
 
  // Себестоимость — напрямую по модели × экономические единицы.
@@ -628,7 +629,8 @@ function renderSkuDetail(){
  const marketPct=N(x.net_sales)?received/Math.abs(N(x.net_sales))*100:null;
  const skuKey=String(base.article||base.sku||"").trim().toLowerCase();
  const marketKey=skuDetailMarket==="ALL"?null:skuDetailMarket;
- const costMap=new Map((D.unit_costs||[]).map(r=>[String(r.article||"").trim().toLowerCase(),N(r.unit_cost)]));
+ const monthDate=month+"-01";
+ const costMap=new Map((D.unit_costs||[]).filter(r=>(!r.valid_from||monthDate>=String(r.valid_from).slice(0,10))&&(!r.valid_to||monthDate<=String(r.valid_to).slice(0,10))).map(r=>[String(r.article||"").trim().toLowerCase(),N(r.unit_cost)]));
  const unitCost=costMap.get(skuKey)||0;
  const cogs=unitCost*unitBase;
 
