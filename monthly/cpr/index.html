@@ -335,8 +335,8 @@ function render(){
  const gross=Math.abs(N(a.sales)),grossB=Math.abs(N(b.sales));
  const clean=Math.abs(N(a.net_sales)),cleanB=Math.abs(N(b.net_sales));
  const ratio=(v,d)=>d?N(v)/Math.abs(N(d))*100:null;
- const pp=(now,prev)=>now==null||prev==null?null:now-prev;
- const ppHtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>0?'pos':d<0?'neg':'neu'}">${d>0?'+':''}${d.toFixed(1)} п.п.</span>`;
+ const ratioDelta=(now,prev)=>now==null||prev==null||prev===0?null:(now/prev-1)*100;
+ const ratioDeltaHtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>0?'pos':d<0?'neg':'neu'}">${d>0?'+':''}${d.toFixed(1)}%</span>`;
 
  const marketExpensePct=ratio(marketExpenses,clean),marketExpensePctB=ratio(marketExpensesB,cleanB);
  const resultNoCompPct=ratio(resultNoComp,gross),resultNoCompPctB=ratio(resultNoCompB,grossB);
@@ -346,13 +346,13 @@ function render(){
 
  const k=[
   ["Чистые продажи",RUB(a.net_sales),`${NUM(a.sold_units)} шт`,null],
-  ["Расходы маркетплейса",RUB(-marketExpenses),`${marketExpensePct==null?"—":marketExpensePct.toFixed(1)+"%"} от чистых продаж`,pp(marketExpensePct,marketExpensePctB)],
-  ["Результат Ozon без компенсаций",RUB(resultNoComp),`${resultNoCompPct==null?"—":resultNoCompPct.toFixed(1)+"%"} от GMV`,pp(resultNoCompPct,resultNoCompPctB)],
-  ["Компенсации",RUB(comp),`${compPct==null?"—":compPct.toFixed(1)+"%"} от GMV`,pp(compPct,compPctB)],
-  ["Бизнес-расходы",biz.loaded?RUB(-businessExpenses):"—",biz.loaded?`${businessPct==null?"—":businessPct.toFixed(1)+"%"} от GMV`:"данные не загружены",biz.loaded&&bizB.loaded?pp(businessPct,businessPctB):null],
-  ["Итог после всех расходов",biz.loaded?RUB(finalAfterAll):"—",biz.loaded?`${finalPct==null?"—":finalPct.toFixed(1)+"%"} от GMV`:"после загрузки бизнес-расходов",biz.loaded&&bizB.loaded?pp(finalPct,finalPctB):null]
+  ["Расходы маркетплейса",RUB(-marketExpenses),`${marketExpensePct==null?"—":marketExpensePct.toFixed(1)+"%"} от чистых продаж`,ratioDelta(marketExpensePct,marketExpensePctB)],
+  ["Результат Ozon без компенсаций",RUB(resultNoComp),`${resultNoCompPct==null?"—":resultNoCompPct.toFixed(1)+"%"} от GMV`,ratioDelta(resultNoCompPct,resultNoCompPctB)],
+  ["Компенсации",RUB(comp),`${compPct==null?"—":compPct.toFixed(1)+"%"} от GMV`,ratioDelta(compPct,compPctB)],
+  ["Бизнес-расходы",biz.loaded?RUB(-businessExpenses):"—",biz.loaded?`${businessPct==null?"—":businessPct.toFixed(1)+"%"} от GMV`:"данные не загружены",biz.loaded&&bizB.loaded?ratioDelta(businessPct,businessPctB):null],
+  ["Итог после всех расходов",biz.loaded?RUB(finalAfterAll):"—",biz.loaded?`${finalPct==null?"—":finalPct.toFixed(1)+"%"} от GMV`:"после загрузки бизнес-расходов",biz.loaded&&bizB.loaded?ratioDelta(finalPct,finalPctB):null]
  ];
- document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="meta">${x[2]}${x[3]===null?"":'<span class="sep">•</span>'+ppHtml(x[3])}</div></div>`).join("");
+ document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="meta">${x[2]}${x[3]===null?"":'<span class="sep">•</span>'+ratioDeltaHtml(x[3])}</div></div>`).join("");
 
 
 
