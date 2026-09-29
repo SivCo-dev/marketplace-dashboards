@@ -460,7 +460,22 @@ function render(){
  const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
  document.querySelector("#sku").innerHTML=sku.map(x=>{
    const e=rowTypedEconomics(x);
-   return `<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')"><td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td><td>${RUB(x.net_sales)}</td><td>${NUM(x.sold_units)}</td><td>${RUB(e.commission)}</td><td>${RUB(e.logistics)}</td><td>${RUB(e.compensation)}</td><td><b>${RUB(e.result)}</b></td><td><b>${RUB(e.perUnit)}</b></td></tr>`;
+   const otherExpenses=N(e.acquiring)+N(e.fbo)+N(e.partner)+N(e.promotion)+N(e.other);
+   const returnWriteoffUnits=N(x.return_operations)+N(x.disposal_units)+N(x.returns_without_compensation)+N(x.compensated_units);
+   const returnWriteoffPct=N(x.economic_units)?returnWriteoffUnits/N(x.economic_units)*100:0;
+   const resultPct=N(x.sales)?N(e.result)/Math.abs(N(x.sales))*100:0;
+   return `<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')">
+     <td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td>
+     <td>${RUB(x.net_sales)}</td>
+     <td>${NUM(x.sold_units)}</td>
+     <td>${RUB(e.commission)}</td>
+     <td>${RUB(e.logistics)}</td>
+     <td>${RUB(otherExpenses)}</td>
+     <td><b>${NUM(returnWriteoffUnits)} шт</b><br><span class="sub">${returnWriteoffPct.toFixed(1)}%</span></td>
+     <td>${RUB(e.compensation)}</td>
+     <td><b>${RUB(e.result)}</b><br><span class="sub">(${resultPct.toFixed(1)}%)</span></td>
+     <td><b>${RUB(e.perUnit)}</b></td>
+   </tr>`;
  }).join("");
 
  populateSkuQuickSearch();
