@@ -48,15 +48,15 @@
 .cat-bar{height:9px;background:#eef1f6;border-radius:7px;overflow:hidden}.cat-bar>span{display:block;height:100%;border-radius:7px}
 .cat-bar.sales>span{background:var(--market-accent)}.cat-bar.expenses>span{background:#e99199}.cat-bar.result>span{background:#75c69b}
 .cat-value{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}.cat-pct{color:var(--muted);font-size:10px;font-weight:700;margin-left:4px}.cat-table th,.cat-table td,.market-table th,.market-table td,.sku-table th,.sku-table td{padding:10px 8px;border-bottom:1px solid #eef1f5;text-align:right;font-variant-numeric:tabular-nums}.cat-table th:first-child,.cat-table td:first-child,.market-table th:first-child,.market-table td:first-child,.sku-table th:first-child,.sku-table td:first-child{text-align:left}.cat-table th,.market-table th,.sku-table th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
-.bottom{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(360px,.75fr);gap:16px}.notice{margin-bottom:16px;background:#fff8e8;border:1px solid #ffe3a8;color:#8a5a00;border-radius:12px;padding:11px 14px;font-size:12px}
+.bottom{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px}.notice{margin-bottom:16px;background:#fff8e8;border:1px solid #ffe3a8;color:#8a5a00;border-radius:12px;padding:11px 14px;font-size:12px}
 .stockgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.business-grid{grid-template-columns:repeat(3,1fr)}.business-summary{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.business-summary .sum-card{background:#fafbfc;border:1px solid var(--line);border-radius:11px;padding:12px}.business-summary .sum-card .l{font-size:10px;color:var(--muted);font-weight:750;text-transform:uppercase}.business-summary .sum-card .v{font-size:19px;font-weight:850;margin-top:4px}.mini{border:1px solid var(--line);border-radius:12px;padding:14px}.mini .l{color:var(--muted);font-size:11px}.mini .v{font-size:19px;font-weight:800;margin-top:4px}
 .section{margin-top:16px}.scroll{max-height:410px;overflow:auto}.empty{color:var(--muted);padding:20px;text-align:center}
-.sku-table{font-size:11.5px;table-layout:auto}
-.sku-table th,.sku-table td{padding:8px 4px}
-.sku-table th{font-size:9.5px;letter-spacing:.015em;line-height:1.15;white-space:normal}
+.sku-table{font-size:10.5px;table-layout:auto}
+.sku-table th,.sku-table td{padding:8px 3px}
+.sku-table th{font-size:9px;letter-spacing:0;line-height:1.1;white-space:normal}
 .sku-table td:not(:first-child){white-space:nowrap}
-.sku-table td:first-child{min-width:112px}
-.sku-table td:first-child .sub{font-size:10px}
+.sku-table td:first-child{min-width:94px}
+.sku-table td:first-child .sub{font-size:9.5px}
 .sku-table tbody tr{cursor:pointer}.sku-table tbody tr:hover,.sku-table tbody tr.active-row{background:#f4f7ff}
 .sku-search-card{padding:12px}.sku-search-toggle{display:none;border:0;background:transparent;padding:0;font:inherit;font-weight:800;color:var(--market-accent);cursor:pointer}.sku-search-card.collapsed .sku-search-toggle{display:block}.sku-search-card.collapsed .sku-search-body{display:none}.sku-search-body label{display:block;font-size:11px;color:var(--muted);font-weight:750;margin-bottom:6px}.sku-search-row{display:grid;grid-template-columns:1fr auto;gap:8px}.sku-search-row input{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font:inherit;min-width:0}.sku-search-row button{border:1px solid var(--market-accent);background:var(--market-accent);color:#fff;border-radius:9px;padding:9px 12px;font:inherit;font-weight:750;cursor:pointer}.detail-panel{position:sticky;top:18px;max-height:calc(100vh - 36px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.sku-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}.sku-photo{width:86px;height:86px;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:11px;background:#fafbfc;flex:0 0 auto}.sku-title{font-size:21px;font-weight:850}.sku-name{color:var(--muted);margin-top:3px}.sku-meta{font-size:12px;color:var(--muted);margin-top:8px}
 .market-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0 14px;border-top:1px solid var(--line)}.market-toolbar .section-title{font-size:12px;font-weight:800}.market-tabs{display:flex;gap:6px;flex-wrap:wrap}.market-tab{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 11px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}.market-tab.active{background:var(--market-accent);color:#fff;border-color:var(--market-accent)}.market-tab.ozon.active{background:#005bff;border-color:#005bff}.market-tab.yandex.active{background:#ffcc00;color:#111827;border-color:#ffcc00}.market-tab.wb.active{background:#c627b6;border-color:#c627b6}
@@ -140,7 +140,7 @@
   <div class="bottom">
     <div class="card">
       <h2>SKU — экономика месяца</h2><div class="sub">Нажми на SKU — карточка откроется справа, как в ежедневном дашборде.</div>
-      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Шт</th><th>Комиссия</th><th>Логистика</th><th>Компенсации</th><th>Результат</th><th>Получаем/шт</th></tr></thead><tbody id="sku"></tbody></table></div>
+      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Шт</th><th>Комиссия</th><th>Логистика</th><th>Компенсации</th><th>Результат</th><th>Получаем/<br>шт</th></tr></thead><tbody id="sku"></tbody></table></div>
     </div>
     <div>
       <div id="skuSearchCard" class="card sku-search-card">
