@@ -1,6 +1,19 @@
 # Phase 5.1 — Monthly UX redesign
 Status: READY FOR PRODUCT REVIEW (bounded data export; no production cutover).
 
+## Visual iteration — executive dashboard
+
+The shadow frontend now uses the approved warm green/beige executive layout:
+
+- six compact KPI cards;
+- a factual “100 ₽ of sales” allocation view;
+- a comparison panel that stays explicitly unavailable until comparable history exists;
+- expense structure and a financial bridge;
+- one product worklist with single-select modes for all products, leaders, largest marketplace expenses, growth, decline, negative after COGS, and expense-only;
+- growth/decline remain disabled when the contract has no comparable closed month.
+
+No production `/monthly/` route, v1 API, Edge Function, database object, or n8n workflow was changed by this visual iteration.
+
 ## A. What was wrong with the current UI
 The previous view prioritized technical state labels and equal-weight KPI cards.
 It had no product drawer, meaningful SKU triage, marketplace comparison or monthly context.
