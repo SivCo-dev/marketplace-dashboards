@@ -1,82 +1,24 @@
-export const numberOrNull = value => value == null || value === "" ? null : Number(value);
-
-export function money(value) {
-  const n = numberOrNull(value);
-  return n == null || !Number.isFinite(n)
-    ? "—"
-    : `${n.toLocaleString("ru-RU", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })} ₽`;
+export const numberOrNull = v => v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+export const escapeHtml = v => String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+export const money = (v,currency=true) => numberOrNull(v) == null ? "—" : Number(v).toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2}) + (currency ? " ₽" : "");
+export const units = v => numberOrNull(v) == null ? "—" : Number(v).toLocaleString("ru-RU");
+export const rate = (v,base) => numberOrNull(v) == null || numberOrNull(base) == null || Number(base) <= 0 ? null : Math.abs(Number(v))/Number(base)*100;
+export const pct = v => numberOrNull(v) == null ? "—" : Number(v).toLocaleString("ru-RU",{maximumFractionDigits:1})+"%";
+export const monthLabel = v => new Intl.DateTimeFormat("ru-RU",{month:"long",year:"numeric",timeZone:"UTC"}).format(new Date(v+"-01T00:00:00Z"));
+export const shortMonth = v => new Intl.DateTimeFormat("ru-RU",{month:"short",timeZone:"UTC"}).format(new Date(v+"-01T00:00:00Z"));
+export function validatePayload(p) {
+ if(p?.contract_version!=="monthly-api-v2.0"||!p.metadata||!p.financial_economics||!p.expense_structure||!p.units||!Array.isArray(p.sku_rows)) throw new Error("Неподдерживаемый контракт данных"); return p;
 }
-
-export function decimalMoney(value) {
-  const n = numberOrNull(value);
-  return n == null || !Number.isFinite(n)
-    ? "—"
-    : `${n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽`;
+export function selectPayload(bundle,tenant,month,marketplace="ALL") {
+ // ALL currently has one available source; never fabricate a consolidated sum.
+ if(marketplace!=="ALL"&&marketplace!=="OZON") return null;
+ return bundle?.payloads.find(p=>p.metadata.tenant_id===tenant&&p.metadata.month===month&&p.metadata.marketplace==="OZON")??null;
 }
-
-export function units(value) {
-  const n = numberOrNull(value);
-  return n == null || !Number.isFinite(n) ? "—" : n.toLocaleString("ru-RU");
+export const expenseOnly = r => numberOrNull(r.sales)===0&&numberOrNull(r.returns)===0&&numberOrNull(r.marketplace_expenses)!=null&&Number(r.marketplace_expenses)!==0;
+export function filterRows(rows,{search="",category="",focus="all",sort="result_desc"}={}) {
+ const needle=search.trim().toLowerCase();
+ const result=rows.filter(r=>(!needle||[r.article,r.canonical_sku,r.product_name].some(v=>String(v??"").toLowerCase().includes(needle)))&&(!category||String(r.category_id??r.category??"")===category)&&(focus!=="negative"||(numberOrNull(r.result_after_cogs)!=null&&Number(r.result_after_cogs)<0))&&(focus!=="expense-only"||expenseOnly(r)));
+ const key=sort.startsWith("sales")?"sales":sort.startsWith("expenses")?"marketplace_expenses":"result_after_cogs",asc=sort.endsWith("asc");
+ return result.sort((a,b)=>{let av=numberOrNull(a[key]),bv=numberOrNull(b[key]);if(av==null)return bv==null?String(a.canonical_sku).localeCompare(String(b.canonical_sku)):1;if(bv==null)return -1;if(key==="marketplace_expenses"){av=Math.abs(av);bv=Math.abs(bv);}return (asc?av-bv:bv-av)||String(a.canonical_sku).localeCompare(String(b.canonical_sku));});
 }
-
-export function percent(value, base) {
-  const n = numberOrNull(value);
-  const d = numberOrNull(base);
-  return n == null || !d ? "—" : `${(Math.abs(n) / Math.abs(d) * 100).toFixed(1)}%`;
-}
-
-export function monthLabel(value) {
-  const [year, month] = String(value).split("-").map(Number);
-  return new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" })
-    .format(new Date(Date.UTC(year, month - 1, 1)));
-}
-
-export function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-export function validatePayload(payload) {
-  if (!payload || payload.contract_version !== "monthly-api-v2.0") {
-    throw new Error("Неподдерживаемая версия Monthly API");
-  }
-  for (const key of ["metadata", "financial_economics", "units", "expense_structure", "sku_rows"]) {
-    if (!(key in payload)) throw new Error(`Monthly API: отсутствует ${key}`);
-  }
-  if (!Array.isArray(payload.sku_rows)) throw new Error("Monthly API: sku_rows должен быть массивом");
-  return payload;
-}
-
-export function viewModel(payload) {
-  const p = validatePayload(payload);
-  const m = p.metadata;
-  const f = p.financial_economics;
-  const expense = p.expense_structure?.total || {};
-  const expenseRows = [
-    ["Комиссия", expense.commission],
-    ["Логистика", expense.logistics],
-    ["Хранение", expense.storage],
-    ["Продвижение", expense.promotion],
-    ["Прочее", expense.other],
-  ].map(([label, value]) => ({ label, value: numberOrNull(value) }));
-
-  return {
-    metadata: m,
-    financial: f,
-    units: p.units,
-    expenseRows,
-    skuRows: p.sku_rows,
-    warnings: p.warnings || [],
-    isClosed: m.marketplace_close_status === "CLOSED",
-    isLive: m.marketplace_close_status === "LIVE",
-    financeWaiting: m.finance_data_status === "WAITING_FOR_FINANCE",
-  };
-}
-
-export function sumExpenseRows(rows) {
-  return rows.reduce((sum, row) => sum + Math.abs(numberOrNull(row.value) || 0), 0);
-}
+export const monthsBefore = month => {const[y,m]=month.split("-").map(Number);return Array.from({length:4},(_,i)=>new Date(Date.UTC(y,m-4+i,1)).toISOString().slice(0,7));};

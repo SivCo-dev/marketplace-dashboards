@@ -1,0 +1,16 @@
+import {readFile,writeFile} from "node:fs/promises";
+import {randomBytes,createCipheriv,createHash} from "node:crypto";
+import {resolve,dirname} from "node:path";
+const [sourcePath,outputPath,privateDirectory]=process.argv.slice(2);
+if(!sourcePath||!outputPath||!privateDirectory)throw new Error("Usage: seal-review.mjs PRIVATE_SOURCE OUTPUT PRIVATE_DIRECTORY");
+const source=await readFile(sourcePath);const bundle=JSON.parse(source);
+if(bundle.payloads.length!==4)throw new Error("Expected W/CPR September and October only");
+const key=randomBytes(32),iv=randomBytes(12);
+const cipher=createCipheriv("aes-256-gcm",key,iv);
+const ciphertext=Buffer.concat([cipher.update(source),cipher.final(),cipher.getAuthTag()]);
+await writeFile(outputPath,JSON.stringify({version:1,algorithm:"AES-256-GCM",iv:iv.toString("base64url"),ciphertext:ciphertext.toString("base64url")}));
+const fragment="review="+key.toString("base64url");
+const url="https://sivco-dev.github.io/marketplace-dashboards/monthly-v2/?tenant=W&month=2026-09#"+fragment;
+await writeFile(resolve(privateDirectory,"review-access.private.json"),JSON.stringify({fragment,url},null,2));
+await writeFile(resolve(privateDirectory,"OPEN_MONTHLY_REVIEW.private.html"),'<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Monthly — приватная ссылка ревью</title><style>body{font:18px system-ui;padding:60px;background:#f5f5f0;color:#244f42}a{display:inline-block;padding:18px 24px;background:#244f42;color:white;border-radius:12px;text-decoration:none}p{max-width:650px;line-height:1.7}</style><h1>Monthly Dashboard / product review</h1><p>Приватная ссылка открывает зашифрованный срез для W и CPR без входа. Передавайте её только участникам ревью.</p><a rel="noreferrer" href="'+url+'">Открыть Monthly Dashboard →</a>');
+console.log(JSON.stringify({sealed:true,payloads:bundle.payloads.length,bytes:source.length,sha256:createHash("sha256").update(source).digest("hex")}));

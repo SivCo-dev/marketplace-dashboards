@@ -1,101 +1,24 @@
 <!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>Monthly Dashboard v2 — Shadow</title>
-  <link rel="stylesheet" href="./styles.css">
-</head>
-<body>
-  <div class="shell">
-    <header class="topbar">
-      <div>
-        <div class="eyebrow">MARKETPLACE PERFORMANCE</div>
-        <h1>Monthly Dashboard <span>v2</span></h1>
-        <p>Единый финансовый отчёт W / CPR · shadow read-only</p>
-      </div>
-      <div class="top-actions">
-        <span class="shadow-badge">SHADOW URL</span>
-        <div id="userBox" class="user-box" hidden>
-          <span id="userEmail"></span>
-          <button id="signOutButton" class="quiet-button" type="button">Выйти</button>
-        </div>
-      </div>
-    </header>
-
-    <section id="authPanel" class="auth-panel" hidden>
-      <div class="auth-copy">
-        <div class="auth-icon">↗</div>
-        <div>
-          <h2>Доступ к Monthly v2</h2>
-          <p>Войдите через Supabase Auth. Кабинеты доступны только по tenant membership.</p>
-        </div>
-      </div>
-      <form id="authForm" class="auth-form">
-        <label>Email<input id="emailInput" type="email" autocomplete="username" required></label>
-        <label>Пароль<input id="passwordInput" type="password" autocomplete="current-password" required></label>
-        <button type="submit">Войти</button>
-      </form>
-      <div id="authError" class="form-error" role="alert"></div>
-    </section>
-
-    <main id="dashboard" hidden>
-      <section class="toolbar card">
-        <label>Организация<select id="tenantSelect"></select></label>
-        <label>Период<select id="monthSelect"></select></label>
-        <label>Маркетплейс<select disabled><option>Ozon</option></select></label>
-        <div class="toolbar-spacer"></div>
-        <button id="refreshButton" class="refresh-button" type="button">Обновить</button>
-      </section>
-
-      <section id="stateBanner" class="state-banner" aria-live="polite"></section>
-
-      <section class="status-strip card">
-        <div><span>Контур</span><strong id="sourceLayer">—</strong></div>
-        <div><span>Lifecycle</span><strong id="closeStatus">—</strong></div>
-        <div><span>Готовность</span><strong id="readiness">—</strong></div>
-        <div><span>Finance</span><strong id="financeStatus">—</strong></div>
-        <div><span>Обновлено</span><strong id="refreshedAt">—</strong></div>
-      </section>
-
-      <section id="kpiGrid" class="kpi-grid"></section>
-
-      <section class="two-column">
-        <article class="card funnel-card">
-          <div class="card-heading"><div><h2>Экономика месяца</h2><p>Готовые значения reporting layer</p></div><span id="revisionBadge" class="revision-badge"></span></div>
-          <div id="funnel" class="funnel"></div>
-        </article>
-        <article class="card expense-card">
-          <div class="card-heading"><div><h2>Структура расходов</h2><p>Marketplace expenses по группам</p></div><strong id="expenseTotal">—</strong></div>
-          <div id="expenseBars" class="expense-bars"></div>
-          <div class="expense-foot"><span>Прямые</span><strong id="directTotal">—</strong><span>Распределённые</span><strong id="sharedTotal">—</strong></div>
-        </article>
-      </section>
-
-      <section class="card sku-card">
-        <div class="card-heading sku-heading">
-          <div><h2>SKU — экономика месяца</h2><p>Единицы Finance, расходы, COGS и результат</p></div>
-          <label class="search-box">⌕<input id="skuSearch" type="search" placeholder="SKU, артикул или название"></label>
-        </div>
-        <div class="table-scroll">
-          <table>
-            <thead><tr>
-              <th>SKU / товар</th><th>Net sales</th><th>Fin. units</th><th>Комиссия</th><th>Логистика</th><th>Продвижение</th><th>Прочее</th><th>Результат МП</th><th>COGS</th><th>После COGS</th>
-            </tr></thead>
-            <tbody id="skuBody"></tbody>
-          </table>
-        </div>
-        <div id="skuEmpty" class="empty-state" hidden></div>
-      </section>
-
-      <footer class="footer-note">
-        <span>Monthly API v2</span>
-        <span>n8n не участвует в read-path</span>
-        <span id="contractVersion"></span>
-      </footer>
-    </main>
-  </div>
-  <script type="module" src="./app.js"></script>
-</body>
-</html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'">
+<title>Monthly — результат бизнеса</title><link rel="stylesheet" href="./styles.css"></head><body>
+<a class="skip" href="#overview">К отчёту</a>
+<header class="header"><a class="brand" href="#overview" aria-label="Monthly, обзор"><span class="brand-mark">m<span>·</span></span><span>monthly<span class="brand-sub">performance</span></span></a><nav aria-label="Разделы отчёта"><a href="#overview">Обзор</a><a href="#expenses">Расходы</a><a href="#products">Товары</a><a href="#trends">Динамика</a></nav><span class="review-tag"><i></i> Product review</span></header>
+<main class="shell" id="main">
+<section class="page-heading"><div><div class="eyebrow">ЭКОНОМИКА МАРКЕТПЛЕЙСОВ</div><h1>Результат месяца<span class="dot">.</span></h1><p>От оборота к результату. От результата — к каждому товару.</p></div><div class="controls"><label>Кабинет<select id="tenantSelect" aria-label="Кабинет"></select></label><label>Месяц<select id="monthSelect" aria-label="Месяц"></select></label></div></section>
+<div class="scope-line"><div id="marketTabs" class="tabs" role="group" aria-label="Маркетплейс"></div><span id="coverage" class="muted"></span></div>
+<div class="review-note" id="reviewNote" role="status">Открываем срез для ревью…</div>
+<div id="accessNote" class="access-note" hidden>Для просмотра данных откройте приватную ссылку ревью. Она сразу открывает отчёт — аккаунт и пароль не нужны.</div>
+<section id="overview" class="overview section-anchor"><div class="hero"><div class="hero-top"><span class="eyebrow">ТЕКУЩИЙ РЕЗУЛЬТАТ</span><span id="monthStatus" class="pill">—</span></div><div class="hero-number" id="heroResult">—</div><div class="hero-sub">После себестоимости <span id="heroMargin"></span></div><div class="hero-foot"><span id="heroNote">Данные ещё не доступны</span><a href="#products">Что влияет на результат <span>↗</span></a></div></div><div class="journey" id="journey"></div></section>
+<div id="contextLine" class="context-line"></div><section class="insights" id="insights" aria-label="На что обратить внимание"></section>
+<section id="expenses" class="section-anchor analysis-grid">
+<article class="panel"><div class="section-title"><div><span class="section-number">01 / ПРИЧИНЫ</span><h2>Куда уходит выручка</h2></div><span class="subtle-tag">Доля от продаж</span></div><p class="section-desc">Комиссия, доставка и остальные расходы площадок.</p><div id="expenseComposition" class="composition" aria-hidden="true"></div><div class="expense-head"><span>Статья</span><span>Сумма</span><span>От продаж</span></div><div id="expenseRows"></div><div id="expenseDrill" class="expense-drill"></div><p class="footnote">Изменение ставок к прошлому месяцу: — · нет сопоставимого периода.</p></article>
+<article class="panel marketplace-panel"><div class="section-title"><div><span class="section-number">02 / ПЛОЩАДКИ</span><h2>Вклад маркетплейсов</h2></div></div><p class="section-desc">Выручка, нагрузка расходов и результат в одном сравнении.</p><div id="marketComparison"></div><div class="coverage-note">Общий итог учитывает только доступные площадки. WB и Яндекс Маркет пока не подключены.</div></article></section>
+<section id="products" class="panel products section-anchor"><div class="section-title"><div><span class="section-number">03 / ТОЧКИ РОСТА</span><h2>Какие товары дают результат</h2><p class="section-desc">Откройте товар, чтобы увидеть его полную экономику.</p></div><span id="skuCount" class="subtle-tag"></span></div>
+<div class="product-toolbar"><label class="search"><span>⌕</span><input id="skuSearch" type="search" aria-label="Поиск товара" placeholder="Найти по названию, артикулу или SKU"></label><label class="select-label">Категория<select id="categoryFilter" aria-label="Категория"></select></label><label class="select-label">Показать<select id="focusFilter" aria-label="Показать товары"><option value="all">Все товары</option><option value="negative">Убыточные</option><option value="expense-only">Только расходы</option></select></label><label class="select-label">Сортировка<select id="sortSelect" aria-label="Сортировка товаров"><option value="result_desc">Результат ↓</option><option value="result_asc">Результат ↑</option><option value="sales_desc">Продажи ↓</option><option value="expenses_desc">Расходы ↓</option></select></label></div>
+<div class="table-scroll" tabindex="0" aria-label="Таблица товаров, прокрутка по горизонтали"><table><thead><tr><th>Товар / SKU</th><th>Продажи<span>до возвратов</span></th><th>Ед.<span>продано / возврат</span></th><th>Возвраты</th><th>Расходы МП</th><th>Результат МП</th><th>Себестоимость</th><th class="result-col">После COGS</th><th>На ед.<span>результат МП</span></th></tr></thead><tbody id="skuBody"></tbody></table></div><div id="skuEmpty" class="empty" hidden></div><div class="table-footer"><span>Суммы в ₽ · финансовые единицы · товар открывается по клику</span><span>Товары только с расходами включены</span></div></section>
+<section id="trends" class="panel section-anchor"><div class="section-title"><div><span class="section-number">04 / ДИНАМИКА</span><h2>Месяц в контексте</h2></div><span class="subtle-tag">3 полных месяца + текущий</span></div><p class="section-desc">LIVE-период неполный: его значения нельзя напрямую сравнивать с закрытым месяцем.</p><div id="trendTable" class="table-scroll"></div><p class="footnote">Исторические значения и изменения появятся с расширением покрытия v2. Изменения расходов сравниваются в процентных пунктах.</p></section>
+<footer><span>Monthly / management performance</span><details><summary>Состояние данных</summary><pre id="technicalState">Нет данных</pre></details><span>Shadow · только просмотр</span></footer></main>
+<dialog id="productDrawer" aria-labelledby="drawerTitle"><div class="drawer-head"><div><span class="eyebrow">КАРТОЧКА ТОВАРА</span><span id="drawerSku" class="muted"></span></div><button id="drawerClose" class="icon-button" aria-label="Закрыть карточку">✕</button></div><div class="drawer-scroll"><h2 id="drawerTitle"></h2><div id="drawerTabs" class="tabs" role="group" aria-label="Площадка товара"></div><div id="drawerBody"></div></div></dialog>
+<script type="module" src="./app.js"></script></body></html>

@@ -1,191 +1,121 @@
-import { MONTHLY_API_URL, MONTHS, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, TENANTS } from "./config.js";
-import { decimalMoney, escapeHtml, money, monthLabel, numberOrNull, percent, sumExpenseRows, units, viewModel } from "./core.js";
-
-const state = { payload: null, model: null, session: null };
-const query = new URLSearchParams(location.search);
-const localDemo = ["localhost", "127.0.0.1"].includes(location.hostname) && query.get("demo") === "1";
-let supabase = null;
-if (!localDemo) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.95.0");
-  supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js";
+import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js";
+import {openReview} from "./shadow-access.js";
+const $=s=>document.querySelector(s);
+const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",expense:"commission"};
+const query=new URLSearchParams(location.search);
+const dateText=v=>v?new Date(v).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Moscow"})+" МСК":"—";
+const tenant=()=>$("#tenantSelect").value;
+const month=()=>$("#monthSelect").value;
+const finance=()=>state.payload?.financial_economics??{};
+const t=(id,value)=>{$(id).textContent=value;};
+const signedClass=v=>numberOrNull(v)==null?"":Number(v)<0?"negative":"positive";
+const tabs=(selected,attr)=>MARKETPLACES.map(m=>'<button type="button" '+attr+'="'+m.id+'" aria-pressed="'+(m.id===selected)+'">'+e(m.label)+(m.id==="WB"||m.id==="YANDEX"?'<span class="tab-dot"></span>':"")+'</button>').join("");
+function readScope(){return selectPayload(state.bundle,tenant(),month(),state.market);}
+function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);history.replaceState(null,"",url);}
+function renderSummary(){
+ const p=state.payload,f=finance(),m=p?.metadata??{},waiting=m.finance_data_status==="WAITING_FOR_FINANCE";
+ t("#heroResult",money(f.result_after_cogs));$("#heroResult").classList.toggle("loss",numberOrNull(f.result_after_cogs)!=null&&f.result_after_cogs<0);
+ t("#heroMargin",rate(f.result_after_cogs,f.net_sales)==null?"":(f.result_after_cogs<0?"−":"")+pct(rate(f.result_after_cogs,f.net_sales))+" от net sales");
+ t("#monthStatus",p?(m.marketplace_close_status==="CLOSED"?"Месяц закрыт":"LIVE · месяц идёт"):"Нет данных");
+ t("#heroNote",waiting?"Ожидаем Finance за этот месяц":p?"Промежуточный результат · компенсации ещё не завершены":"Финансовые данные площадки недоступны");
+ const journey=[["Продажи",f.sales,"До возвратов"],["Выручка нетто",f.net_sales,"Возвраты: "+money(f.returns)],["Расходы площадок",f.marketplace_expenses,pct(rate(f.marketplace_expenses,f.sales))+" от продаж"],["Осталось после МП",f.result_without_compensation,"Без компенсаций"],["Себестоимость",f.cogs,m.cost_status==="COMPLETE"?"Себестоимость загружена":"Себестоимость недоступна"]];
+ $("#journey").innerHTML=journey.map(([label,value,note],i)=>'<div class="journey-step"><span class="step-index">0'+(i+1)+'</span><div><span class="metric-label">'+e(label)+'</span><strong>'+money(value)+'</strong><small>'+e(note)+'</small></div></div>').join("");
+ $("#contextLine").innerHTML=p?'<span><i class="status-dot"></i>'+e(m.marketplace_close_status==="CLOSED"?"База месяца зафиксирована · ревизия "+m.base_close_revision:"Месяц открыт · данные продолжат поступать")+'</span><span>Компенсации: '+money(f.compensation)+' · '+e(m.compensation_status==="PENDING"?"ожидаются":m.compensation_status==="COMPLETE"?"завершены":"нет данных")+'</span><span>Бизнес-расходы: '+(m.business_expense_status==="NOT_APPLICABLE"?"не применяются":"не доступны")+'</span>':"";
+ if(p) $("#contextLine").insertAdjacentHTML("beforeend",'<span>Списания: — · данные не подключены</span>');
+ const rows=p?.sku_rows??[],losses=rows.filter(r=>numberOrNull(r.result_after_cogs)!=null&&r.result_after_cogs<0),best=filterRows(rows)[0];
+ const largest=GROUPS.map(([key,label])=>({key,label,value:f[key]})).filter(r=>numberOrNull(r.value)!=null).sort((a,b)=>Math.abs(b.value)-Math.abs(a.value))[0];
+ const cards=[
+ ["Расходная нагрузка",largest?pct(rate(f.marketplace_expenses,f.sales)):"—",largest?"Основная статья — "+largest.label.toLowerCase()+": "+pct(rate(largest.value,f.sales))+" от продаж.":waiting?"Finance пока не поступил. Доли появятся вместе с начислениями.":"Данные о расходах отсутствуют.","expenses"],
+ ["Товары в минусе",rows.length?String(losses.length):"—",rows.length?(losses.length?"Проверьте себестоимость и расходы по убыточным SKU.":"Среди доступных SKU нет отрицательного результата после COGS."):"Анализ появится после загрузки товарной экономики.","negative"],
+ ["Лидер результата",best?money(best.result_after_cogs):"—",best?(best.article||best.canonical_sku)+" · откройте полную экономику товара.":"Товар с наибольшим результатом появится здесь.","best"]
+ ];
+ $("#insights").innerHTML=cards.map(([label,value,note,action])=>'<button class="insight" data-insight="'+action+'"><span>'+label+' <b>↗</b></span><strong>'+e(value)+'</strong><small>'+e(note)+'</small></button>').join("");
+ $("#technicalState").textContent=p?JSON.stringify(m,null,2):"Нет данных выбранной площадки";
 }
-
-const $ = selector => document.querySelector(selector);
-const tenantSelect = $("#tenantSelect");
-const monthSelect = $("#monthSelect");
-const dashboard = $("#dashboard");
-const authPanel = $("#authPanel");
-
-function currentTenant() { return TENANTS[tenantSelect.value] ? tenantSelect.value : "W"; }
-function currentMonth() { return MONTHS.includes(monthSelect.value) ? monthSelect.value : MONTHS[0]; }
-
-function populateControls() {
-  tenantSelect.innerHTML = Object.entries(TENANTS).map(([id, cfg]) => `<option value="${id}">${escapeHtml(cfg.label)}</option>`).join("");
-  monthSelect.innerHTML = MONTHS.map(month => `<option value="${month}">${escapeHtml(monthLabel(month))}</option>`).join("");
-  tenantSelect.value = TENANTS[query.get("tenant")?.toUpperCase()] ? query.get("tenant").toUpperCase() : "W";
-  monthSelect.value = MONTHS.includes(query.get("month")) ? query.get("month") : MONTHS[0];
+function renderExpenses(){
+ const p=state.payload,f=finance(),total=p?.expense_structure?.total??{};
+ $("#expenseComposition").innerHTML=GROUPS.map(([key],i)=>'<span class="color-'+i+'" style="width:'+Math.min(100,rate(total[key],Math.abs(f.marketplace_expenses??0))??0)+'%"></span>').join("");
+ $("#expenseRows").innerHTML=GROUPS.map(([key,label],i)=>'<button class="expense-row '+(key===state.expense?"selected":"")+'" data-expense="'+key+'" aria-pressed="'+(key===state.expense)+'"><span><i class="color-'+i+'"></i>'+label+'</span><strong>'+money(total[key])+'</strong><span>'+pct(rate(total[key],f.sales))+'</span></button>').join("");
+ renderExpenseDrill();
 }
-
-function setUrl() {
-  const next = new URL(location.href);
-  next.searchParams.set("tenant", currentTenant());
-  next.searchParams.set("month", currentMonth());
-  if (localDemo) next.searchParams.set("demo", "1");
-  history.replaceState(null, "", next);
+function renderExpenseDrill(){
+ const p=state.payload,key=state.expense,label=GROUPS.find(g=>g[0]===key)[1];
+ const rows=[...(p?.sku_rows??[])].filter(r=>numberOrNull(r[key])!=null&&r[key]!==0).sort((a,b)=>Math.abs(b[key])-Math.abs(a[key])).slice(0,3);
+ $("#expenseDrill").innerHTML='<div class="allocation"><span>'+e(label)+' / прямые<strong>'+money(p?.expense_structure?.direct?.[key])+'</strong></span><span>Распределённые<strong>'+money(p?.expense_structure?.allocated_shared?.[key])+'</strong></span></div><p class="mini-heading">Наибольшие расходы по статье</p>'+ (rows.length?rows.map(r=>'<button class="mini-product" data-sku="'+e(r.canonical_sku)+'"><span>'+e(r.article||r.canonical_sku)+'</span><strong>'+money(r[key])+' ↗</strong></button>').join(""):'<p class="muted">Нет данных для детализации.</p>')+'<p class="micro">«—» означает отсутствие значения в контракте, а не нулевой расход.</p>';
 }
-
-function showAuth() {
-  authPanel.hidden = false; dashboard.hidden = true; $("#userBox").hidden = true;
+function renderMarkets(){
+ $("#marketComparison").innerHTML=MARKETPLACES.filter(m=>m.id!=="ALL").map(m=>{
+ const p=selectPayload(state.bundle,tenant(),month(),m.id),f=p?.financial_economics??{};
+ return '<button class="market-card '+(!p?"unavailable":"")+'" data-market="'+m.id+'"><div class="market-heading"><span class="market-icon '+m.id.toLowerCase()+'">'+(m.id==="OZON"?"O":m.id==="WB"?"W":"Я")+'</span><strong>'+e(m.label)+'</strong><span class="muted">'+(p?"Данные подключены":"Не подключён")+'</span><span>↗</span></div>'+(p?'<div class="market-metrics"><span>Выручка нетто<strong>'+money(f.net_sales)+'</strong></span><span>Расходы / продажи<strong>'+pct(rate(f.marketplace_expenses,f.sales))+'</strong></span><span>После COGS<strong>'+money(f.result_after_cogs)+'</strong></span></div><div class="market-expenses">Расходы МП: '+money(f.marketplace_expenses)+'</div>':'<p>Выручка, расходы и результат появятся после подключения.</p>')+'</button>';
+ }).join("");
 }
-
-function showDashboard() {
-  authPanel.hidden = true; dashboard.hidden = false;
-  $("#userBox").hidden = localDemo;
-  $("#userEmail").textContent = state.session?.user?.email || "";
+function renderProducts(){
+ const source=state.payload?.sku_rows??[];
+ const rows=filterRows(source,{search:$("#skuSearch").value,category:$("#categoryFilter").value,focus:$("#focusFilter").value,sort:$("#sortSelect").value});
+ t("#skuCount",rows.length+" из "+source.length+" SKU");
+ $("#skuBody").innerHTML=rows.map(r=>'<tr><td><button class="product-link" data-sku="'+e(r.canonical_sku)+'"><span class="product-monogram">'+e((r.article||r.canonical_sku||"?").slice(0,2))+'</span><span><strong>'+e(r.article||r.canonical_sku)+'</strong><small>'+e(r.product_name||"Название не передано")+'</small>'+(expenseOnly(r)?'<em>Только расходы</em>':"")+'</span><b>↗</b></button></td><td>'+money(r.sales,false)+'</td><td>'+units(r.financial_sale_units)+' / '+units(r.financial_return_units)+'</td><td>'+money(r.returns,false)+'</td><td>'+money(r.marketplace_expenses,false)+'</td><td>'+money(r.result_without_compensation,false)+'</td><td>'+money(r.cogs,false)+'</td><td class="result-col '+signedClass(r.result_after_cogs)+'">'+money(r.result_after_cogs,false)+'</td><td>'+money(r.result_without_compensation_per_financial_unit,false)+'</td></tr>').join("");
+ $("#skuEmpty").hidden=rows.length>0;
+ t("#skuEmpty",source.length?"Нет товаров по выбранным условиям. Измените поиск или фильтр.":state.payload?.metadata.finance_data_status==="WAITING_FOR_FINANCE"?"Finance за этот месяц ещё не поступил. Товары появятся вместе с начислениями.":"Для выбранной площадки нет товарных данных.");
 }
-
-async function fetchMonthly() {
-  if (localDemo) {
-    const { fixtureFor } = await import("./tests/fixtures.js");
-    return fixtureFor(currentTenant(), currentMonth());
-  }
-  if (!state.session?.access_token) throw new Error("AUTH_REQUIRED");
-  const url = new URL(MONTHLY_API_URL);
-  url.searchParams.set("tenant", currentTenant());
-  url.searchParams.set("month", currentMonth());
-  url.searchParams.set("marketplace", "OZON");
-  const response = await fetch(url, {
-    cache: "no-store",
-    headers: { Authorization: `Bearer ${state.session.access_token}`, apikey: SUPABASE_PUBLISHABLE_KEY },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const code = body.error || `HTTP_${response.status}`;
-    if (response.status === 401) throw new Error("AUTH_REQUIRED");
-    if (response.status === 403) throw new Error("TENANT_ACCESS_DENIED");
-    throw new Error(code);
-  }
-  return body;
+function setCategories(){
+ const rows=state.payload?.sku_rows??[],categories=new Map();
+ for(const r of rows)if(r.category_id!=null||r.category)categories.set(String(r.category_id??r.category),r.category_name??r.category??String(r.category_id));
+ $("#categoryFilter").innerHTML=categories.size?'<option value="">Все категории</option>'+[...categories].map(([id,label])=>'<option value="'+e(id)+'">'+e(label)+'</option>').join(""):'<option value="">Категории не переданы</option>';
+ $("#categoryFilter").disabled=!categories.size;
 }
-
-function renderBanner(model) {
-  const m = model.metadata;
-  const banner = $("#stateBanner");
-  if (model.isClosed) {
-    banner.className = "state-banner closed";
-    banner.textContent = `Закрытый месяц · immutable snapshot revision ${m.base_close_revision}. Marketplace-экономика защищена от последующих изменений.`;
-  } else if (model.financeWaiting) {
-    banner.className = "state-banner live";
-    banner.textContent = "LIVE месяц подготовлен, но Finance за выбранный период ещё не поступил. Значения не заменяются ложными нулями.";
-  } else {
-    banner.className = "state-banner live";
-    banner.textContent = "LIVE месяц · данные обновляются из текущего prepared shadow по мере поступления Finance.";
-  }
+function renderTrends(){
+ const months=monthsBefore(MONTHS[0]);
+ const ps=months.map(m=>selectPayload(state.bundle,tenant(),m,state.market));
+ const series=[["Выручка нетто","net_sales"],["Расходы / продажи","expense_rate"],["Результат МП","result_without_compensation"],["После COGS","result_after_cogs"]];
+ $("#trendTable").innerHTML='<table class="trends-table"><thead><tr><th>Показатель</th>'+months.map((m,i)=>'<th>'+e(shortMonth(m))+'<span>'+(ps[i]?.metadata.marketplace_close_status==="CLOSED"?"Закрыт":ps[i]?.metadata.marketplace_close_status==="LIVE"?"LIVE · неполный":"Нет истории")+'</span></th>').join("")+'</tr></thead><tbody>'+series.map(([label,key])=>'<tr><td>'+label+'</td>'+ps.map(p=>'<td>'+(key==="expense_rate"?pct(rate(p?.financial_economics.marketplace_expenses,p?.financial_economics.sales)):money(p?.financial_economics[key]))+'</td>').join("")+'</tr>').join("")+'</tbody></table>';
 }
-
-function renderStatus(model) {
-  const m = model.metadata;
-  $("#sourceLayer").textContent = m.source_layer || "—";
-  $("#closeStatus").textContent = m.marketplace_close_status || "—";
-  $("#readiness").textContent = m.overall_readiness || "—";
-  $("#financeStatus").textContent = m.finance_data_status || "—";
-  $("#refreshedAt").textContent = m.refreshed_at ? new Date(m.refreshed_at).toLocaleString("ru-RU") : "—";
-  $("#revisionBadge").textContent = `REV ${m.base_close_revision ?? 0}`;
+function render(){
+ state.payload=readScope();$("#marketTabs").innerHTML=tabs(state.market,"data-market");t("#coverage",state.market==="ALL"?"Доступно: Ozon · 1 из 3 площадок":state.market==="OZON"?"Финансовые данные Ozon":"Данные площадки пока не подключены");
+ updateUrl();renderSummary();renderExpenses();renderMarkets();setCategories();renderProducts();renderTrends();
 }
-
-function renderKpis(model) {
-  const f = model.financial;
-  const u = model.units;
-  const cards = [
-    ["Net sales", money(f.net_sales), `Продажи ${money(f.sales)} · возвраты ${money(f.returns)}`],
-    ["Расходы МП", money(f.marketplace_expenses), percent(f.marketplace_expenses, f.sales) + " от продаж"],
-    ["Результат МП", money(f.result_without_compensation), "без компенсаций"],
-    ["COGS", money(f.cogs), model.metadata.cost_status || "—"],
-    ["После COGS", money(f.result_after_cogs), "результат после себестоимости"],
-    ["Fin. units", units(u.financial_net_units), `продажи ${units(u.financial_sale_units)} · возвраты ${units(u.financial_return_units)}`],
-  ];
-  $("#kpiGrid").innerHTML = cards.map(([label, value, meta]) => `<article class="kpi"><div class="kpi-label">${escapeHtml(label)}</div><div class="kpi-value">${escapeHtml(value)}</div><div class="kpi-meta">${escapeHtml(meta)}</div></article>`).join("");
+function dlRows(rows){return '<dl class="detail-list">'+rows.map(([name,value,note])=>'<div><dt>'+e(name)+(note?'<small>'+e(note)+'</small>':"")+'</dt><dd>'+e(value)+'</dd></div>').join("")+'</dl>';}
+function renderDrawer(){
+ const row=state.product;
+ $("#drawerTabs").innerHTML=tabs(state.productMarket,"data-product-market");
+ if(state.productMarket!=="ALL"&&state.productMarket!=="OZON"){$("#drawerBody").innerHTML='<div class="empty drawer-empty"><h3>Площадка ещё не подключена</h3><p>Экономика этого товара появится после подключения источника и сопоставления SKU.</p></div>';return;}
+ const statuses=[["Себестоимость",row.cost_status==="COMPLETE"?"Полная":row.cost_status==="NOT_APPLICABLE"?"Не применима":"Недоступна"],["Компенсации",row.compensation_status==="PENDING"?"Ожидаются":row.compensation_status==="COMPLETE"?"Завершены":"Недоступны"]];
+ const detail=[["Продажи",money(row.sales)],["Возвраты",money(row.returns)],["Выручка нетто",money(row.net_sales)],["Единицы: продано / возврат / нетто",units(row.financial_sale_units)+" / "+units(row.financial_return_units)+" / "+units(row.financial_net_units),"По финансовым операциям"],["Списания, ед.",units(row.written_off_units),"Операционные данные не подключены"],["Комиссия",money(row.commission)],["Логистика",money(row.logistics)],["Хранение",money(row.storage)],["Продвижение",money(row.promotion)],["Прочие расходы",money(row.other)],["Всего расходы МП",money(row.marketplace_expenses)],["Результат без компенсаций",money(row.result_without_compensation)],["Компенсации",money(row.compensation),row.compensation_status==="PENDING"?"Ожидается завершение слоя":""],["Себестоимость единицы",money(row.unit_cost)],["COGS",money(row.cogs)],["Выручка нетто / фин. ед.",money(row.net_sales_per_financial_unit),"Это net sales на единицу, не банковская выплата"],["Результат МП / фин. ед.",money(row.result_without_compensation_per_financial_unit)],["Результат после COGS / ед.","—","Отдельное поле ещё не передано API"]];
+ const timeline=monthsBefore(MONTHS[0]).map(m=>{const p=selectPayload(state.bundle,tenant(),m);const r=p?.sku_rows.find(r=>r.product_id===row.product_id&&r.canonical_sku===row.canonical_sku);return '<div><span>'+e(shortMonth(m))+'</span><strong>'+money(r?.result_after_cogs)+'</strong><small>'+(p?.metadata.marketplace_close_status==="LIVE"?"LIVE · неполный":r?"Закрытый месяц":"Нет истории")+'</small></div>';}).join("");
+ $("#drawerBody").innerHTML='<p class="drawer-scope">'+e(monthLabel(month()))+' · '+(state.productMarket==="ALL"?"Все доступные площадки · только Ozon":"Ozon")+'</p><div class="drawer-result"><span>После себестоимости</span><strong class="'+signedClass(row.result_after_cogs)+'">'+money(row.result_after_cogs)+'</strong><small>Промежуточный результат</small></div><div class="drawer-status">'+statuses.map(([k,v])=>'<span>'+k+': <strong>'+v+'</strong></span>').join("")+'</div><h3>Экономика товара</h3>'+dlRows(detail)+'<h3>Прямые и распределённые расходы</h3><div class="table-scroll"><table class="allocation-table"><thead><tr><th>Статья</th><th>Прямые</th><th>Shared</th></tr></thead><tbody>'+GROUPS.map(([k,l])=>'<tr><td>'+l+'</td><td>'+money(row.expense_structure?.direct?.[k])+'</td><td>'+money(row.expense_structure?.allocated_shared?.[k])+'</td></tr>').join("")+'</tbody></table></div><h3>Вклад площадок в выручку</h3><div class="product-shares"><span>Ozon <strong>'+(numberOrNull(row.net_sales)!=null&&row.net_sales>0?"100% доступной выручки":"Доля неприменима")+'</strong></span><span>WB <strong>Нет данных</strong></span><span>Яндекс Маркет <strong>Нет данных</strong></span></div><p class="micro">Покрытие — только Ozon. Доли не отражают неподключённые площадки.</p><h3>Результат по месяцам</h3><div class="product-timeline">'+timeline+'</div>';
 }
-
-function renderFunnel(model) {
-  const f = model.financial;
-  const rows = [
-    ["Продажи", f.sales, null, ""],
-    ["Возвраты", f.returns, f.sales, ""],
-    ["Net sales", f.net_sales, f.sales, ""],
-    ["Расходы маркетплейса", f.marketplace_expenses, f.sales, ""],
-    ["Результат без компенсаций", f.result_without_compensation, f.sales, "result"],
-    ["Компенсации", f.compensation, f.sales, ""],
-    ["Результат с компенсациями", f.result_with_compensation, f.sales, ""],
-    ["Себестоимость", f.cogs == null ? null : -Math.abs(f.cogs), f.sales, ""],
-    ["Результат после COGS", f.result_after_cogs, f.sales, "result"],
-    ["Финальный бизнес-результат", f.final_business_result, f.sales, "result"],
-  ];
-  $("#funnel").innerHTML = rows.map(([name, value, base, cls]) => `<div class="funnel-row ${cls}"><span class="name">${escapeHtml(name)}</span><span class="ratio">${escapeHtml(base == null ? "" : percent(value, base))}</span><span class="amount">${escapeHtml(money(value))}</span></div>`).join("");
+function openProduct(sku){
+ const row=state.payload?.sku_rows.find(r=>String(r.canonical_sku)===String(sku));if(!row)return;
+ state.product=row;state.productMarket=state.market==="OZON"?"OZON":"ALL";
+ t("#drawerTitle",row.product_name||row.article||row.canonical_sku);t("#drawerSku",(row.article||"")+" · SKU "+row.canonical_sku);
+ renderDrawer();$("#productDrawer").showModal();document.body.classList.add("drawer-open");$(".drawer-scroll").scrollTop=0;
 }
-
-function groupTotal(group) {
-  if (!group) return null;
-  const values = ["commission", "logistics", "storage", "promotion", "other"].map(key => numberOrNull(group[key]));
-  return values.every(value => value == null) ? null : values.reduce((sum, value) => sum + Math.abs(value || 0), 0);
-}
-
-function renderExpenses(model) {
-  const total = sumExpenseRows(model.expenseRows);
-  const max = Math.max(1, ...model.expenseRows.map(row => Math.abs(row.value || 0)));
-  $("#expenseTotal").textContent = total || model.expenseRows.some(row => row.value != null) ? money(-total) : "—";
-  $("#expenseBars").innerHTML = model.expenseRows.map(row => `<div class="expense-line"><span class="expense-name">${escapeHtml(row.label)}</span><span class="expense-track"><span class="expense-fill" style="width:${row.value == null ? 0 : Math.max(2, Math.abs(row.value) / max * 100)}%"></span></span><span class="expense-value">${escapeHtml(money(row.value))}</span></div>`).join("");
-  $("#directTotal").textContent = money(groupTotal(state.payload.expense_structure?.direct));
-  $("#sharedTotal").textContent = money(groupTotal(state.payload.expense_structure?.allocated_shared));
-}
-
-function renderSku(model) {
-  const needle = $("#skuSearch").value.trim().toLowerCase();
-  const rows = model.skuRows.filter(row => !needle || [row.canonical_sku, row.article, row.product_name].some(value => String(value || "").toLowerCase().includes(needle)));
-  $("#skuBody").innerHTML = rows.map(row => {
-    const resultClass = numberOrNull(row.result_after_cogs) >= 0 ? "positive" : "negative";
-    return `<tr><td><div class="sku-id">${escapeHtml(row.article || row.canonical_sku)}</div><div class="sku-name">${escapeHtml(row.product_name || row.canonical_sku)}</div></td><td>${escapeHtml(money(row.net_sales))}</td><td>${escapeHtml(units(row.financial_net_units))}</td><td>${escapeHtml(money(row.commission))}</td><td>${escapeHtml(money(row.logistics))}</td><td>${escapeHtml(money(row.promotion))}</td><td>${escapeHtml(money(row.other))}</td><td>${escapeHtml(money(row.result_without_compensation))}</td><td>${escapeHtml(money(row.cogs))}</td><td class="${resultClass}">${escapeHtml(decimalMoney(row.result_after_cogs))}</td></tr>`;
-  }).join("");
-  $("#skuEmpty").hidden = rows.length > 0;
-  $("#skuEmpty").textContent = model.financeWaiting ? "SKU появятся после первой Finance-загрузки." : needle ? "По запросу ничего не найдено." : "В выбранном периоде нет SKU-строк.";
-}
-
-function render(payload) {
-  state.payload = payload; state.model = viewModel(payload);
-  document.documentElement.style.setProperty("--accent", TENANTS[currentTenant()].accent);
-  renderBanner(state.model); renderStatus(state.model); renderKpis(state.model); renderFunnel(state.model); renderExpenses(state.model); renderSku(state.model);
-  $("#contractVersion").textContent = payload.contract_version;
-}
-
-function renderError(error) {
-  const banner = $("#stateBanner"); banner.className = "state-banner error";
-  banner.textContent = error.message === "TENANT_ACCESS_DENIED" ? "Нет доступа к выбранному кабинету. Проверьте tenant membership." : `Monthly v2 недоступен: ${error.message}`;
-}
-
-async function load() {
-  showDashboard(); dashboard.classList.add("loading"); setUrl();
-  try { render(await fetchMonthly()); } catch (error) {
-    if (error.message === "AUTH_REQUIRED" && !localDemo) { state.session = null; showAuth(); return; }
-    renderError(error);
-  } finally { dashboard.classList.remove("loading"); }
-}
-
-async function initAuth() {
-  if (localDemo) { showDashboard(); await load(); return; }
-  const { data: { session } } = await supabase.auth.getSession(); state.session = session;
-  if (session) await load(); else showAuth();
-  supabase.auth.onAuthStateChange((_event, nextSession) => { state.session = nextSession; if (nextSession) load(); else showAuth(); });
-}
-
-populateControls();
-tenantSelect.addEventListener("change", load); monthSelect.addEventListener("change", load);
-$("#refreshButton").addEventListener("click", load);
-$("#skuSearch").addEventListener("input", () => state.model && renderSku(state.model));
-$("#signOutButton").addEventListener("click", () => supabase.auth.signOut());
-$("#authForm").addEventListener("submit", async event => {
-  event.preventDefault(); $("#authError").textContent = "";
-  const { error } = await supabase.auth.signInWithPassword({ email: $("#emailInput").value.trim(), password: $("#passwordInput").value });
-  if (error) $("#authError").textContent = "Не удалось войти. Проверьте email, пароль и доступ.";
+$("#tenantSelect").innerHTML=Object.entries(TENANTS).map(([id,c])=>'<option value="'+e(id)+'">'+e(c.label)+'</option>').join("");
+$("#monthSelect").innerHTML=MONTHS.map(m=>'<option value="'+m+'">'+e(monthLabel(m))+'</option>').join("");
+$("#tenantSelect").value=TENANTS[query.get("tenant")]?query.get("tenant"):"W";
+$("#monthSelect").value=MONTHS.includes(query.get("month"))?query.get("month"):"2026-09";
+state.market=MARKETPLACES.some(m=>m.id===query.get("marketplace"))?query.get("marketplace"):"ALL";
+for(const id of ["#tenantSelect","#monthSelect"])$(id).addEventListener("change",render);
+for(const id of ["#skuSearch","#categoryFilter","#focusFilter","#sortSelect"])$(id).addEventListener(id==="#skuSearch"?"input":"change",renderProducts);
+$("#drawerClose").addEventListener("click",()=>$("#productDrawer").close());
+$("#productDrawer").addEventListener("close",()=>document.body.classList.remove("drawer-open"));
+document.addEventListener("click",event=>{
+ const nav=event.target.closest('a[href^="#"]');
+ if(nav){event.preventDefault();document.querySelector(nav.getAttribute("href"))?.scrollIntoView({behavior:"smooth"});return;}
+ const mp=event.target.closest("[data-market]");
+ if(mp){state.market=mp.dataset.market;render();return;}
+ const pm=event.target.closest("[data-product-market]");
+ if(pm){state.productMarket=pm.dataset.productMarket;renderDrawer();return;}
+ const ex=event.target.closest("[data-expense]");
+ if(ex){state.expense=ex.dataset.expense;renderExpenses();return;}
+ const sku=event.target.closest("[data-sku]");
+ if(sku){openProduct(sku.dataset.sku);return;}
+ const insight=event.target.closest("[data-insight]");
+ if(insight){const action=insight.dataset.insight;if(action==="best"){const best=filterRows(state.payload?.sku_rows??[])[0];if(best)openProduct(best.canonical_sku);}else if(action==="negative"){$("#focusFilter").value="negative";renderProducts();$("#products").scrollIntoView({behavior:"smooth"});}else $("#expenses").scrollIntoView({behavior:"smooth"});}
 });
-
-initAuth().catch(renderError);
+render();
+try{
+ state.bundle=await openReview();
+ if(state.bundle){state.bundle.payloads.forEach(validatePayload);t("#reviewNote","Срез для продуктового ревью · "+dateText(state.bundle.exported_at)+" · данные не обновляются в реальном времени");render();}
+ else{t("#reviewNote","Предпросмотр Monthly · финансовые данные доступны по приватной ссылке");$("#accessNote").hidden=false;}
+}catch(error){t("#reviewNote",error.message);$("#reviewNote").classList.add("error");$("#accessNote").hidden=false;}
