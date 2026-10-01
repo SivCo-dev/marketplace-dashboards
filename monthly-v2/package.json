@@ -1,0 +1,8 @@
+{
+  "name": "monthly-dashboard-v2-shadow",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/contract.test.mjs"
+  }
+}

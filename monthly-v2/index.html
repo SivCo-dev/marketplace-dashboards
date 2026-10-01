@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Monthly Dashboard v2 — Shadow</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">MARKETPLACE PERFORMANCE</div>
+        <h1>Monthly Dashboard <span>v2</span></h1>
+        <p>Единый финансовый отчёт W / CPR · shadow read-only</p>
+      </div>
+      <div class="top-actions">
+        <span class="shadow-badge">SHADOW URL</span>
+        <div id="userBox" class="user-box" hidden>
+          <span id="userEmail"></span>
+          <button id="signOutButton" class="quiet-button" type="button">Выйти</button>
+        </div>
+      </div>
+    </header>
+
+    <section id="authPanel" class="auth-panel" hidden>
+      <div class="auth-copy">
+        <div class="auth-icon">↗</div>
+        <div>
+          <h2>Доступ к Monthly v2</h2>
+          <p>Войдите через Supabase Auth. Кабинеты доступны только по tenant membership.</p>
+        </div>
+      </div>
+      <form id="authForm" class="auth-form">
+        <label>Email<input id="emailInput" type="email" autocomplete="username" required></label>
+        <label>Пароль<input id="passwordInput" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Войти</button>
+      </form>
+      <div id="authError" class="form-error" role="alert"></div>
+    </section>
+
+    <main id="dashboard" hidden>
+      <section class="toolbar card">
+        <label>Организация<select id="tenantSelect"></select></label>
+        <label>Период<select id="monthSelect"></select></label>
+        <label>Маркетплейс<select disabled><option>Ozon</option></select></label>
+        <div class="toolbar-spacer"></div>
+        <button id="refreshButton" class="refresh-button" type="button">Обновить</button>
+      </section>
+
+      <section id="stateBanner" class="state-banner" aria-live="polite"></section>
+
+      <section class="status-strip card">
+        <div><span>Контур</span><strong id="sourceLayer">—</strong></div>
+        <div><span>Lifecycle</span><strong id="closeStatus">—</strong></div>
+        <div><span>Готовность</span><strong id="readiness">—</strong></div>
+        <div><span>Finance</span><strong id="financeStatus">—</strong></div>
+        <div><span>Обновлено</span><strong id="refreshedAt">—</strong></div>
+      </section>
+
+      <section id="kpiGrid" class="kpi-grid"></section>
+
+      <section class="two-column">
+        <article class="card funnel-card">
+          <div class="card-heading"><div><h2>Экономика месяца</h2><p>Готовые значения reporting layer</p></div><span id="revisionBadge" class="revision-badge"></span></div>
+          <div id="funnel" class="funnel"></div>
+        </article>
+        <article class="card expense-card">
+          <div class="card-heading"><div><h2>Структура расходов</h2><p>Marketplace expenses по группам</p></div><strong id="expenseTotal">—</strong></div>
+          <div id="expenseBars" class="expense-bars"></div>
+          <div class="expense-foot"><span>Прямые</span><strong id="directTotal">—</strong><span>Распределённые</span><strong id="sharedTotal">—</strong></div>
+        </article>
+      </section>
+
+      <section class="card sku-card">
+        <div class="card-heading sku-heading">
+          <div><h2>SKU — экономика месяца</h2><p>Единицы Finance, расходы, COGS и результат</p></div>
+          <label class="search-box">⌕<input id="skuSearch" type="search" placeholder="SKU, артикул или название"></label>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th>SKU / товар</th><th>Net sales</th><th>Fin. units</th><th>Комиссия</th><th>Логистика</th><th>Продвижение</th><th>Прочее</th><th>Результат МП</th><th>COGS</th><th>После COGS</th>
+            </tr></thead>
+            <tbody id="skuBody"></tbody>
+          </table>
+        </div>
+        <div id="skuEmpty" class="empty-state" hidden></div>
+      </section>
+
+      <footer class="footer-note">
+        <span>Monthly API v2</span>
+        <span>n8n не участвует в read-path</span>
+        <span id="contractVersion"></span>
+      </footer>
+    </main>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
