@@ -145,7 +145,7 @@ function setCategories(){
 }
 
 function drawerTabs(selected){return MARKETPLACES.map(item=>'<button type="button" data-product-market="'+item.id+'" aria-pressed="'+(item.id===selected)+'">'+e(item.label)+'</button>').join("");}
-function dlRows(rows){return '<dl class="detail-list">'+rows.map(([name,value,note])=>'<div><dt>'+e(name)+(note?'<small>'+e(note)+'</small>':"")+'</dt><dd>'+e(value)+'</dd></div>').join("")+'</dl>';}
+function dlRows(rows){return '<dl class="detail-list">'+rows.map(([name,value,note])=>'<div><dt>'+e(name)+'</dt><dd><span>'+e(value)+'</span>'+(note?'<small>'+e(note)+'</small>':"")+'</dd></div>').join("")+'</dl>';}
 function renderDrawer(){
  const row=state.product;if(!row)return;
  $("#drawerTabs").innerHTML=drawerTabs(state.productMarket);
