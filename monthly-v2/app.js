@@ -1,5 +1,5 @@
-import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002b";
-import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002b";
+import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002orange";
+import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
 import {openReview} from "./shadow-access.js?v=20261002b";
 
 const $=s=>document.querySelector(s);
@@ -20,16 +20,20 @@ const metricRate=(p,key)=>rate(p?.financial_economics?.[key],p?.financial_econom
 
 function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);history.replaceState(null,"",url);}
 
+function availableMarkets(){
+ return [...new Set((state.bundle?.payloads??[]).filter(p=>p.metadata.tenant_id===tenant()&&p.metadata.month===month()&&p.metadata.marketplace!=="ALL"&&p.metadata.data_available!==false).map(p=>p.metadata.marketplace))];
+}
 function renderHeader(){
- const p=state.payload,m=p?.metadata??{};
- $text("#pageTitle",tenant()+" · "+monthLabel(month()).replace(/^./,c=>c.toUpperCase()));
+ const p=state.payload,m=p?.metadata??{},available=availableMarkets();
+ $text("#pageTitle",(TENANTS[tenant()]?.label??tenant())+" · "+monthLabel(month()).replace(/^./,c=>c.toUpperCase()));
  $text("#monthStatus",p?(m.marketplace_close_status==="CLOSED"?"Закрыт · ревизия "+m.base_close_revision:"LIVE · текущий месяц"):"Нет данных");
  $("#monthStatus").className="status-pill "+(m.marketplace_close_status==="CLOSED"?"closed":m.marketplace_close_status==="LIVE"?"live":"empty");
  const ready=comparisonReady(),prev=previousMonth(month());
  $("#comparisonSelect").innerHTML='<option>'+(ready?"к "+shortMonth(prev):"Нет сопоставимой истории")+'</option>';
  $("#comparisonSelect").disabled=!ready;
- $text("#bridgeMarket",state.market==="ALL"?"Ozon · доступно":MARKETPLACES.find(item=>item.id===state.market)?.label??state.market);
- $text("#footerCoverage",state.market==="ALL"?"Доступно: Ozon · 1 из 3 площадок":p?"Данные Ozon":"Площадка не подключена");
+ const marketLabel=MARKETPLACES.find(item=>item.id===state.market)?.label??state.market;
+ $text("#bridgeMarket",state.market==="ALL"?(available.length>1?"Все площадки":MARKETPLACES.find(item=>item.id===available[0])?.label??"Все площадки"):marketLabel);
+ $text("#footerCoverage",state.market==="ALL"?(available.length?"Доступно: "+available.map(id=>MARKETPLACES.find(item=>item.id===id)?.label??id).join(" · "):"Нет доступных площадок"):(p?"Данные: "+marketLabel:"Площадка не подключена"));
 }
 
 function deltaText(current,previous,mode="amount"){
@@ -96,18 +100,19 @@ function renderBridge(){
  $("#bridgeChart").innerHTML='<div class="bridge-grid"></div>'+steps.map(([label,value,bottom,tone])=>{const height=clamp(Math.abs(numberOrNull(value)??0)/base*100),floor=clamp(bottom/base*100);return '<div class="bridge-step"><div class="bridge-value '+signedClass(value)+'">'+money(value,false)+'</div><div class="bridge-column"><span class="bridge-fill '+tone+'" style="--height:'+height+'%;--bottom:'+floor+'%"></span></div><small>'+label+'</small></div>';}).join("");
 }
 
+const comparableProductResult=row=>numberOrNull(row?.result_after_cogs)??(numberOrNull(row?.result_without_compensation)==null?null:Number(row.result_without_compensation)+(numberOrNull(row.compensation)??0));
 function productDelta(row){
  if(!comparisonReady())return null;
  const previous=previousPayload()?.sku_rows?.find(item=>(row.product_id!=null&&item.product_id===row.product_id)||String(item.canonical_sku)===String(row.canonical_sku));
- const currentValue=numberOrNull(row.result_after_cogs),oldValue=numberOrNull(previous?.result_after_cogs);
+ const currentValue=comparableProductResult(row),oldValue=comparableProductResult(previous);
  if(currentValue==null||oldValue==null||oldValue===0)return null;
  return (currentValue-oldValue)/Math.abs(oldValue)*100;
 }
 
 function focusMembers(source,focus){
- if(focus==="leaders")return [...source].filter(row=>numberOrNull(row.result_after_cogs)!=null).sort((a,b)=>b.result_after_cogs-a.result_after_cogs).slice(0,12);
+ if(focus==="leaders")return [...source].filter(row=>comparableProductResult(row)!=null).sort((a,b)=>comparableProductResult(b)-comparableProductResult(a)).slice(0,12);
  if(focus==="expenses")return [...source].filter(row=>numberOrNull(row.marketplace_expenses)!=null&&row.marketplace_expenses!==0).sort((a,b)=>Math.abs(b.marketplace_expenses)-Math.abs(a.marketplace_expenses)).slice(0,12);
- if(focus==="negative")return source.filter(row=>numberOrNull(row.result_after_cogs)!=null&&row.result_after_cogs<0);
+ if(focus==="negative")return source.filter(row=>comparableProductResult(row)!=null&&comparableProductResult(row)<0);
  if(focus==="expense-only")return source.filter(expenseOnly);
  if(focus==="growth")return comparisonReady()?source.filter(row=>(productDelta(row)??0)>0):[];
  if(focus==="decline")return comparisonReady()?source.filter(row=>(productDelta(row)??0)<0):[];
@@ -144,12 +149,16 @@ function setCategories(){
  if([...$("#categoryFilter").options].some(option=>option.value===current))$("#categoryFilter").value=current;
 }
 
-function drawerTabs(selected){return MARKETPLACES.map(item=>'<button type="button" data-product-market="'+item.id+'" aria-pressed="'+(item.id===selected)+'">'+e(item.label)+'</button>').join("");}
+function drawerTabs(selected){
+ const available=new Set(["ALL",...availableMarkets()]);
+ return MARKETPLACES.filter(item=>available.has(item.id)).map(item=>'<button type="button" data-product-market="'+item.id+'" aria-pressed="'+(item.id===selected)+'">'+e(item.label)+'</button>').join("");
+}
 function dlRows(rows){return '<dl class="detail-list">'+rows.map(([name,value,note])=>'<div><dt>'+e(name)+'</dt><dd><span>'+e(value)+'</span>'+(note?'<small>'+e(note)+'</small>':"")+'</dd></div>').join("")+'</dl>';}
 function renderDrawer(){
  const row=state.product;if(!row)return;
  $("#drawerTabs").innerHTML=drawerTabs(state.productMarket);
- if(state.productMarket!=="ALL"&&state.productMarket!=="OZON"){$("#drawerBody").innerHTML='<div class="empty drawer-empty"><h3>Площадка ещё не подключена</h3><p>Экономика товара появится после подключения источника и сопоставления SKU.</p></div>';return;}
+ const selectedPayload=selectPayload(state.bundle,tenant(),month(),state.productMarket);
+ if(!selectedPayload){$("#drawerBody").innerHTML='<div class="empty drawer-empty"><h3>Площадка ещё не подключена</h3><p>Для выбранного периода нет финансового слоя.</p></div>';return;}
  const statuses=[["Себестоимость",row.cost_status==="COMPLETE"?"Полная":row.cost_status==="NOT_APPLICABLE"?"Не применима":"Недоступна"],["Компенсации",row.compensation_status==="PENDING"?"Ожидаются":row.compensation_status==="COMPLETE"?"Завершены":"Недоступны"]];
  const turnover=Number(row.net_sales??0),netUnits=Number(row.financial_net_units??0),resultMp=Number(row.result_without_compensation??0),comp=Number(row.compensation??0);
  const expensePct=value=>turnover>0&&value!=null?(Math.abs(Number(value))/turnover*100).toLocaleString("ru-RU",{maximumFractionDigits:1})+"% от чистых продаж":"";
@@ -160,7 +169,7 @@ function renderDrawer(){
  const timeline=monthsBefore(month()).map(value=>{const p=selectPayload(state.bundle,tenant(),value);const found=p?.sku_rows.find(item=>item.product_id===row.product_id&&item.canonical_sku===row.canonical_sku);const foundUnits=Number(found?.financial_net_units??0),perUnit=found&&foundUnits>0&&found.result_after_cogs!=null?Number(found.result_after_cogs)/foundUnits:null;return '<div><span>'+e(shortMonth(value))+'</span><strong>'+money(found?.result_after_cogs)+'</strong><small>'+(p?.metadata.marketplace_close_status==="LIVE"?"LIVE · неполный":found?"Закрытый месяц":"Нет истории")+'</small>'+(found?'<small>После всех расходов + компенсации / шт: <b>'+money(perUnit)+'</b></small>':"")+'</div>';}).join("");
  $("#drawerBody").innerHTML='<p class="drawer-scope">'+e(monthLabel(month()))+' · '+(state.productMarket==="ALL"?"Все доступные площадки · только Ozon":"Ozon")+'</p><div class="drawer-result"><span>После себестоимости</span><strong class="'+signedClass(row.result_after_cogs)+'">'+money(row.result_after_cogs)+'</strong><small>Промежуточный результат</small></div><div class="drawer-status">'+statuses.map(([key,value])=>'<span>'+key+': <strong>'+value+'</strong></span>').join("")+'</div><h3>Экономика товара</h3>'+dlRows(detail)+'<h3>Прямые и распределённые расходы</h3><div class="table-scroll"><table class="allocation-table"><thead><tr><th>Статья</th><th>Прямые</th><th>Shared</th></tr></thead><tbody>'+GROUPS.map(([key,label])=>'<tr><td>'+label+'</td><td>'+money(row.expense_structure?.direct?.[key])+'</td><td>'+money(row.expense_structure?.allocated_shared?.[key])+'</td></tr>').join("")+'</tbody></table></div><h3>Результат по месяцам</h3><div class="product-timeline">'+timeline+'</div>';
 }
-function openProduct(sku){const row=state.payload?.sku_rows.find(item=>String(item.canonical_sku)===String(sku));if(!row)return;state.product=row;state.productMarket=state.market==="OZON"?"OZON":"ALL";$text("#drawerTitle",row.product_name||row.article||row.canonical_sku);$text("#drawerSku",(row.article||"")+" · SKU "+row.canonical_sku);renderDrawer();$("#productDrawer").showModal();document.body.classList.add("drawer-open");$(".drawer-scroll").scrollTop=0;}
+function openProduct(sku){const row=state.payload?.sku_rows.find(item=>String(item.canonical_sku)===String(sku));if(!row)return;state.product=row;state.productMarket=state.market;$text("#drawerTitle",row.product_name||row.article||row.canonical_sku);$text("#drawerSku",(row.article||"")+" · SKU "+row.canonical_sku);renderDrawer();$("#productDrawer").showModal();document.body.classList.add("drawer-open");$(".drawer-scroll").scrollTop=0;}
 
 function render(){
  state.payload=selectPayload(state.bundle,tenant(),month(),state.market);updateUrl();renderHeader();renderSummary();renderAllocation();renderComparison();renderExpenses();renderBridge();setCategories();renderProducts();
@@ -187,7 +196,14 @@ $("#productDrawer").addEventListener("click",event=>{
 $("#productDrawer").addEventListener("close",()=>document.body.classList.remove("drawer-open"));
 document.addEventListener("click",event=>{
  const focus=event.target.closest("[data-focus]");if(focus&&!focus.disabled){state.focus=focus.dataset.focus;renderProducts();$("#products").scrollIntoView({behavior:"smooth",block:"start"});return;}
- const productMarket=event.target.closest("[data-product-market]");if(productMarket){state.productMarket=productMarket.dataset.productMarket;renderDrawer();return;}
+ const productMarket=event.target.closest("[data-product-market]");if(productMarket){
+   const nextMarket=productMarket.dataset.productMarket;
+   const nextPayload=selectPayload(state.bundle,tenant(),month(),nextMarket);
+   const nextRow=nextPayload?.sku_rows?.find(item=>String(item.canonical_sku)===String(state.product?.canonical_sku));
+   state.productMarket=nextMarket;
+   if(nextRow)state.product=nextRow;
+   renderDrawer();return;
+ }
  const sku=event.target.closest("[data-sku]");if(sku){openProduct(sku.dataset.sku);}
 });
 render();
