@@ -923,6 +923,7 @@ document.addEventListener("DOMContentLoaded",()=>{
  if(!TENANT_CONFIG[TENANT]) tenantSelect.insertAdjacentHTML("beforeend",`<option value="${TENANT}">${CFG.label}</option>`);
  tenantSelect.value=TENANT;
  tenantSelect.onchange=()=>{location.href="./?tenant="+encodeURIComponent(tenantSelect.value)};
+ if(!CFG.account_id){const b=document.querySelector("#openImportBtn");if(b)b.style.display="none"}
  const file=document.querySelector("#importFile");if(file)file.onchange=()=>readImportFile(file.files?.[0]);
 });
 
@@ -939,7 +940,7 @@ fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);re
  document.querySelector("#marketFilter").innerHTML='<option value="ALL">Все</option>'+markets.map(m=>`<option value="${m}">${m==="YANDEX"?"Яндекс":m==="OZON"?"Ozon":m}</option>`).join("");
  document.querySelector("#month").onchange=render;document.querySelector("#compare").onchange=render;document.querySelector("#category").onchange=render;document.querySelector("#marketFilter").onchange=render;document.querySelector("#skuQuickSearch").onkeydown=e=>{if(e.key==="Enter")openQuickSku()};
  const liveMin=x.meta?.live_min_date,liveMax=x.meta?.live_max_date;
- document.querySelector("#notice").textContent=`Важно: июнь–август — закрытые данные кабинета. Расходы июля–августа — напрямую из отчёта по начислениям Ozon. Текущий месяц собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
+ document.querySelector("#notice").textContent=x.meta?.note?("Важно: "+x.meta.note):`Важно: июнь–август — закрытые данные кабинета. Расходы июля–августа — напрямую из отчёта по начислениям Ozon. Текущий месяц собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
  document.querySelector("#updated").textContent="Обновлено "+new Date(x.meta?.generated_at||Date.now()).toLocaleString("ru-RU");
  toggleSkuSearch(true);
  render();
