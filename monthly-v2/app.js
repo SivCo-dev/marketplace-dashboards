@@ -173,6 +173,12 @@ $("#marketSelect").addEventListener("change",()=>{state.market=$("#marketSelect"
 $("#skuSearch").addEventListener("input",renderProducts);
 for(const id of ["#categoryFilter","#sortSelect"])$(id).addEventListener("change",renderProducts);
 $("#drawerClose").addEventListener("click",()=>$("#productDrawer").close());
+$("#productDrawer").addEventListener("click",event=>{
+ const dialog=event.currentTarget;
+ const rect=dialog.getBoundingClientRect();
+ const outside=event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom;
+ if(outside)dialog.close();
+});
 $("#productDrawer").addEventListener("close",()=>document.body.classList.remove("drawer-open"));
 document.addEventListener("click",event=>{
  const focus=event.target.closest("[data-focus]");if(focus&&!focus.disabled){state.focus=focus.dataset.focus;renderProducts();$("#products").scrollIntoView({behavior:"smooth",block:"start"});return;}
