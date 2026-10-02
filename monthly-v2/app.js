@@ -1,6 +1,6 @@
-import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js";
-import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js";
-import {openReview} from "./shadow-access.js";
+import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002b";
+import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002b";
+import {openReview} from "./shadow-access.js?v=20261002b";
 
 const $=s=>document.querySelector(s);
 const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all"};
