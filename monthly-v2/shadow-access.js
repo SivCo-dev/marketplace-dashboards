@@ -3,7 +3,7 @@ export async function openReview() {
  const keyText=new URLSearchParams(location.hash.slice(1)).get("review");
  if(!keyText)return null;
  const decode=text=>{const s=text.replaceAll("-","+").replaceAll("_","/");const p=s+"=".repeat((4-s.length%4)%4);return Uint8Array.from(atob(p),c=>c.charCodeAt(0));};
- const response=await fetch("./review.enc.json",{cache:"no-store",referrerPolicy:"no-referrer"});
+ const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),10000);let response;try{response=await fetch("./review.enc.json?ts="+Date.now(),{cache:"no-store",referrerPolicy:"no-referrer",signal:controller.signal});}catch(error){if(error?.name==="AbortError")throw new Error("Срез ревью не загрузился за 10 секунд. Обновите страницу.");throw error;}finally{clearTimeout(timer);}
  if(!response.ok)throw new Error("Срез ревью временно недоступен.");
  const envelope=await response.json();
  try {
