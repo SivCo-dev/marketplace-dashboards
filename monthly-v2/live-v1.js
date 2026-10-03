@@ -1,3 +1,4 @@
+import {validatePayload} from "./core.js?v=20261002orange";
 const BASE="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1";
 const TENANTS=["W","CPR","ORANGE"];
 const MONTHS=["2026-07","2026-08","2026-09","2026-10"];
@@ -79,19 +80,35 @@ function mergeAll(parts,tenant,month){
  const cogs=parts.every(p=>p.financial_economics.cogs!=null)?sum("cogs"):null;
  return {contract_version:"monthly-api-v2.0",metadata:{...parts[0].metadata,tenant_id:tenant,marketplace:"ALL",month,data_available:true,source_layer:"MONTHLY_V1_LIVE"},financial_economics:{sales:sum("sales"),returns:sum("returns"),net_sales:sum("net_sales"),commission:sum("commission"),logistics:sum("logistics"),storage:sum("storage"),promotion:sum("promotion"),other:sum("other"),marketplace_expenses:sum("marketplace_expenses"),result_without_compensation:sum("result_without_compensation"),compensation:sum("compensation"),result_with_compensation:sum("result_with_compensation"),cogs,result_after_cogs:cogs==null?null:sum("result_after_cogs"),business_expenses:0,final_business_result:null},units:{financial_sale_units:parts.reduce((a,p)=>a+n(p.units.financial_sale_units),0),financial_return_units:parts.reduce((a,p)=>a+n(p.units.financial_return_units),0),financial_net_units:parts.reduce((a,p)=>a+n(p.units.financial_net_units),0),ordered_units:null,delivered_units:null,returned_units:null,written_off_units:parts.reduce((a,p)=>a+n(p.units.written_off_units),0),operational_metrics_status:"PARTIAL"},expense_structure:{total:{commission:sum("commission"),logistics:sum("logistics"),storage:sum("storage"),promotion:sum("promotion"),other:sum("other")},direct:{commission:parts.reduce((a,p)=>a+n(p.expense_structure.direct.commission),0),logistics:parts.reduce((a,p)=>a+n(p.expense_structure.direct.logistics),0),storage:parts.reduce((a,p)=>a+n(p.expense_structure.direct.storage),0),promotion:parts.reduce((a,p)=>a+n(p.expense_structure.direct.promotion),0),other:parts.reduce((a,p)=>a+n(p.expense_structure.direct.other),0)},allocated_shared:{commission:parts.reduce((a,p)=>a+n(p.expense_structure.allocated_shared.commission),0),logistics:parts.reduce((a,p)=>a+n(p.expense_structure.allocated_shared.logistics),0),storage:parts.reduce((a,p)=>a+n(p.expense_structure.allocated_shared.storage),0),promotion:parts.reduce((a,p)=>a+n(p.expense_structure.allocated_shared.promotion),0),other:parts.reduce((a,p)=>a+n(p.expense_structure.allocated_shared.other),0)}},sku_rows,warnings:[]};
 }
-export async function loadLiveBundle(){
- const responses=await Promise.all(TENANTS.map(async tenant=>{
-   const r=await fetch(BASE+"?tenant="+encodeURIComponent(tenant),{cache:"no-store"});
-   if(!r.ok)throw new Error("Ошибка загрузки "+tenant+": "+r.status);
-   return [tenant,await r.json()];
- }));
- const payloads=[];
- for(const [tenant,d] of responses){
-   for(const month of MONTHS){
-     const parts=[];
-     for(const market of MARKETS){const p=payloadFor(d,tenant,month,market);if(p){payloads.push(p);parts.push(p);}}
-     const all=mergeAll(parts,tenant,month); if(all)payloads.push(all);
+export async function loadLiveBundle({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000}={}){
+ const bundle={exported_at:null,payloads:[],tenant_status:Object.fromEntries(TENANTS.map(tenant=>[tenant,{status:"loading"}]))};
+ onUpdate(bundle);
+ await Promise.allSettled(TENANTS.map(async tenant=>{
+   const controller=new AbortController();
+   const timer=setTimeout(()=>controller.abort(),timeoutMs);
+   let payloads=[];
+   let status;
+   try{
+     const r=await fetcher(BASE+"?tenant="+encodeURIComponent(tenant),{cache:"no-store",signal:controller.signal});
+     if(!r.ok)throw new Error("Ошибка загрузки "+tenant+": "+r.status);
+     const d=await r.json();
+     if(!d||!Array.isArray(d.sku))throw new Error("Некорректный ответ "+tenant);
+     for(const month of MONTHS){
+       const parts=[];
+       for(const market of MARKETS){const p=payloadFor(d,tenant,month,market);if(p){validatePayload(p);payloads.push(p);parts.push(p);}}
+       const all=mergeAll(parts,tenant,month);if(all){validatePayload(all);payloads.push(all);}
+     }
+     status={status:"ready",refreshed_at:d.meta?.generated_at??new Date().toISOString()};
+   }catch(error){
+     payloads=[];
+     status={status:"error",message:controller.signal.aborted?"Превышено время загрузки "+tenant:String(error.message??error)};
+   }finally{
+     clearTimeout(timer);
    }
- }
- return {exported_at:new Date().toISOString(),payloads};
+   bundle.payloads.push(...payloads);
+   bundle.tenant_status[tenant]=status;
+   bundle.exported_at=new Date().toISOString();
+   onUpdate(bundle);
+ }));
+ return bundle;
 }

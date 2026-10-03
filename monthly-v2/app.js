@@ -1,6 +1,6 @@
 import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002orange";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
-import {loadLiveBundle} from "./live-v1.js?v=20261003live1";
+import {loadLiveBundle} from "./live-v1.js?v=20261003fix1";
 
 const $=s=>document.querySelector(s);
 const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all"};
@@ -171,8 +171,18 @@ function renderDrawer(){
 }
 function openProduct(sku){const row=state.payload?.sku_rows.find(item=>String(item.canonical_sku)===String(sku));if(!row)return;state.product=row;state.productMarket=state.market;$text("#drawerTitle",row.product_name||row.article||row.canonical_sku);$text("#drawerSku",(row.article||"")+" · SKU "+row.canonical_sku);renderDrawer();$("#productDrawer").showModal();document.body.classList.add("drawer-open");$(".drawer-scroll").scrollTop=0;}
 
+function renderLoadStatus(){
+ const selected=state.bundle?.tenant_status?.[tenant()];
+ const failed=Object.entries(state.bundle?.tenant_status??{}).filter(([,value])=>value.status==="error").map(([id])=>TENANTS[id]?.label??id);
+ $("#reviewNote").classList.toggle("error",selected?.status==="error");
+ if(!selected||selected.status==="loading")$text("#reviewNote","Загружаем данные "+(TENANTS[tenant()]?.label??tenant())+"…");
+ else if(selected.status==="error")$text("#reviewNote",selected.message);
+ else $text("#reviewNote","Актуальные данные Monthly · "+dateText(selected.refreshed_at)+(failed.length?" · Недоступно: "+failed.join(", "):""));
+ $("#accessNote").hidden=selected?.status!=="error";
+ if(selected?.status==="error")$text("#accessNote","Данные "+(TENANTS[tenant()]?.label??tenant())+" временно недоступны. Остальные кабинеты работают независимо.");
+}
 function render(){
- state.payload=selectPayload(state.bundle,tenant(),month(),state.market);updateUrl();renderHeader();renderSummary();renderAllocation();renderComparison();renderExpenses();renderBridge();setCategories();renderProducts();
+ state.payload=selectPayload(state.bundle,tenant(),month(),state.market);renderLoadStatus();updateUrl();renderHeader();renderSummary();renderAllocation();renderComparison();renderExpenses();renderBridge();setCategories();renderProducts();
 }
 
 $("#tenantSelect").innerHTML=Object.entries(TENANTS).map(([id,config])=>'<option value="'+e(id)+'">'+e(config.label)+'</option>').join("");
@@ -207,14 +217,7 @@ document.addEventListener("click",event=>{
  const sku=event.target.closest("[data-sku]");if(sku){openProduct(sku.dataset.sku);}
 });
 render();
-try{
- state.bundle=await loadLiveBundle();
- state.bundle.payloads.forEach(validatePayload);
- $text("#reviewNote","Актуальные данные Monthly · "+dateText(state.bundle.exported_at));
- $("#accessNote").hidden=true;
+await loadLiveBundle({onUpdate:bundle=>{
+ state.bundle=bundle;
  render();
-}catch(error){
- $text("#reviewNote","Ошибка загрузки данных: "+error.message);
- $("#reviewNote").classList.add("error");
- $("#accessNote").hidden=false;
-}
+}});
