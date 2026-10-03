@@ -208,7 +208,13 @@ document.addEventListener("click",event=>{
 });
 render();
 try{
- state.bundle=await openReview();
- if(state.bundle){state.bundle.payloads.forEach(validatePayload);$text("#reviewNote","Срез для продуктового ревью · "+dateText(state.bundle.exported_at)+" · данные не обновляются в реальном времени");render();}
- else{$text("#reviewNote","Предпросмотр Monthly · финансовые данные доступны по приватной ссылке");$("#accessNote").hidden=false;}
-}catch(error){$text("#reviewNote",error.message);$("#reviewNote").classList.add("error");$("#accessNote").hidden=false;}
+ state.bundle=await loadLiveBundle();
+ state.bundle.payloads.forEach(validatePayload);
+ $text("#reviewNote","Актуальные данные Monthly · "+dateText(state.bundle.exported_at));
+ $("#accessNote").hidden=true;
+ render();
+}catch(error){
+ $text("#reviewNote","Ошибка загрузки данных: "+error.message);
+ $("#reviewNote").classList.add("error");
+ $("#accessNote").hidden=false;
+}
