@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<script>if(!new URLSearchParams(location.search).has("standalone"))location.replace("../?tenant=CPR");</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CPR Monthly Report v1.0</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--line:#e7ebf2;--text:#111827;--muted:#667085;--blue:#3765df;--green:#16a36a;--red:#e24b5b;--orange:#f47b20;--market-accent:#3765df;--market-accent-soft:#eef3ff;--shadow:0 8px 24px rgba(16,24,40,.05)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.35 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial}
+.wrap{max-width:1560px;margin:0 auto;padding:24px}
+.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.title h1{margin:0;font-size:30px}.title p{margin:5px 0 0;color:var(--muted)}
+.dev{display:flex;align-items:center;gap:12px}.badge{background:#fff3e8;color:#c85b12;border:1px solid #ffd8b7;padding:7px 12px;border-radius:999px;font-weight:800;font-size:12px}
+.updated{color:var(--muted);font-size:12px;text-align:right}
+.import-btn{border:1px solid var(--market-accent);background:var(--market-accent);color:#fff;border-radius:10px;padding:9px 12px;font:inherit;font-weight:800;cursor:pointer}
+.modal-backdrop{position:fixed;inset:0;background:rgba(17,24,39,.42);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000}.modal-backdrop.open{display:flex}
+.import-modal{width:min(980px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.18);padding:18px}
+.import-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.import-head h2{margin:0}.icon-btn{border:0;background:#f3f5f8;border-radius:9px;padding:7px 10px;font-size:18px;cursor:pointer}
+.import-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.import-field label{display:block;color:var(--muted);font-size:11px;font-weight:750;margin-bottom:5px}.import-field input,.import-field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font:inherit;background:#fff}
+.import-drop{margin-top:12px;border:1.5px dashed #bdc5d1;border-radius:12px;padding:18px;text-align:center;background:#fafbfc}.import-drop input{max-width:100%}
+.import-status{margin-top:12px;padding:10px 12px;border-radius:10px;background:#f7f8fb;color:var(--muted);font-size:12px}
+.mapping-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.mapping-grid .import-field{min-width:0}
+.preview-wrap{margin-top:12px;overflow:auto;max-height:300px;border:1px solid var(--line);border-radius:10px}.preview-wrap table{width:100%;border-collapse:collapse;font-size:12px}.preview-wrap th,.preview-wrap td{padding:7px 9px;border-bottom:1px solid #eef1f5;white-space:nowrap;text-align:right}.preview-wrap th:first-child,.preview-wrap td:first-child{text-align:left}
+.import-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.import-actions button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font:inherit;font-weight:800;cursor:pointer}.import-actions .primary{background:var(--market-accent);border-color:var(--market-accent);color:#fff}.import-actions button:disabled{opacity:.45;cursor:not-allowed}
+.filters{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;margin-bottom:16px}.f{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px}.f label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:4px}.f select{width:100%;border:0;background:transparent;font:inherit;font-weight:700;outline:none}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--market-accent);border-radius:14px;padding:14px 16px 16px;box-shadow:var(--shadow)}.kpi .l{color:var(--muted);font-size:12px;font-weight:700}.kpi .v{font-size:24px;font-weight:850;margin:7px 0 5px}.kpi .meta{font-size:12px;color:var(--muted);font-weight:650;line-height:1.35}.kpi .meta .sep{opacity:.55;padding:0 4px}.delta{font-size:12px;font-weight:750}.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--muted)}
+.grid{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:16px}.main-finance-grid{display:block;margin-bottom:16px}.main-finance-grid .finance-card{width:100%}.analysis-row{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch}.analysis-row>.card{height:100%}.secondary-grid{grid-template-columns:1.05fr 1.55fr}.finance-matrix th,.finance-matrix td{white-space:nowrap}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:17px}.card h2{font-size:17px;margin:0}.sub{color:var(--muted);font-size:12px;margin:3px 0 14px}
+.funnel .row{display:grid;grid-template-columns:1.5fr .8fr .55fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f7}.funnel .row:last-child{border-bottom:0}.funnel .amt,.funnel .pct{text-align:right;font-variant-numeric:tabular-nums}.funnel .final{background:#eefaf5;margin:8px -10px -6px;padding:12px 10px;border-radius:10px;font-weight:850}.expense{color:var(--red)}.income{color:var(--green)}
+.trend-wrap{overflow-x:auto}
+.trend-table{width:100%;border-collapse:collapse;min-width:860px}
+.trend-table th,.trend-table td{padding:10px 8px;border-bottom:1px solid #eef1f5;text-align:right;font-variant-numeric:tabular-nums}
+.trend-table th:first-child,.trend-table td:first-child{text-align:left}
+.trend-table th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.025em;vertical-align:bottom}
+.trend-table tbody tr.live{background:var(--market-accent-soft)}
+.trend-month{font-weight:800;white-space:nowrap}.live-badge{display:inline-block;margin-left:7px;padding:3px 7px;border-radius:999px;background:var(--market-accent);color:#fff;font-size:9px;font-weight:850}
+.mini-metric{display:grid;grid-template-columns:minmax(54px,1fr) 58px;gap:7px;align-items:center}
+.mini-track{height:8px;background:#edf0f5;border-radius:7px;overflow:hidden}.mini-track span{display:block;height:100%;border-radius:7px}
+.mini-track.sales span{background:var(--market-accent)}.mini-track.returns span{background:#aeb7c7}.mini-track.direct span{background:#e88992}.mini-track.allocated span{background:#f0b45d}.mini-track.result span{background:#71bf98}
+.mini-num{text-align:right;font-weight:750;white-space:nowrap}.trend-money{font-weight:800;white-space:nowrap}
+.mid{display:grid;grid-template-columns:.8fr 1.2fr;gap:16px;margin-bottom:16px}
+.expense-list{display:grid;grid-template-columns:190px 1fr;gap:18px;align-items:center;min-height:250px}
+.exp-donut-wrap{display:flex;justify-content:center;align-items:center}
+.exp-donut{width:174px;height:174px;border-radius:50%;position:relative;box-shadow:inset 0 0 0 1px rgba(17,24,39,.04)}
+.exp-donut:after{content:"";position:absolute;inset:31px;background:#fff;border-radius:50%;box-shadow:0 0 0 1px #eef1f5}
+.exp-center{position:absolute;inset:31px;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px}
+.exp-center .sum{font-size:19px;font-weight:900}.exp-center .cap{font-size:10px;color:var(--muted);margin-top:2px}.exp-center .ratio{font-size:15px;font-weight:850;margin-top:6px}.exp-center .ratio-cap{font-size:9px;color:var(--muted)}
+.exp-legend{display:grid;gap:8px}.exp-item{display:grid;grid-template-columns:10px minmax(95px,1fr) 52px 90px;gap:8px;align-items:center;font-size:12px}.exp-dot{width:8px;height:8px;border-radius:50%}.exp-item .name{font-weight:700}.exp-item .share,.exp-item .amount{text-align:right;font-variant-numeric:tabular-nums}.exp-item .share{color:var(--muted)}.cat-table,.market-table,.sku-table{width:100%;border-collapse:collapse}
+.cat-metric{display:grid;grid-template-columns:minmax(42px,.55fr) minmax(104px,1fr);gap:7px;align-items:center}
+.cat-bar{height:9px;background:#eef1f6;border-radius:7px;overflow:hidden}.cat-bar>span{display:block;height:100%;border-radius:7px}
+.cat-bar.sales>span{background:var(--market-accent)}.cat-bar.expenses>span{background:#e99199}.cat-bar.result>span{background:#75c69b}
+.cat-value{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}.cat-pct{color:var(--muted);font-size:10px;font-weight:700;margin-left:4px}.cat-table th,.cat-table td,.market-table th,.market-table td,.sku-table th,.sku-table td{padding:10px 8px;border-bottom:1px solid #eef1f5;text-align:right;font-variant-numeric:tabular-nums}.cat-table th:first-child,.cat-table td:first-child,.market-table th:first-child,.market-table td:first-child,.sku-table th:first-child,.sku-table td:first-child{text-align:left}.cat-table th,.market-table th,.sku-table th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.bottom{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:16px}.notice{margin-bottom:16px;background:#fff8e8;border:1px solid #ffe3a8;color:#8a5a00;border-radius:12px;padding:11px 14px;font-size:12px}
+.stockgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.business-grid{grid-template-columns:repeat(3,1fr)}.business-summary{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.business-summary .sum-card{background:#fafbfc;border:1px solid var(--line);border-radius:11px;padding:12px}.business-summary .sum-card .l{font-size:10px;color:var(--muted);font-weight:750;text-transform:uppercase}.business-summary .sum-card .v{font-size:19px;font-weight:850;margin-top:4px}.mini{border:1px solid var(--line);border-radius:12px;padding:14px}.mini .l{color:var(--muted);font-size:11px}.mini .v{font-size:19px;font-weight:800;margin-top:4px}
+.section{margin-top:16px}.scroll{max-height:410px;overflow:auto}.empty{color:var(--muted);padding:20px;text-align:center}
+.sku-table{font-size:10.5px;table-layout:auto}
+.sku-table th,.sku-table td{padding:8px 3px}
+.sku-table th{font-size:9px;letter-spacing:0;line-height:1.1;white-space:normal}
+.sku-table td:not(:first-child){white-space:nowrap}
+.sku-table td:first-child{min-width:94px}
+.sku-table td:first-child .sub{font-size:9.5px}
+.sku-table tbody tr{cursor:pointer}.sku-table tbody tr:hover,.sku-table tbody tr.active-row{background:#f4f7ff}
+.sku-search-card{padding:12px}.sku-search-toggle{display:none;border:0;background:transparent;padding:0;font:inherit;font-weight:800;color:var(--market-accent);cursor:pointer}.sku-search-card.collapsed .sku-search-toggle{display:block}.sku-search-card.collapsed .sku-search-body{display:none}.sku-search-body label{display:block;font-size:11px;color:var(--muted);font-weight:750;margin-bottom:6px}.sku-search-row{display:grid;grid-template-columns:1fr auto;gap:8px}.sku-search-row input{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font:inherit;min-width:0}.sku-search-row button{border:1px solid var(--market-accent);background:var(--market-accent);color:#fff;border-radius:9px;padding:9px 12px;font:inherit;font-weight:750;cursor:pointer}.detail-panel{position:sticky;top:18px;max-height:calc(100vh - 36px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.sku-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}.sku-photo{width:86px;height:86px;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:11px;background:#fafbfc;flex:0 0 auto}.sku-title{font-size:18px;font-weight:850;line-height:1.15}.sku-name{color:var(--muted);margin-top:2px;font-size:12px}.sku-meta{font-size:10.5px;color:var(--muted);margin-top:5px}
+.market-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0 14px;border-top:1px solid var(--line)}.market-toolbar .section-title{font-size:12px;font-weight:800}.market-tabs{display:flex;gap:6px;flex-wrap:wrap}.market-tab{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 11px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}.market-tab:disabled{opacity:.38;cursor:default;background:#f5f6f8;color:#98a2b3;border-color:#e6e8ec}.market-tab.active{background:var(--market-accent);color:#fff;border-color:var(--market-accent)}.market-tab.ozon.active{background:#005bff;border-color:#005bff}.market-tab.yandex.active{background:#ffcc00;color:#111827;border-color:#ffcc00}.market-tab.wb.active{background:#c627b6;border-color:#c627b6}
+.sku-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin-bottom:14px}.sku-kpi{border:1px solid var(--line);border-radius:11px;padding:10px;min-height:104px;display:flex;flex-direction:column;justify-content:flex-start}.sku-kpi .l{font-size:9.5px;color:var(--muted);font-weight:750;text-transform:uppercase;line-height:1.15;min-height:22px}.sku-kpi .v{font-size:16px;font-weight:850;margin-top:4px;line-height:1.15;white-space:nowrap}.sku-kpi .s{font-size:9.5px;color:var(--muted);margin-top:6px;line-height:1.25}.sku-kpi .s .sep{opacity:.5;padding:0 3px}
+.econ-table{width:100%;border-collapse:collapse}.econ-table th,.econ-table td{padding:9px 7px;border-bottom:1px solid #eef1f5;text-align:right}.econ-table th:first-child,.econ-table td:first-child{text-align:left}.econ-table th{font-size:10px;color:var(--muted);text-transform:uppercase}.total-row td{font-weight:850;background:#f5faf7}.source-note{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.45}
+@media(max-width:760px){.sku-kpis{grid-template-columns:repeat(2,1fr)}.market-toolbar{align-items:flex-start;flex-direction:column}.expense-list{grid-template-columns:1fr}.exp-item{grid-template-columns:10px minmax(90px,1fr) 48px 82px}}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.grid,.mid,.bottom,.analysis-row{grid-template-columns:1fr}} 
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title"><h1>CPR Monthly Report</h1><p>Финансовые результаты маркетплейсов • версия 1.0</p></div>
+    <div class="dev"><button class="import-btn" type="button" onclick="openImportCenter()">Загрузить данные</button><span class="badge">MONTHLY 1.0</span><div class="updated" id="updated">Загрузка…</div></div>
+  </div>
+
+  <div class="filters">
+    <div class="f"><label>Период</label><select id="month"></select></div>
+    <div class="f"><label>Сравнение</label><select id="compare"></select></div>
+    <div class="f"><label>Организация</label><select><option>CPR</option></select></div>
+    <div class="f"><label>Маркет</label><select id="marketFilter"><option value="ALL">Все</option></select></div>
+    <div class="f"><label>Категория</label><select id="category"><option value="">Все</option></select></div>
+  </div>
+
+  <div class="notice" id="notice">Подготавливаем данные…</div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="main-finance-grid" id="mainFinanceGrid">
+    <div class="card finance-card">
+      <h2>Финансовая воронка</h2><div class="sub">По маркетплейсам и итого. Проценты — от валовых продаж.</div>
+      <div class="market-tabs" id="marketQuick"></div>
+      <div class="trend-wrap"><table class="market-table finance-matrix">
+        <thead id="financeHead"></thead>
+        <tbody id="market"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="analysis-row">
+    <div class="card">
+      <h2>Динамика 4 месяца</h2><div class="sub">Три последних полных месяца + текущий. Проценты — от валовых продаж.</div>
+      <div class="trend-wrap"><table class="trend-table">
+        <thead><tr>
+          <th>Месяц</th>
+          <th>Продажи</th>
+          <th>Возвраты<br>% от продаж</th>
+          <th>Прямые расходы<br>% от продаж</th>
+          <th>Распределённые<br>% от продаж</th>
+          <th>Получено с маркета</th>
+          <th>Результат после МП<br>% от продаж</th>
+        </tr></thead>
+        <tbody id="trend"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>Бизнес-расходы / чистая прибыль</h2><div class="sub">Следующий слой P&L после результата маркетплейса</div>
+      <div class="stockgrid business-grid">
+        <div class="mini"><div class="l">Себестоимость</div><div class="v" id="cogs">—</div></div>
+        <div class="mini"><div class="l">OPEX</div><div class="v" id="opex">—</div></div>
+        <div class="mini"><div class="l">Внешняя логистика</div><div class="v" id="extlog">—</div></div>
+        <div class="mini"><div class="l">Материалы</div><div class="v" id="materials">—</div></div>
+        <div class="mini"><div class="l">Налог</div><div class="v" id="tax">—</div></div>
+        <div class="mini"><div class="l">Прочие бизнес-расходы</div><div class="v" id="businessOther">—</div></div>
+      </div>
+      <div class="business-summary" id="businessSummary"></div>
+    </div>
+  </div>
+
+  <div class="grid section secondary-grid">
+    <div class="card">
+      <h2>Структура расходов</h2><div class="sub">Сумма и доля от валовых продаж</div>
+      <div class="expense-list" id="expenses"></div>
+    </div>
+    <div class="card">
+      <h2>Категории: вклад в продажи и расходы</h2><div class="sub">Продажи, расходы и результат в одном масштабе внутри каждого показателя. Фильтры сверху применяются ко всему блоку.</div>
+      <table class="cat-table"><thead><tr><th>Категория</th><th>Продажи</th><th>Расходы</th><th>Результат</th></tr></thead><tbody id="cats"></tbody></table>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="card">
+      <h2>SKU — экономика месяца</h2><div class="sub">Нажми на SKU — карточка откроется справа, как в ежедневном дашборде.</div>
+      <div class="scroll"><table class="sku-table"><thead><tr><th>SKU</th><th>Продажи</th><th>Продано,<br>шт</th><th>Комиссия</th><th>Логистика</th><th>Остальные<br>расходы</th><th>Возвраты /<br>списания</th><th>Компенсации</th><th>Результат</th><th>Получаем/<br>шт</th></tr></thead><tbody id="sku"></tbody></table></div>
+    </div>
+    <div>
+      <div id="skuSearchCard" class="card sku-search-card">
+        <button type="button" class="sku-search-toggle" onclick="toggleSkuSearch()">⌕ Поиск SKU</button>
+        <div id="skuSearchBody" class="sku-search-body">
+          <label for="skuQuickSearch">Поиск SKU</label>
+          <div class="sku-search-row">
+            <input id="skuQuickSearch" list="skuQuickList" type="text" autocomplete="off" placeholder="Артикул, SKU или название">
+            <datalist id="skuQuickList"></datalist>
+            <button type="button" onclick="openQuickSku()">Открыть</button>
+          </div>
+        </div>
+      </div>
+      <div id="skuDetail" class="card detail-panel" style="margin-top:16px">
+        <div id="skuDetailBody"><div class="sub" style="margin:0">Выбери SKU слева или найди через поиск выше.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="importModal" class="modal-backdrop" onclick="if(event.target===this)closeImportCenter()">
+  <div class="import-modal">
+    <div class="import-head"><div><h2>Импорт данных</h2><div class="sub" style="margin:3px 0 0">Исходный файл без предварительной обработки → проверка → запись в SQL.</div></div><button class="icon-btn" onclick="closeImportCenter()">×</button></div>
+    <div class="import-grid">
+      <div class="import-field"><label>Организация</label><select id="importTenant"><option value="CPR">CPR</option><option value="W" disabled>W — позже</option><option value="ORANGE" disabled>Orange — проверим следующим</option></select></div>
+      <div class="import-field"><label>Тип файла</label><select id="importType"><option value="compensation">Компенсации Ozon</option></select></div>
+      <div class="import-field"><label>Месяц</label><select id="importMonth"></select></div>
+      <div class="import-field"><label>PIN импорта</label><input id="importPin" type="password" autocomplete="off" placeholder="Введите PIN"></div>
+    </div>
+    <div class="import-drop"><input id="importFile" type="file" accept=".xlsx,.xls,.csv"><div class="sub" style="margin:8px 0 0">Можно загружать исходный XLSX/XLS/CSV Ozon как есть.</div></div>
+    <div id="importStatus" class="import-status">Файл ещё не выбран.</div>
+    <div id="mappingBlock" style="display:none">
+      <div class="sub" style="margin:12px 0 4px"><b>Сопоставление колонок</b> — система заполнит автоматически, при необходимости можно поправить.</div>
+      <div id="mappingGrid" class="mapping-grid"></div>
+      <div id="preview" class="preview-wrap"></div>
+    </div>
+    <div class="import-actions">
+      <button onclick="closeImportCenter()">Отмена</button>
+      <button id="prepareImportBtn" onclick="prepareImportPreview()" disabled>Проверить</button>
+      <button id="applyImportBtn" class="primary" onclick="applyImport()" disabled>Записать в SQL</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v1?tenant=CPR";
+const IMPORT_API="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-import-v1";
+let D={months:[],categories:[],sku:[],expense_detail:[],manual_expenses:[],unit_costs:[]};
+let selectedSku=null,skuDetailMarket="ALL";
+const N=v=>Number(v||0), RUB=v=>Math.round(N(v)).toLocaleString("ru-RU")+" ₽", NUM=v=>Math.round(N(v)).toLocaleString("ru-RU");
+const pct=(v,b)=>b?Math.abs(N(v))/Math.abs(N(b))*100:0;
+const monthName=m=>new Date(m+"T00:00:00").toLocaleDateString("ru-RU",{month:"short",year:"2-digit"});
+const getMonth=m=>D.months.find(x=>String(x.month).slice(0,7)===m)||{};
+const filtSku=m=>{
+ const category=document.querySelector("#category").value;
+ const market=document.querySelector("#marketFilter").value||"ALL";
+ return D.sku.filter(x=>String(x.month).slice(0,7)===m
+   && (!category || x.master_category===category)
+   && (market==="ALL" || String(x.marketplace||"OZON").toUpperCase()===market));
+};
+const filtSkuAllMarkets=m=>{
+ const category=document.querySelector("#category").value;
+ return D.sku.filter(x=>String(x.month).slice(0,7)===m && (!category || x.master_category===category));
+};
+function applyMarketTheme(mk){
+ const theme={
+   ALL:["#3765df","#eef3ff"],
+   OZON:["#005bff","#edf3ff"],
+   YANDEX:["#ffcc00","#fff8d9"],
+   WB:["#c627b6","#fbeefa"]
+ }[mk]||["#3765df","#eef3ff"];
+ document.documentElement.style.setProperty("--market-accent",theme[0]);
+ document.documentElement.style.setProperty("--market-accent-soft",theme[1]);
+}
+function setMarketFilter(mk){
+ document.querySelector("#marketFilter").value=mk;
+ render();
+}
+const agg=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales","sold_units","commission","logistics","storage","promotion","other","net_compensation_amount","preliminary_compensation","final_with_compensation"])a[k]=(a[k]||0)+N(x[k]);return a},{});
+const delta=(a,b)=>N(b)!==0?(N(a)/N(b)-1)*100:null;
+const dhtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>=0?'pos':'neg'}">${d>=0?'+':''}${d.toFixed(1)}%</span>`;
+
+function selectedAgg(month){return aggregateUnified(filtSku(month))}
+function businessExpenseSlice(month){
+ const rows=(D.manual_expenses||[]).filter(r=>String(r.month).slice(0,7)===month);
+ const selected=filtSku(month);
+ const selectedKeys=new Set(selected.map(r=>String(r.month_sku)));
+ const costMap=new Map((D.unit_costs||[]).map(x=>[String(x.article||""),N(x.unit_cost)]));
+ const out={cogs:0,opex:0,external_logistics:0,materials:0,tax:0,business_other:0,loaded:false};
+
+ // Себестоимость — напрямую по модели × экономические единицы.
+ out.cogs=selected.reduce((s,x)=>{
+   const unitCost=costMap.get(String(x.article||""))||0;
+   const units=N(x.economic_units)||N(x.sold_units);
+   return s+unitCost*units;
+ },0);
+ if(out.cogs>0)out.loaded=true;
+
+ for(const r of rows){
+   const type=String(r.expense_type||"").toLowerCase();
+   if(!(type in out) || type==="cogs")continue;
+   let base=D.sku.filter(x=>String(x.month).slice(0,7)===month);
+   if(r.marketplace)base=base.filter(x=>String(x.marketplace||"").toUpperCase()===String(r.marketplace).toUpperCase());
+   if(r.account_id)base=base.filter(x=>String(x.account_id||"")===String(r.account_id));
+   if(r.master_category)base=base.filter(x=>String(x.master_category||"")===String(r.master_category));
+   const denom=base.reduce((s,x)=>s+Math.max(0,N(x.net_sales)),0);
+   const numer=base.filter(x=>selectedKeys.has(String(x.month_sku))).reduce((s,x)=>s+Math.max(0,N(x.net_sales)),0);
+   const share=denom>0?numer/denom:(selected.length?1:0);
+   out[type]+=Math.abs(N(r.amount))*share;
+   out.loaded=true;
+ }
+ out.total=out.cogs+out.opex+out.external_logistics+out.materials+out.tax+out.business_other;
+ return out;
+}
+
+function typedExpenseAgg(month, rows){
+ const keys=new Set(rows.map(r=>String(r.month_sku)));
+ const detail=(D.expense_detail||[]).filter(r=>String(r.month).slice(0,7)===month && keys.has(String(r.month_sku)));
+ if(!detail.length)return null;
+ const z={};
+ for(const r of detail)z[r.expense_code]=(z[r.expense_code]||0)+N(r.amount);
+ return {
+   commission:N(z.commission_direct),
+   logistics:N(z.delivery_direct)+N(z.delivery_allocated),
+   acquiring:N(z.acquiring_allocated),
+   fbo:N(z.fbo_allocated),
+   partner:N(z.partner_direct)+N(z.partner_allocated),
+   promotion:N(z.promotion_direct)+N(z.promotion_allocated),
+   other:N(z.other_direct)+N(z.other_allocated),
+   compensation:N(z.compensation),
+   total:Object.values(z).reduce((s,v)=>s+N(v),0)
+ };
+}
+function rowTypedEconomics(r){
+ const detail=(D.expense_detail||[]).filter(x=>String(x.month_sku)===String(r.month_sku));
+ if(!detail.length){
+   const commission=N(r.commission),logistics=N(r.logistics)+N(r.allocated_logistics),
+         partner=N(r.storage),promotion=N(r.promotion)+N(r.allocated_promotion),
+         other=N(r.other)+N(r.allocated_other),compensation=N(r.net_compensation_amount);
+   const directExpense=commission+N(r.logistics)+N(r.storage)+N(r.promotion)+N(r.other);
+   const allocatedExpense=N(r.allocated_logistics)+N(r.allocated_storage)+N(r.allocated_promotion)+N(r.allocated_other)+N(r.allocated_commission);
+   const directSubtotal=N(r.net_sales)+directExpense+compensation;
+   const unitBase=N(r.economic_units)||N(r.sold_units);
+   const result=N(r.final_with_compensation);
+   return {
+     typed:false,commission,logistics,acquiring:0,fbo:0,partner,promotion,other,compensation,
+     expenseTotal:directExpense+allocatedExpense,directExpense,allocatedExpense,
+     directSubtotal,result,
+     directPerUnit:unitBase?directSubtotal/unitBase:0,
+     perUnit:unitBase?result/unitBase:0
+   };
+ }
+ const z={};
+ for(const x of detail)z[x.expense_code]=(z[x.expense_code]||0)+N(x.amount);
+ const commission=N(z.commission_direct),
+       logistics=N(z.delivery_direct)+N(z.delivery_allocated),
+       acquiring=N(z.acquiring_allocated),
+       fbo=N(z.fbo_allocated),
+       partner=N(z.partner_direct)+N(z.partner_allocated),
+       promotion=N(z.promotion_direct)+N(z.promotion_allocated),
+       other=N(z.other_direct)+N(z.other_allocated),
+       compensation=N(z.compensation);
+ const directExpense=N(z.commission_direct)+N(z.delivery_direct)+N(z.partner_direct)+N(z.promotion_direct)+N(z.other_direct);
+ const allocatedExpense=N(z.acquiring_allocated)+N(z.delivery_allocated)+N(z.fbo_allocated)+N(z.partner_allocated)+N(z.promotion_allocated)+N(z.other_allocated);
+ const expenseTotal=directExpense+allocatedExpense;
+ const directSubtotal=N(r.net_sales)+directExpense+compensation;
+ const result=N(r.net_sales)+expenseTotal+compensation;
+ const unitBase=N(r.economic_units)||N(r.sold_units);
+ return {
+   typed:true,commission,logistics,acquiring,fbo,partner,promotion,other,compensation,expenseTotal,directExpense,allocatedExpense,
+   directSubtotal,result,
+   directPerUnit:unitBase?directSubtotal/unitBase:0,
+   perUnit:unitBase?result/unitBase:0
+ };
+}
+function aggregateUnified(rows){
+ const z={sales:0,returns:0,net_sales:0,sold_units:0,commission:0,logistics:0,acquiring:0,fbo:0,partner:0,promotion:0,other:0,compensation:0,result:0,directExpense:0,allocatedExpense:0};
+ for(const r of rows){
+   const e=rowTypedEconomics(r);
+   z.sales+=N(r.sales); z.returns+=N(r.returns); z.net_sales+=N(r.net_sales); z.sold_units+=N(r.sold_units);
+   for(const k of ["commission","logistics","acquiring","fbo","partner","promotion","other","compensation","result","directExpense","allocatedExpense"])z[k]+=N(e[k]);
+ }
+ return z;
+}
+function render(){
+ const m=document.querySelector("#month").value,c=document.querySelector("#compare").value;
+ const marketSel=document.querySelector("#marketFilter").value||"ALL";
+ applyMarketTheme(marketSel);
+ const a=selectedAgg(m),b=selectedAgg(c);
+ const selectedRows=filtSku(m), compareRows=filtSku(c);
+ const comp=N(a.compensation),compB=N(b.compensation);
+ const marketExpenses=Math.abs(N(a.directExpense)+N(a.allocatedExpense));
+ const marketExpensesB=Math.abs(N(b.directExpense)+N(b.allocatedExpense));
+ const resultNoComp=N(a.net_sales)+N(a.directExpense)+N(a.allocatedExpense);
+ const resultNoCompB=N(b.net_sales)+N(b.directExpense)+N(b.allocatedExpense);
+ const biz=businessExpenseSlice(m),bizB=businessExpenseSlice(c);
+ const businessExpenses=N(biz.total),businessExpensesB=N(bizB.total);
+ const finalAfterAll=N(a.result)-businessExpenses;
+ const finalAfterAllB=N(b.result)-businessExpensesB;
+ const gross=Math.abs(N(a.sales)),grossB=Math.abs(N(b.sales));
+ const clean=Math.abs(N(a.net_sales)),cleanB=Math.abs(N(b.net_sales));
+ const ratio=(v,d)=>d?N(v)/Math.abs(N(d))*100:null;
+ const ratioDelta=(now,prev)=>now==null||prev==null||prev===0?null:(now/prev-1)*100;
+ const ratioDeltaHtml=d=>d==null?'<span class="neu">нет базы</span>':`<span class="${d>0?'pos':d<0?'neg':'neu'}">${d>0?'+':''}${d.toFixed(1)}%</span>`;
+
+ const marketExpensePct=ratio(marketExpenses,clean),marketExpensePctB=ratio(marketExpensesB,cleanB);
+ const resultNoCompPct=ratio(resultNoComp,gross),resultNoCompPctB=ratio(resultNoCompB,grossB);
+ const compPct=ratio(comp,gross),compPctB=ratio(compB,grossB);
+ const businessPct=ratio(businessExpenses,gross),businessPctB=ratio(businessExpensesB,grossB);
+ const finalPct=ratio(finalAfterAll,gross),finalPctB=ratio(finalAfterAllB,grossB);
+
+ const k=[
+  ["Чистые продажи",RUB(a.net_sales),`${NUM(a.sold_units)} шт`,null],
+  ["Расходы маркетплейса",RUB(-marketExpenses),`${marketExpensePct==null?"—":marketExpensePct.toFixed(1)+"%"} от чистых продаж`,ratioDelta(marketExpensePct,marketExpensePctB)],
+  ["Результат Ozon без компенсаций",RUB(resultNoComp),`${resultNoCompPct==null?"—":resultNoCompPct.toFixed(1)+"%"} от GMV`,ratioDelta(resultNoCompPct,resultNoCompPctB)],
+  ["Компенсации",RUB(comp),`${compPct==null?"—":compPct.toFixed(1)+"%"} от GMV`,ratioDelta(compPct,compPctB)],
+  ["Бизнес-расходы",biz.loaded?RUB(-businessExpenses):"—",biz.loaded?`${businessPct==null?"—":businessPct.toFixed(1)+"%"} от GMV`:"данные не загружены",biz.loaded&&bizB.loaded?ratioDelta(businessPct,businessPctB):null],
+  ["Итог после всех расходов",biz.loaded?RUB(finalAfterAll):"—",biz.loaded?`${finalPct==null?"—":finalPct.toFixed(1)+"%"} от GMV`:"после загрузки бизнес-расходов",biz.loaded&&bizB.loaded?ratioDelta(finalPct,finalPctB):null]
+ ];
+ document.querySelector("#kpis").innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="meta">${x[2]}${x[3]===null?"":'<span class="sep">•</span>'+ratioDeltaHtml(x[3])}</div></div>`).join("");
+
+
+
+ const exp=[
+   ["Комиссия",a.commission],["Логистика",a.logistics],["Эквайринг",a.acquiring],["FBO",a.fbo],
+   ["Партнёрские",a.partner],["Продвижение",a.promotion],["Прочее",a.other]
+ ];
+ const expColors=["#e86b75","#6f8fee","#f1bf4b","#8b72d6","#58bfa0","#ef9f64","#a16fd1"];
+ const expAbs=exp.map(x=>Math.abs(N(x[1])));
+ const expTotal=expAbs.reduce((s,v)=>s+v,0);
+ let cursor=0;
+ const stops=expAbs.map((v,i)=>{
+   const start=expTotal?cursor/expTotal*100:0; cursor+=v; const end=expTotal?cursor/expTotal*100:0;
+   return `${expColors[i]} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+ }).join(",");
+ const compactMoney=v=>{
+   const n=Math.abs(N(v));
+   if(n>=1000000)return (n/1000000).toFixed(1).replace(".",",")+" млн ₽";
+   if(n>=1000)return Math.round(n/1000)+" тыс. ₽";
+   return RUB(n);
+ };
+ const expenseRatio=N(a.sales)?expTotal/Math.abs(N(a.sales))*100:0;
+ document.querySelector("#expenses").innerHTML=
+   `<div class="exp-donut-wrap"><div class="exp-donut" style="background:conic-gradient(${stops||"#eef1f5 0 100%"})">
+      <div class="exp-center"><div class="sum">${compactMoney(expTotal)}</div><div class="cap">Всего расходов</div><div class="ratio">${expenseRatio.toFixed(1)}%</div><div class="ratio-cap">от продаж</div></div>
+    </div></div>
+    <div class="exp-legend">${exp.map((x,i)=>`<div class="exp-item">
+      <span class="exp-dot" style="background:${expColors[i]}"></span>
+      <span class="name">${x[0]}</span>
+      <span class="share">${pct(x[1],a.sales).toFixed(1)}%</span>
+      <span class="amount">${RUB(Math.abs(N(x[1])))}</span>
+    </div>`).join("")}</div>`;
+
+ const availableMarkets=[...new Set(D.sku.map(x=>String(x.marketplace||"OZON").toUpperCase()))].sort();
+ document.querySelector("#marketQuick").innerHTML=["ALL",...availableMarkets].map(mk=>{
+   const cls=mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":mk==="WB"?"wb":"";
+   const label=mk==="ALL"?"Все":mk==="YANDEX"?"Яндекс":mk==="OZON"?"Ozon":mk;
+   return `<button class="market-tab ${cls} ${marketSel===mk?'active':''}" onclick="setMarketFilter('${mk}')">${label}</button>`;
+ }).join("");
+
+ const marketStats={};
+ for(const mk of availableMarkets){
+   const rows=filtSkuAllMarkets(m).filter(r=>String(r.marketplace||"OZON").toUpperCase()===mk);
+   marketStats[mk]=aggregateUnified(rows);
+ }
+ const total=aggregateUnified(filtSkuAllMarkets(m));
+ const displayMarkets=marketSel==="ALL"?availableMarkets:availableMarkets.filter(mk=>mk===marketSel);
+ const financeCols=[...displayMarkets.map(mk=>({key:mk,label:mk==="YANDEX"?"Яндекс":mk==="OZON"?"Ozon":mk})),{key:"TOTAL",label:"Итого"}];
+ document.querySelector("#financeHead").innerHTML=`<tr><th>Показатель</th>${financeCols.map(x=>`<th>${x.label}</th>`).join("")}</tr>`;
+ const valueFor=(stat,key)=>key==="TOTAL"?total[key]:stat[key];
+ const statFor=col=>col.key==="TOTAL"?total:marketStats[col.key]||{};
+ const finRows=[
+   ["Продажи","sales","money"],
+   ["Возвраты","returns","pctmoney"],
+   ["Чистые продажи","net_sales","money"],
+   ["Комиссия","commission","pctmoney"],
+   ["Логистика","logistics","pctmoney"],
+   ["Эквайринг","acquiring","pctmoney"],
+   ["FBO","fbo","pctmoney"],
+   ["Партнёрские услуги","partner","pctmoney"],
+   ["Продвижение","promotion","pctmoney"],
+   ["Прочее","other","pctmoney"],
+   ["Компенсации","compensation","pctmoney"],
+   ["Результат после МП","result","result"]
+ ];
+ const cell=(stat,key,kind)=>{
+   const v=N(stat[key]), gross=Math.abs(N(stat.sales));
+   if(kind==="money")return `<b>${RUB(v)}</b>`;
+   if(kind==="pctmoney")return `${RUB(v)} <span class="sub">(${gross?pct(v,gross).toFixed(1):"0.0"}%)</span>`;
+   return `<b>${RUB(v)}</b> <span class="sub">(${gross?(v/gross*100).toFixed(1):"0.0"}%)</span>`;
+ };
+ document.querySelector("#market").innerHTML=finRows.map(r=>`<tr><td><b>${r[0]}</b></td>${financeCols.map(col=>`<td>${cell(statFor(col),r[1],r[2])}</td>`).join("")}</tr>`).join("");
+
+ const catRows=filtSku(m);
+ const catMap=new Map();
+ for(const x of catRows){
+   const key=x.master_category||"Без категории";
+   const e=rowTypedEconomics(x);
+   const z=catMap.get(key)||{master_category:key,sales:0,expenses:0,result:0};
+   z.sales+=N(x.net_sales);
+   z.expenses+=Math.abs(N(e.commission))+Math.abs(N(e.logistics))+Math.abs(N(e.acquiring))+Math.abs(N(e.fbo))+Math.abs(N(e.partner))+Math.abs(N(e.promotion))+Math.abs(N(e.other));
+   z.result+=N(e.result);
+   catMap.set(key,z);
+ }
+ const cats=[...catMap.values()].sort((x,y)=>y.sales-x.sales);
+ const totalCats=cats.reduce((s,x)=>s+N(x.sales),0);
+ const maxCatSales=Math.max(1,...cats.map(x=>Math.abs(N(x.sales))));
+ const maxCatExpenses=Math.max(1,...cats.map(x=>Math.abs(N(x.expenses))));
+ const maxCatResult=Math.max(1,...cats.map(x=>Math.abs(N(x.result))));
+ const metricCell=(value,max,cls,pctText)=>`<div class="cat-metric"><div class="cat-bar ${cls}"><span style="width:${Math.min(100,Math.abs(N(value))/max*100)}%"></span></div><div class="cat-value">${RUB(value)} <span class="cat-pct">(${pctText})</span></div></div>`;
+ document.querySelector("#cats").innerHTML=cats.length?cats.map(x=>{
+   const salesShare=totalCats?N(x.sales)/totalCats*100:0;
+   const expenseShare=N(x.sales)?Math.abs(N(x.expenses))/Math.abs(N(x.sales))*100:0;
+   const resultShare=N(x.sales)?N(x.result)/Math.abs(N(x.sales))*100:0;
+   return `<tr>
+     <td><b>${x.master_category}</b></td>
+     <td>${metricCell(x.sales,maxCatSales,"sales",salesShare.toFixed(1)+"%")}</td>
+     <td>${metricCell(-Math.abs(N(x.expenses)),maxCatExpenses,"expenses",expenseShare.toFixed(1)+"%")}</td>
+     <td>${metricCell(x.result,maxCatResult,"result",resultShare.toFixed(1)+"%")}</td>
+   </tr>`;
+ }).join(""):'<tr><td colspan="4" class="empty">Нет данных</td></tr>';
+
+ const sku=filtSku(m).sort((x,y)=>N(y.net_sales)-N(x.net_sales));
+ document.querySelector("#sku").innerHTML=sku.map(x=>{
+   const e=rowTypedEconomics(x);
+   const otherExpenses=N(e.acquiring)+N(e.fbo)+N(e.partner)+N(e.promotion)+N(e.other);
+   const returnWriteoffUnits=N(x.return_operations)+N(x.disposal_units)+N(x.returns_without_compensation)+N(x.compensated_units);
+   const returnWriteoffPct=N(x.economic_units)?returnWriteoffUnits/N(x.economic_units)*100:0;
+   const resultPct=N(x.sales)?N(e.result)/Math.abs(N(x.sales))*100:0;
+   return `<tr data-key="${x.month_sku}" class="${selectedSku===x.month_sku?'active-row':''}" onclick="openSkuDetail('${String(x.month_sku).replace(/'/g,"\\'")}')">
+     <td><b>${x.article||x.sku}</b><br><span class="sub">${x.product_name||""}</span></td>
+     <td>${RUB(x.net_sales)}</td>
+     <td>${NUM(x.sold_units)}</td>
+     <td>${RUB(e.commission)}</td>
+     <td>${RUB(e.logistics)}</td>
+     <td>${RUB(otherExpenses)}</td>
+     <td><b>${NUM(returnWriteoffUnits)} шт</b><br><span class="sub">${returnWriteoffPct.toFixed(1)}%</span></td>
+     <td>${RUB(e.compensation)}</td>
+     <td><b>${RUB(e.result)}</b><br><span class="sub">(${resultPct.toFixed(1)}%)</span></td>
+     <td><b>${RUB(e.perUnit)}</b></td>
+   </tr>`;
+ }).join("");
+
+ populateSkuQuickSearch();
+ renderTrend();
+ renderManual(m);
+ if(selectedSku)renderSkuDetail();
+}
+
+
+function monthlyMarketRows(monthSku){
+ const base=D.sku.find(r=>String(r.month_sku)===String(monthSku));
+ if(!base)return new Map();
+ const key=String(base.article||base.sku||"").trim().toLowerCase();
+ const month=String(base.month).slice(0,7);
+ const out=new Map();
+ for(const r of D.sku){
+   if(String(r.month).slice(0,7)!==month)continue;
+   const rk=String(r.article||r.sku||"").trim().toLowerCase();
+   if(rk!==key)continue;
+   const mk=String(r.marketplace||"OZON").toUpperCase();
+   const a=out.get(mk)||{marketplace:mk,article:r.article||"",product_name:r.product_name||"",sku:r.sku||"",sales:0,returns:0,net_sales:0,sold_units:0,commission:0,allocated_commission:0,logistics:0,allocated_logistics:0,storage:0,allocated_storage:0,promotion:0,allocated_promotion:0,other:0,allocated_other:0,compensation:0,result:0,economic_units:0,return_operations:0,disposal_units:0,returns_without_compensation:0,compensated_units:0};
+   for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","economic_units","return_operations","disposal_units","returns_without_compensation","compensated_units"])a[k]+=N(r[k]);
+   a.compensation+=N(r.net_compensation_amount);
+   a.result+=N(r.final_with_compensation);
+   out.set(mk,a);
+ }
+ return out;
+}
+function setSkuDetailMarket(mk){skuDetailMarket=mk;renderSkuDetail()}
+function toggleSkuSearch(forceOpen){
+ const card=document.querySelector("#skuSearchCard");
+ if(!card)return;
+ if(forceOpen===true)card.classList.remove("collapsed");
+ else card.classList.toggle("collapsed");
+ if(!card.classList.contains("collapsed"))setTimeout(()=>document.querySelector("#skuQuickSearch")?.focus(),0);
+}
+function collapseSkuSearch(){
+ document.querySelector("#skuSearchCard")?.classList.add("collapsed");
+}
+
+function populateSkuQuickSearch(){
+ const list=document.querySelector("#skuQuickList");
+ if(!list)return;
+ const m=document.querySelector("#month").value;
+ const rows=filtSku(m);
+ const seen=new Set();
+ list.innerHTML=rows.map(r=>{
+   const key=String(r.month_sku);
+   if(seen.has(key))return "";
+   seen.add(key);
+   const label=[r.article||"",r.sku||"",r.product_name||""].filter(Boolean).join(" · ");
+   return `<option value="${String(r.article||r.sku||"").replace(/"/g,"&quot;")}">${label}</option>`;
+ }).join("");
+}
+function openQuickSku(){
+ const inp=document.querySelector("#skuQuickSearch");
+ const q=String(inp?.value||"").trim().toLowerCase();
+ if(!q)return;
+ const m=document.querySelector("#month").value;
+ const rows=filtSku(m);
+ const hit=rows.find(r=>String(r.article||"").toLowerCase()===q||String(r.sku||"").toLowerCase()===q)
+   ||rows.find(r=>[r.article,r.sku,r.product_name].filter(Boolean).join(" ").toLowerCase().includes(q));
+ if(!hit){
+   inp.setCustomValidity("SKU не найден в выбранном периоде");
+   inp.reportValidity();
+   setTimeout(()=>inp.setCustomValidity(""),1200);
+   return;
+ }
+ inp.value=hit.article||hit.sku;
+ openSkuDetail(hit.month_sku);
+}
+
+function openSkuDetail(monthSku){
+ selectedSku=monthSku;
+ collapseSkuSearch();
+ const base=D.sku.find(r=>String(r.month_sku)===String(monthSku));
+ if(!base)return;
+ const available=[...monthlyMarketRows(monthSku).keys()];
+ skuDetailMarket=available.length>1?"ALL":(available[0]||"ALL");
+ document.querySelectorAll("#sku tr[data-key]").forEach(r=>r.classList.toggle("active-row",r.dataset.key===monthSku));
+ renderSkuDetail();
+}
+function skuMetricCompare(base,month,market){
+ const key=String(base.article||base.sku||"").trim().toLowerCase();
+ const rows=D.sku.filter(r=>String(r.month).slice(0,7)===month && String(r.article||r.sku||"").trim().toLowerCase()===key && (market==="ALL"||String(r.marketplace||"OZON").toUpperCase()===market));
+ if(!rows.length)return null;
+ const z=rows.reduce((a,r)=>{const e=rowTypedEconomics(r);a.sales+=N(r.sales);a.returns+=N(r.returns);a.net+=N(r.net_sales);a.economic+=N(r.economic_units)||N(r.sold_units);a.direct+=N(e.directSubtotal);a.market+=N(e.result);return a},{sales:0,returns:0,net:0,economic:0,direct:0,market:0});
+ return z;
+}
+function relDelta(now,prev){return now==null||prev==null||prev===0?null:(now/prev-1)*100}
+function miniDeltaHtml(d){return d==null?'<span class="neu">нет базы</span>':`<span class="${d>0?'pos':d<0?'neg':'neu'}">${d>0?'+':''}${d.toFixed(1)}%</span>`}
+function renderSkuDetail(){
+ const box=document.querySelector("#skuDetailBody");
+ const base=D.sku.find(r=>String(r.month_sku)===String(selectedSku));
+ if(!base){box.innerHTML='<div class="sub" style="margin:0">Выбери SKU слева.</div>';return}
+ const stats=monthlyMarketRows(selectedSku);
+ const marketOrder=["OZON","WB","YANDEX"];
+ const available=marketOrder.filter(mk=>stats.has(mk));
+ const all=[...stats.values()];
+ const sum=rows=>rows.reduce((a,x)=>{for(const k of ["sales","returns","net_sales","sold_units","commission","allocated_commission","logistics","allocated_logistics","storage","allocated_storage","promotion","allocated_promotion","other","allocated_other","compensation","result","economic_units","return_operations","disposal_units","returns_without_compensation","compensated_units"])a[k]=(a[k]||0)+N(x[k]);return a},{});
+ const totalStats=sum(all);
+ if(skuDetailMarket!=="ALL"&&!stats.has(skuDetailMarket))skuDetailMarket="ALL";
+ const x=skuDetailMarket==="ALL"?totalStats:(stats.get(skuDetailMarket)||{});
+ const tabs=["ALL",...marketOrder].map(mk=>{
+   const cls=mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":mk==="WB"?"wb":"";
+   const disabled=mk!=="ALL"&&!stats.has(mk);
+   const label=mk==="ALL"?"Все":mk==="YANDEX"?"Яндекс":mk;
+   return `<button class="market-tab ${cls} ${skuDetailMarket===mk?'active':''}" ${disabled?"disabled":""} onclick="setSkuDetailMarket('${mk}')">${label}</button>`
+ }).join("");
+ const noData=false;
+
+ const typedRows=(D.expense_detail||[]).filter(r=>String(r.month_sku)===String(base.month_sku) && (skuDetailMarket==="ALL"||String(r.marketplace||"OZON").toUpperCase()===skuDetailMarket));
+ const typed=Object.fromEntries(typedRows.map(r=>[r.expense_code,N(r.amount)]));
+ const hasTyped=typedRows.length>0;
+
+ const directCommission=hasTyped?N(typed.commission_direct):N(x.commission);
+ const directDelivery=hasTyped?N(typed.delivery_direct):N(x.logistics);
+ const directPartner=hasTyped?N(typed.partner_direct):N(x.storage);
+ const directPromotion=hasTyped?N(typed.promotion_direct):N(x.promotion);
+ const directOther=hasTyped?N(typed.other_direct):N(x.other);
+ const compensation=hasTyped?N(typed.compensation):N(x.compensation);
+
+ const allocatedAcquiring=hasTyped?N(typed.acquiring_allocated):N(x.allocated_commission);
+ const allocatedDelivery=hasTyped?N(typed.delivery_allocated):N(x.allocated_logistics);
+ const allocatedFbo=hasTyped?N(typed.fbo_allocated):0;
+ const allocatedPartner=hasTyped?N(typed.partner_allocated):N(x.allocated_storage);
+ const allocatedPromotion=hasTyped?N(typed.promotion_allocated):N(x.allocated_promotion);
+ const allocatedOther=hasTyped?N(typed.other_allocated):N(x.allocated_other);
+
+ const directSubtotal=N(x.net_sales)+directCommission+directDelivery+directPartner+directPromotion+directOther+compensation;
+ const knownAllocated=allocatedAcquiring+allocatedDelivery+allocatedFbo+allocatedPartner+allocatedPromotion+allocatedOther;
+ const received=hasTyped?directSubtotal+knownAllocated:N(x.result);
+ const unexplainedShared=hasTyped?0:(Math.abs((received-(directSubtotal+knownAllocated)))>1 ? received-(directSubtotal+knownAllocated) : 0);
+
+ const unitBase=N(x.economic_units)||N(x.sold_units);
+ const directPerUnit=unitBase?directSubtotal/unitBase:0;
+ const perUnit=unitBase?received/unitBase:0;
+
+ const month=String(base.month).slice(0,7);
+ const compareMonth=document.querySelector("#compare")?.value||"";
+ const compare=skuMetricCompare(base,compareMonth,skuDetailMarket);
+ const returnsPct=N(x.sales)?Math.abs(N(x.returns))/Math.abs(N(x.sales))*100:null;
+ const compareReturnsPct=compare&&compare.sales?Math.abs(compare.returns)/Math.abs(compare.sales)*100:null;
+ const directPct=N(x.net_sales)?directSubtotal/Math.abs(N(x.net_sales))*100:null;
+ const marketPct=N(x.net_sales)?received/Math.abs(N(x.net_sales))*100:null;
+ const skuKey=String(base.article||base.sku||"").trim().toLowerCase();
+ const marketKey=skuDetailMarket==="ALL"?null:skuDetailMarket;
+ const costMap=new Map((D.unit_costs||[]).map(r=>[String(r.article||"").trim().toLowerCase(),N(r.unit_cost)]));
+ const unitCost=costMap.get(skuKey)||0;
+ const cogs=unitCost*unitBase;
+
+ const manualRows=(D.manual_expenses||[]).filter(r=>String(r.month).slice(0,7)===month);
+ const allocManual=type=>{
+   const rows=manualRows.filter(r=>String(r.expense_type||"").toLowerCase()===type);
+   if(!rows.length)return null;
+   let total=0;
+   for(const r of rows){
+     let baseRows=D.sku.filter(x=>String(x.month).slice(0,7)===month);
+     if(r.marketplace)baseRows=baseRows.filter(x=>String(x.marketplace||"").toUpperCase()===String(r.marketplace).toUpperCase());
+     if(r.account_id)baseRows=baseRows.filter(x=>String(x.account_id||"")===String(r.account_id));
+     if(r.master_category)baseRows=baseRows.filter(x=>String(x.master_category||"")===String(r.master_category));
+     if(marketKey)baseRows=baseRows.filter(x=>String(x.marketplace||"").toUpperCase()===marketKey);
+
+     const denom=baseRows.reduce((s,z)=>s+Math.max(0,N(z.net_sales)),0);
+     const numer=baseRows.filter(z=>String(z.article||z.sku||"").trim().toLowerCase()===skuKey)
+       .reduce((s,z)=>s+Math.max(0,N(z.net_sales)),0);
+     if(denom>0)total+=Math.abs(N(r.amount))*numer/denom;
+   }
+   return total? -total : 0;
+ };
+
+ const businessRows=[
+   ["Себестоимость",unitCost? -cogs:null,unitCost?NUM(unitCost)+" ₽ × "+NUM(unitBase)+" ед.":"нет себестоимости"],
+   ["OPEX",allocManual("opex"),"по чистым продажам"],
+   ["Внешняя логистика",allocManual("external_logistics"),"по чистым продажам"],
+   ["Материалы",allocManual("materials"),"по чистым продажам"],
+   ["Налог",allocManual("tax"),"управленческое распределение по чистым продажам"],
+   ["Прочие бизнес-расходы",allocManual("business_other"),"по чистым продажам"]
+ ];
+ const businessLoaded=businessRows.some(r=>r[1]!==null);
+ const businessTotal=businessRows.reduce((s,r)=>s+(r[1]===null?0:N(r[1])),0);
+ const finalAfterBusiness=received+businessTotal;
+ const finalPerUnit=unitBase?finalAfterBusiness/unitBase:0;
+ const businessPct=N(x.net_sales)?finalAfterBusiness/Math.abs(N(x.net_sales))*100:null;
+ let compareBusinessPct=null;
+ if(compare&&compare.net){
+   const cmpShareBase=D.sku.filter(r=>String(r.month).slice(0,7)===compareMonth);
+   const cmpNetAll=cmpShareBase.reduce((s,r)=>s+Math.max(0,N(r.net_sales)),0);
+   const cmpSkuNet=cmpShareBase.filter(r=>String(r.article||r.sku||"").trim().toLowerCase()===skuKey && (skuDetailMarket==="ALL"||String(r.marketplace||"OZON").toUpperCase()===skuDetailMarket)).reduce((s,r)=>s+Math.max(0,N(r.net_sales)),0);
+   const cmpShare=cmpNetAll>0?cmpSkuNet/cmpNetAll:0;
+   const cmpManual=(D.manual_expenses||[]).filter(r=>String(r.month).slice(0,7)===compareMonth);
+   const cmpBusiness=cmpManual.reduce((s,r)=>{
+     const t=String(r.expense_type||"").toLowerCase();
+     if(!["opex","external_logistics","materials","tax","business_other"].includes(t))return s;
+     return s+Math.abs(N(r.amount))*cmpShare;
+   },0);
+   const cmpCostMap=new Map((D.unit_costs||[]).map(r=>[String(r.article||"").trim().toLowerCase(),N(r.unit_cost)]));
+   const cmpCogs=(cmpCostMap.get(skuKey)||0)*(compare.economic||0);
+   compareBusinessPct=(compare.market-cmpBusiness-cmpCogs)/Math.abs(compare.net)*100;
+ }
+ const directDelta=relDelta(directPct,compare&&compare.net?compare.direct/Math.abs(compare.net)*100:null);
+ const marketDelta=relDelta(marketPct,compare&&compare.net?compare.market/Math.abs(compare.net)*100:null);
+ const businessDelta=relDelta(businessPct,compareBusinessPct);
+ const returnsDelta=relDelta(returnsPct,compareReturnsPct);
+ const fmtMaybe=v=>v===null?"—":RUB(v);
+ const pctOfSales=v=>N(x.sales)?(Math.abs(N(v))/Math.abs(N(x.sales))*100).toFixed(1)+"%":"—";
+ const pctSignedOfSales=v=>N(x.sales)?(N(v)/Math.abs(N(x.sales))*100).toFixed(1)+"%":"—";
+ const moneyPct=(v,signed=false)=>`${RUB(v)} <span class="sub">(${signed?pctSignedOfSales(v):pctOfSales(v)})</span>`;
+
+ box.innerHTML=
+ `<div class="sku-head">
+    <div class="sku-photo">Фото товара<br>подключим позже</div>
+    <div><div class="sku-title">${base.article||base.sku}</div><div class="sku-name">${base.product_name||""}</div><div class="sku-meta">SKU: ${base.sku} • ${monthName(String(base.month).slice(0,10))}</div></div>
+  </div>
+  <div class="market-toolbar"><div><div class="section-title">Детализация</div><div class="sub" style="margin:2px 0 0">Сверху — сравнение маркетов, ниже — подробная экономика выбранного.</div></div><div class="market-tabs">${tabs}</div></div>
+  ${noData?'<div class="empty">По этому SKU на выбранном маркетплейсе данных пока нет.</div>':
+  `<div class="sku-kpis">
+     <div class="sku-kpi"><div class="l">Продано</div><div class="v">${NUM(x.sold_units)} шт</div></div>
+     <div class="sku-kpi"><div class="l">Продажи</div><div class="v">${RUB(x.sales)}</div></div>
+     <div class="sku-kpi"><div class="l">Возвраты</div><div class="v">${RUB(Math.abs(N(x.returns)))}</div><div class="s">${returnsPct==null?"—":returnsPct.toFixed(1)+"%"} <span class="sep">•</span> ${miniDeltaHtml(returnsDelta)}</div></div>
+     <div class="sku-kpi"><div class="l">После прямых / шт</div><div class="v">${RUB(directPerUnit)}</div><div class="s">${directPct==null?"—":directPct.toFixed(1)+"%"} <span class="sep">•</span> ${miniDeltaHtml(directDelta)}</div></div>
+     <div class="sku-kpi"><div class="l">После маркета / шт</div><div class="v">${RUB(perUnit)}</div><div class="s">${marketPct==null?"—":marketPct.toFixed(1)+"%"} <span class="sep">•</span> ${miniDeltaHtml(marketDelta)}</div></div>
+     <div class="sku-kpi"><div class="l">После бизнеса / шт</div><div class="v">${businessLoaded?RUB(finalPerUnit):"—"}</div><div class="s">${businessLoaded&&businessPct!=null?businessPct.toFixed(1)+"%":"—"} <span class="sep">•</span> ${businessLoaded?miniDeltaHtml(businessDelta):'<span class="neu">нет базы</span>'}</div></div>
+   </div>
+   <table class="econ-table">
+     <thead><tr><th>Показатель</th><th>Итого</th></tr></thead>
+     <tbody>
+       <tr><td><b>Продажи</b></td><td><b>${RUB(x.sales)}</b></td></tr>
+       <tr><td>Возвраты</td><td>${moneyPct(x.returns)}</td></tr>
+       <tr><td><b>Чистые продажи</b></td><td><b>${moneyPct(x.net_sales,true)}</b></td></tr>
+
+       <tr><td colspan="2" style="padding-top:16px"><b>Прямые расходы SKU</b></td></tr>
+       <tr><td>Комиссия <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directCommission)}</b></td></tr>
+       <tr><td>Логистика <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directDelivery)}</b></td></tr>
+       <tr><td>Партнёрские услуги <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directPartner)}</b></td></tr>
+       <tr><td>Продвижение <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directPromotion)}</b></td></tr>
+       <tr><td>Прочее <span class="sub">(по SKU)</span></td><td><b>${moneyPct(directOther)}</b></td></tr>
+       <tr><td>Компенсации <span class="sub">(по SKU)</span></td><td><b>${moneyPct(compensation)}</b></td></tr>
+       <tr class="total-row"><td>Подытог после прямых расходов</td><td>${moneyPct(directSubtotal,true)}</td></tr>
+       <tr class="total-row"><td>После прямых расходов / шт</td><td>${RUB(directPerUnit)}</td></tr>
+
+       <tr><td colspan="2" style="padding-top:16px"><b>Распределённые расходы маркетплейса</b></td></tr>
+       <tr><td>Эквайринг <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedAcquiring)}</b></td></tr>
+       <tr><td>Логистика <span class="sub">(по типу расхода)</span></td><td><b>${moneyPct(allocatedDelivery)}</b></td></tr>
+       <tr><td>FBO <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedFbo)}</b></td></tr>
+       <tr><td>Партнёрские услуги <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedPartner)}</b></td></tr>
+       <tr><td>Продвижение <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedPromotion)}</b></td></tr>
+       <tr><td>Прочее <span class="sub">(по чистым продажам)</span></td><td><b>${moneyPct(allocatedOther)}</b></td></tr>
+       ${unexplainedShared?`<tr><td>Не разнесено <span class="sub">(контрольный остаток)</span></td><td><b>${RUB(unexplainedShared)}</b></td></tr>`:""}
+       <tr class="total-row"><td>Итого после всех расходов маркетплейса</td><td>${moneyPct(received,true)}</td></tr>
+       <tr class="total-row"><td>Итого после всех расходов маркетплейса / шт</td><td>${RUB(perUnit)}</td></tr>
+
+       <tr><td colspan="2" style="padding-top:16px"><b>Расходы бизнеса</b></td></tr>
+       ${businessRows.map(r=>`<tr><td>${r[0]} <span class="sub">(${r[2]})</span></td><td><b>${r[1]===null?"—":moneyPct(r[1])}</b></td></tr>`).join("")}
+       <tr class="total-row"><td>Чистая прибыль SKU</td><td>${businessLoaded?moneyPct(finalAfterBusiness,true):"—"}</td></tr>
+       <tr class="total-row"><td>Чистая прибыль SKU / экономическую единицу</td><td>${businessLoaded?RUB(finalPerUnit):"—"}</td></tr>
+     </tbody>
+   </table>
+   <div class="source-note">Проценты в карточке считаются от валовых продаж SKU, как и в финансовой воронке. Для августа 2026 типизация построена по фактическим type_id Ozon Finance API. Доставка 32/59/98 идёт напрямую по SKU; FBO 12/77/71, эквайринг 1, страхование 76, продвижение 41/52 и прочее 15 распределяются по утверждённой модели. Контрольный остаток для типизированного месяца равен нулю.</div>`}
+ `;
+}
+
+function renderTrend(){
+ const months=[...new Set(D.sku.map(x=>String(x.month).slice(0,7)))].sort().slice(-4);
+ const vals=months.map(m=>({month:m,...selectedAgg(m)}));
+ const current=months[months.length-1]||"";
+ const maxSales=Math.max(1,...vals.map(x=>Math.abs(N(x.sales))));
+ const metric=(value,max,cls,suffix="%")=>`<div class="mini-metric"><div class="mini-track ${cls}"><span style="width:${Math.min(100,Math.abs(N(value))/Math.max(1,max)*100)}%"></span></div><div class="mini-num">${N(value).toFixed(1)}${suffix}</div></div>`;
+ const rows=vals.map(x=>{
+   const gross=Math.abs(N(x.sales));
+   const returnsPct=gross?Math.abs(N(x.returns))/gross*100:0;
+   const directPct=gross?Math.abs(N(x.directExpense))/gross*100:0;
+   const allocatedPct=gross?Math.abs(N(x.allocatedExpense))/gross*100:0;
+   const resultPct=gross?N(x.result)/gross*100:0;
+   return {...x,returnsPct,directPct,allocatedPct,resultPct};
+ });
+ const maxReturns=Math.max(1,...rows.map(x=>x.returnsPct));
+ const maxDirect=Math.max(1,...rows.map(x=>x.directPct));
+ const maxAllocated=Math.max(1,...rows.map(x=>x.allocatedPct));
+ const maxResult=Math.max(1,...rows.map(x=>Math.abs(x.resultPct)));
+ document.querySelector("#trend").innerHTML=rows.map(x=>`<tr class="${x.month===current?'live':''}">
+   <td><span class="trend-month">${monthName(x.month+"-01")}</span>${x.month===current?'<span class="live-badge">LIVE</span>':''}</td>
+   <td><div class="mini-metric"><div class="mini-track sales"><span style="width:${Math.min(100,Math.abs(N(x.sales))/maxSales*100)}%"></span></div><div class="mini-num">${RUB(x.sales)}</div></div></td>
+   <td>${metric(x.returnsPct,maxReturns,"returns")}</td>
+   <td>${metric(x.directPct,maxDirect,"direct")}</td>
+   <td>${metric(x.allocatedPct,maxAllocated,"allocated")}</td>
+   <td class="trend-money">${RUB(x.result)}</td>
+   <td>${metric(x.resultPct,maxResult,"result")}</td>
+ </tr>`).join("");
+}
+function renderManual(m){
+ const b=businessExpenseSlice(m);
+ const set=(id,v)=>document.querySelector(id).textContent=b.loaded&&N(v)!==0?RUB(-Math.abs(v)):"—";
+ set("#cogs",b.cogs);set("#opex",b.opex);set("#extlog",b.external_logistics);set("#materials",b.materials);set("#tax",b.tax);set("#businessOther",b.business_other);
+ const market=selectedAgg(m);
+ const gross=Math.abs(N(market.sales));
+ const afterLoaded=b.loaded?N(market.result)-b.total:null;
+ const margin=afterLoaded==null||!gross?null:afterLoaded/gross*100;
+ const hasCogs=N(b.cogs)>0;
+ const resultLabel=hasCogs?"Чистая прибыль":"Промежуточный результат";
+ const resultNote=hasCogs?(margin==null?"":margin.toFixed(1)+"% от продаж"):"без себестоимости";
+ document.querySelector("#businessSummary").innerHTML=
+   `<div class="sum-card"><div class="l">Результат после МП</div><div class="v">${RUB(market.result)}</div></div>
+    <div class="sum-card"><div class="l">Загруженные бизнес-расходы</div><div class="v">${b.loaded?RUB(-b.total):"—"}</div></div>
+    <div class="sum-card"><div class="l">${resultLabel}</div><div class="v">${afterLoaded==null?"—":RUB(afterLoaded)}</div><div class="sub" style="margin:3px 0 0">${resultNote}</div></div>`;
+}
+
+let IMPORT_RAW=null,IMPORT_HEADERS=[],IMPORT_ROWS=[],IMPORT_NORMALIZED=[];
+const importFields=[
+ ["article","Артикул продавца / модель"],
+ ["sku","SKU Ozon"],
+ ["compensated_units","Компенсировано, шт"],
+ ["compensation_amount","Сумма компенсации"],
+ ["decompensation_amount","Декомпенсация"],
+ ["disposal_units","Утиль, шт"],
+ ["returns_without_compensation","Возврат без компенсации, шт"]
+];
+function openImportCenter(){
+ document.querySelector("#importModal").classList.add("open");
+ const pin=sessionStorage.getItem("monthlyImportPin")||"";
+ document.querySelector("#importPin").value=pin;
+}
+function closeImportCenter(){document.querySelector("#importModal").classList.remove("open")}
+function normH(v){return String(v??"").trim().toLowerCase().replace(/ё/g,"е").replace(/\s+/g," ")}
+function guessColumn(key,headers){
+ const rules={
+  article:[/артикул.*продав/,/^артикул$/, /offer.?id/,/offer id/],
+  sku:[/^sku$/, /sku.*ozon/,/ozon.*sku/,/идентификатор.*товар/],
+  compensated_units:[/компенс.*(шт|кол)/,/(шт|кол).*компенс/],
+  compensation_amount:[/сум.*компенс/,/компенс.*сум/,/размер.*компенс/],
+  decompensation_amount:[/декомпенс/,/удержан.*компенс/],
+  disposal_units:[/(утилиз|утил).*(шт|кол)/,/(шт|кол).*(утилиз|утил)/],
+  returns_without_compensation:[/возврат.*без.*компенс/,/без.*компенс.*возврат/]
+ };
+ const hs=headers.map(normH);
+ for(const re of rules[key]||[]){const i=hs.findIndex(x=>re.test(x));if(i>=0)return headers[i]}
+ return "";
+}
+function mappingSelect(key,label){
+ const guessed=guessColumn(key,IMPORT_HEADERS);
+ return `<div class="import-field"><label>${label}</label><select id="map_${key}"><option value="">— не использовать —</option>${IMPORT_HEADERS.map(h=>`<option value="${String(h).replace(/"/g,"&quot;")}" ${h===guessed?"selected":""}>${h}</option>`).join("")}</select></div>`;
+}
+async function readImportFile(file){
+ if(!file)return;
+ const status=document.querySelector("#importStatus");
+ status.textContent="Читаю файл…";
+ try{
+  const data=await file.arrayBuffer();
+  const wb=XLSX.read(data,{type:"array",cellDates:true});
+  let best=null;
+  for(const sheetName of wb.SheetNames){
+   const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:"",raw:false});
+   for(let r=0;r<Math.min(40,matrix.length);r++){
+    const headers=(matrix[r]||[]).map(x=>String(x).trim()).filter(Boolean);
+    const score=importFields.reduce((s,[k])=>s+(guessColumn(k,headers)?1:0),0);
+    if(!best||score>best.score)best={sheetName,matrix,row:r,headers,score};
+   }
+  }
+  if(!best||best.headers.length<2)throw Error("Не удалось найти таблицу в файле");
+  IMPORT_HEADERS=best.headers;
+  const rows=best.matrix.slice(best.row+1).filter(row=>row.some(v=>String(v).trim()!==""));
+  IMPORT_ROWS=rows.map(row=>Object.fromEntries(IMPORT_HEADERS.map((h,i)=>[h,row[i]??""])));
+  IMPORT_RAW={file,sheetName:best.sheetName,headerRow:best.row+1,score:best.score};
+  document.querySelector("#mappingGrid").innerHTML=importFields.map(([k,l])=>mappingSelect(k,l)).join("");
+  document.querySelector("#mappingBlock").style.display="";
+  document.querySelector("#prepareImportBtn").disabled=false;
+  document.querySelector("#applyImportBtn").disabled=true;
+  status.textContent=`Найден лист «${best.sheetName}», строк данных: ${IMPORT_ROWS.length}. Автоопределено полей: ${best.score} из ${importFields.length}.`;
+ }catch(e){
+  IMPORT_RAW=null;IMPORT_ROWS=[];IMPORT_HEADERS=[];
+  document.querySelector("#mappingBlock").style.display="none";
+  document.querySelector("#prepareImportBtn").disabled=true;
+  document.querySelector("#applyImportBtn").disabled=true;
+  status.textContent="Ошибка чтения: "+e.message;
+ }
+}
+function numImport(v){
+ if(v==null||v==="")return null;
+ const s=String(v).replace(/\s/g,"").replace(",",".").replace(/[^0-9.\-]/g,"");
+ if(!s)return null;const n=Number(s);return Number.isFinite(n)?n:null;
+}
+function prepareImportPreview(){
+ const map=Object.fromEntries(importFields.map(([k])=>[k,document.querySelector("#map_"+k).value]));
+ if(!map.article&&!map.sku){document.querySelector("#importStatus").textContent="Нужно сопоставить Артикул или SKU.";return}
+ const grouped=new Map();
+ for(const row of IMPORT_ROWS){
+  const article=map.article?String(row[map.article]||"").trim():"";
+  const sku=map.sku?String(row[map.sku]||"").trim():"";
+  if(!article&&!sku)continue;
+  const key=sku||article;
+  const z=grouped.get(key)||{article:article||null,sku:sku||null};
+  for(const k of ["compensated_units","compensation_amount","decompensation_amount","disposal_units","returns_without_compensation"]){
+    if(!map[k])continue;
+    const n=numImport(row[map[k]]);
+    if(n!=null)z[k]=(z[k]??0)+n;
+  }
+  grouped.set(key,z);
+ }
+ IMPORT_NORMALIZED=[...grouped.values()];
+ const sums=IMPORT_NORMALIZED.reduce((a,x)=>{for(const k of ["compensated_units","compensation_amount","decompensation_amount","disposal_units","returns_without_compensation"])if(x[k]!=null)a[k]=(a[k]||0)+N(x[k]);return a},{});
+ const cols=["SKU / артикул","Компенс., шт","Компенсация","Декомпенсация","Утиль","Возврат без комп."];
+ document.querySelector("#preview").innerHTML=`<table><thead><tr>${cols.map(x=>"<th>"+x+"</th>").join("")}</tr></thead><tbody>${IMPORT_NORMALIZED.slice(0,100).map(x=>`<tr><td>${x.article||x.sku||""}</td><td>${x.compensated_units??"—"}</td><td>${x.compensation_amount==null?"—":RUB(x.compensation_amount)}</td><td>${x.decompensation_amount==null?"—":RUB(x.decompensation_amount)}</td><td>${x.disposal_units??"—"}</td><td>${x.returns_without_compensation??"—"}</td></tr>`).join("")}</tbody></table>`;
+ document.querySelector("#importStatus").innerHTML=`К записи: <b>${IMPORT_NORMALIZED.length}</b> SKU • компенсации: <b>${sums.compensated_units||0} шт / ${RUB(sums.compensation_amount||0)}</b> • декомпенсации: <b>${RUB(sums.decompensation_amount||0)}</b> • утиль: <b>${sums.disposal_units||0} шт</b> • возвраты без компенсации: <b>${sums.returns_without_compensation||0} шт</b>.`;
+ document.querySelector("#applyImportBtn").disabled=IMPORT_NORMALIZED.length===0;
+}
+async function applyImport(){
+ if(!IMPORT_NORMALIZED.length||!IMPORT_RAW)return;
+ const pin=document.querySelector("#importPin").value.trim();
+ if(!pin){document.querySelector("#importStatus").textContent="Введите PIN импорта.";return}
+ sessionStorage.setItem("monthlyImportPin",pin);
+ const month=document.querySelector("#importMonth").value;
+ const btn=document.querySelector("#applyImportBtn");btn.disabled=true;
+ document.querySelector("#importStatus").textContent="Записываю в SQL…";
+ try{
+  const res=await fetch(IMPORT_API,{method:"POST",headers:{"Content-Type":"application/json","x-import-pin":pin},body:JSON.stringify({
+   type:"compensation",tenant:"CPR",month,marketplace:"OZON",account_id:"ozon_cpr",filename:IMPORT_RAW.file.name,rows:IMPORT_NORMALIZED
+  })});
+  const out=await res.json();
+  if(!res.ok)throw Error(out.error||("HTTP "+res.status));
+  document.querySelector("#importStatus").innerHTML=`Готово. Пакет <b>${out.batch_id}</b>, записано SKU: <b>${out.rows}</b>. Обновляю отчёт…`;
+  setTimeout(()=>location.reload(),900);
+ }catch(e){document.querySelector("#importStatus").textContent="Ошибка импорта: "+e.message;btn.disabled=false}
+}
+document.addEventListener("DOMContentLoaded",()=>{
+ const file=document.querySelector("#importFile");if(file)file.onchange=()=>readImportFile(file.files?.[0]);
+});
+
+fetch(API,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(x=>{
+ D=x;
+ const months=D.months.map(x=>String(x.month).slice(0,7));
+ document.querySelector("#month").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");document.querySelector("#importMonth").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
+ document.querySelector("#compare").innerHTML=months.map(m=>`<option value="${m}">${monthName(m+"-01")}</option>`).join("");
+ document.querySelector("#month").value=months[months.length-1]||"";
+ document.querySelector("#compare").value=months[Math.max(0,months.length-2)]||"";
+ const cats=[...new Set(D.sku.map(x=>x.master_category).filter(Boolean))].sort();
+ document.querySelector("#category").innerHTML='<option value="">Все</option>'+cats.map(c=>`<option>${c}</option>`).join("");
+ const markets=[...new Set(D.sku.map(x=>String(x.marketplace||"OZON").toUpperCase()))].sort();
+ document.querySelector("#marketFilter").innerHTML='<option value="ALL">Все</option>'+markets.map(m=>`<option value="${m}">${m==="YANDEX"?"Яндекс":m==="OZON"?"Ozon":m}</option>`).join("");
+ document.querySelector("#month").onchange=render;document.querySelector("#compare").onchange=render;document.querySelector("#category").onchange=render;document.querySelector("#marketFilter").onchange=render;document.querySelector("#skuQuickSearch").onkeydown=e=>{if(e.key==="Enter")openQuickSku()};
+ const liveMin=x.meta?.live_min_date,liveMax=x.meta?.live_max_date;
+ document.querySelector("#notice").textContent=`Важно: июнь–август — закрытые данные из старого SKU Monthly. Текущий месяц пока собирается из ежедневного Finance SQL (${liveMin||"—"} — ${liveMax||"—"}), поэтому его результат предварительный и без ещё не загруженных OPEX/себестоимости/ручных расходов.`;
+ document.querySelector("#updated").textContent="Обновлено "+new Date(x.meta?.generated_at||Date.now()).toLocaleString("ru-RU");
+ toggleSkuSearch(true);
+ render();
+}).catch(e=>{document.querySelector("#notice").textContent="Ошибка загрузки: "+e.message});
+</script>
+</body></html>

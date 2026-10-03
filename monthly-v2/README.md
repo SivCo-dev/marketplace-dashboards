@@ -1,7 +1,20 @@
-# Monthly v2 / product review
-One reusable W/CPR management dashboard at `/monthly-v2/`.
+# Monthly v2 / production monthly screen
+One reusable W/CPR/Orange management dashboard. The production entrypoint is `/monthly/`;
+the same sources remain at `/monthly-v2/` for verification.
 
-## Current review access
+## Production data path (Stage 6)
+The browser calls the read-only `monthly-data-v2` Edge Function. It returns the accepted
+`monthly-scope-v2.2` contract for one tenant, month and marketplace. There is no login form.
+The service credential stays inside the Edge Function and is never shipped to the browser.
+
+The UI loads tenants independently and loads marketplace slices on demand. A failed tenant or
+marketplace does not clear already loaded organizations. Missing and partial COGS remains `null`;
+the frontend does not replace unknown cost with zero.
+
+The pre-cutover `/monthly/` tree is preserved at `/monthly-legacy-20261003/`. The legacy
+`monthly-data-v1`, Daily pages, Telegram, n8n and snapshots are unchanged by this cutover.
+
+## Historical review access
 Open the private review link supplied to the reviewer. There is no login/register screen.
 The bare URL opens the layout with unavailable values; it does not disclose financial data.
 
@@ -39,11 +52,9 @@ Then run `npm test`.
 Checks cover controls, full SKU-to-account reconciliation, expense-only retention, nulls,
 filter/sort behavior, encrypted round-trip and rejection of the wrong key.
 
-## Cutover gate
-The current shadow CSP allows same-origin connections only. Before production cutover,
-restore the authenticated user flow and explicitly update CSP for the approved Supabase origin and pinned SDK.
-Test valid users, missing membership, cross-tenant denial, expired sessions and end-to-end API values.
-The export path must not be used as a production authorization replacement.
-No cutover is included in Phase 5.1.
+## Cutover verification
+Run `npm test`, then verify W/CPR/Orange for July–September and explicit October
+`PRELIMINARY`/`MISSING` states through `monthly-data-v2`. Direct execution of the database
+wrapper remains denied to `anon` and `authenticated`; only the Edge service role can call it.
 
 See `IMPLEMENTATION_REPORT.md` and `API_GAPS.md`.
