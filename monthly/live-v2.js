@@ -155,17 +155,25 @@ export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000
   })();
   inflight.set(key,promise);return promise;
  }
- async function loadTenant(tenant){
+ async function loadTenant(tenant,months=MONTHS){
   tenant=String(tenant).toUpperCase();
   if(!TENANTS.includes(tenant))throw new Error("Недопустимый tenant");
-  if(bundle.tenant_status[tenant]?.status==="ready")return bundle;
+  months=[...new Set(months)].filter(month=>MONTHS.includes(month));
+  if(!months.length)return bundle;
+  const missing=months.filter(month=>!bundle.payloads.some(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===scopeKey(tenant,month,"ALL")));
+  if(!missing.length)return bundle;
   bundle.tenant_status[tenant]={status:"loading"};publish();
-  const results=await Promise.allSettled(MONTHS.map(month=>loadScope(tenant,month,"ALL")));
+  const results=[];
+  for(const month of missing){
+   try{results.push({status:"fulfilled",value:await loadScope(tenant,month,"ALL")});}
+   catch(reason){results.push({status:"rejected",reason});}
+  }
   const ready=results.filter(result=>result.status==="fulfilled").map(result=>result.value);
-  if(!ready.length){
+  const totalReady=months.filter(month=>bundle.payloads.some(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===scopeKey(tenant,month,"ALL"))).length;
+  if(!totalReady){
    bundle.tenant_status[tenant]={status:"error",message:`Данные ${tenant} временно недоступны`};
   }else{
-   bundle.tenant_status[tenant]={status:"ready",refreshed_at:latestTimestamp(ready.map(payload=>({updated_at:payload.metadata.refreshed_at})),bundle.exported_at),partial:ready.length!==MONTHS.length};
+   bundle.tenant_status[tenant]={status:"ready",refreshed_at:latestTimestamp(ready.map(payload=>({updated_at:payload.metadata.refreshed_at})),bundle.exported_at),partial:totalReady!==months.length};
   }
   publish();return bundle;
  }

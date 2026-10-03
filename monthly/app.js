@@ -198,7 +198,7 @@ state.market=MARKETPLACES.some(item=>item.id===query.get("marketplace"))?query.g
 $("#marketSelect").value=state.market;
 let loader;
 async function ensureSelection(){
- await loader.loadTenant(tenant());
+ await loader.loadTenant(tenant(),[month(),previousMonth(month())]);
  if(state.market!=="ALL")await Promise.allSettled([loader.loadScope(tenant(),month(),state.market),loader.loadScope(tenant(),previousMonth(month()),state.market)]);
 }
 for(const id of ["#tenantSelect","#monthSelect"])$(id).addEventListener("change",async()=>{state.focus="all";render();await ensureSelection();render();});
