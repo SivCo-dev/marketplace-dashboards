@@ -7,12 +7,32 @@ const MARKETS=["OZON","WB","YANDEX"];
 const n=v=>Number(v||0);
 const ym=v=>String(v||"").slice(0,7);
 
-function costMap(d){
- const m=new Map();
- for(const x of d.unit_costs||[]) m.set(String(x.sku||x.canonical_sku||x.article||""),Number(x.unit_cost||x.cost||0)||null);
+const costKey=(account,market,sku)=>[account??"",String(market??"OZON").toUpperCase(),String(sku??"").trim().toLowerCase()].join("|");
+function costMap(d,month){
+ const m=new Map(),date=month+"-01";
+ const canonical=Array.isArray(d.cost_history);
+ for(const x of canonical?d.cost_history:d.unit_costs||[]){
+   if(x.valid_from&&date<String(x.valid_from).slice(0,10))continue;
+   if(x.valid_to&&(canonical?date>=String(x.valid_to).slice(0,10):date>String(x.valid_to).slice(0,10)))continue;
+   const value=x.unit_cost??x.cost;
+   if(value==null||!Number.isFinite(Number(value)))continue;
+   for(const id of [x.sku,x.canonical_sku,x.article])if(id!=null&&String(id).trim())m.set(costKey(x.account_id,x.marketplace,id),Number(value));
+ }
  return m;
 }
-function skuRow(x,costs){
+function cogsMap(d,month){
+ return new Map((d.cogs_sku||[]).filter(x=>ym(x.month)===month).map(x=>[costKey(x.account_id,x.marketplace,x.canonical_sku),x]));
+}
+function rowCost(x,costs){
+ for(const id of [x.sku,x.article]){
+   const exact=costs.get(costKey(x.account_id,x.marketplace,id));
+   if(exact!=null)return exact;
+   const generic=costs.get(costKey(null,x.marketplace,id));
+   if(generic!=null)return generic;
+ }
+ return null;
+}
+function skuRow(x,costs,closedCosts){
  const commission=n(x.commission)+n(x.allocated_commission);
  const logistics=n(x.logistics)+n(x.allocated_logistics);
  const storage=n(x.storage)+n(x.allocated_storage);
@@ -22,8 +42,11 @@ function skuRow(x,costs){
  const comp=n(x.net_compensation_amount??x.compensation_amount??x.compensation);
  const result=n(x.final_without_compensation ?? x.direct_net_received ?? (n(x.net_sales)+expenses));
  const netUnits=n(x.economic_units??x.sold_units);
- const unitCost=costs.get(String(x.sku||x.article||""))??null;
- const cogs=unitCost==null?null:Math.max(netUnits,0)*unitCost;
+ const costUnits=n(x.sold_units);
+ const closedCost=closedCosts.get(costKey(x.account_id,x.marketplace,x.sku));
+ const verified=closedCost?.cost_status==="COMPLETE"&&closedCost.cogs!=null;
+ const unitCost=verified?closedCost.unit_cost:rowCost(x,costs);
+ const cogs=verified?n(closedCost.cogs):costUnits===0?0:unitCost==null?null:costUnits*unitCost;
  return {
    product_id:x.product_id??null, canonical_sku:String(x.sku||x.article||""),
    article:x.article||x.sku||"", product_name:x.product_name||x.article||x.sku||"",
@@ -36,9 +59,9 @@ function skuRow(x,costs){
    compensated_units:n(x.compensated_units??0),
    commission, logistics, storage, promotion, other,
    marketplace_expenses:expenses, result_without_compensation:result,
-   compensation:comp, unit_cost:unitCost, cogs,
+   compensation:comp, unit_cost:unitCost, cogs, cost_units:verified?n(closedCost.net_financial_units):costUnits,
    result_after_cogs:cogs==null?null:result+comp-cogs,
-   cost_status:cogs==null?"UNAVAILABLE":"COMPLETE",
+   cost_status:cogs==null?"UNAVAILABLE":costUnits===0&&unitCost==null?"NOT_APPLICABLE":"COMPLETE",
    compensation_status:"COMPLETE",
    expense_structure:{
      direct:{commission:n(x.commission),logistics:n(x.logistics),storage:n(x.storage),promotion:n(x.promotion),other:n(x.other)},
@@ -47,8 +70,8 @@ function skuRow(x,costs){
  };
 }
 function payloadFor(d,tenant,month,market){
- const costs=costMap(d);
- const rows=(d.sku||[]).filter(x=>ym(x.month)===month && String(x.marketplace||"OZON").toUpperCase()===market).map(x=>skuRow(x,costs));
+ const costs=costMap(d,month),closedCosts=cogsMap(d,month);
+ const rows=(d.sku||[]).filter(x=>ym(x.month)===month && String(x.marketplace||"OZON").toUpperCase()===market).map(x=>skuRow(x,costs,closedCosts));
  if(!rows.length)return null;
  const sum=k=>rows.reduce((a,x)=>a+n(x[k]),0);
  const sales=sum("sales"), returns=sum("returns"), net_sales=sum("net_sales"), commission=sum("commission"), logistics=sum("logistics"), storage=sum("storage"), promotion=sum("promotion"), other=sum("other"), compensation=sum("compensation");

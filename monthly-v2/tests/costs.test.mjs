@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {loadLiveBundle} from '../live-v1.js';
+import {selectPayload} from '../core.js';
+const row={month:'2026-09-01',account_id:'ozon_cpr',marketplace:'OZON',sku:'123',article:'Аврора-47',sales:100000,net_sales:100000,sold_units:5,commission:-20000};
+async function load(data){const b=await loadLiveBundle({fetcher:async url=>new URL(url).searchParams.get('tenant')==='CPR'?{ok:true,json:async()=>data}:{ok:false,status:500}});return selectPayload(b,'CPR','2026-09');}
+const legacy=await load({sku:[row,{...row,sku:'fee',article:'fee',sales:0,net_sales:0,sold_units:0}],unit_costs:[{article:'Аврора-47',unit_cost:2700}]});
+assert.equal(legacy.sku_rows[0].unit_cost,2700);
+assert.equal(legacy.financial_economics.cogs,13500);
+assert.equal(legacy.sku_rows[1].cogs,0);
+const history=[{account_id:'ozon_cpr',marketplace:'OZON',canonical_sku:'123',unit_cost:2700,valid_from:'2026-07-01',valid_to:'2026-10-01'}];
+const canonical=await load({sku:[row],cost_history:history,cogs_sku:[{account_id:'ozon_cpr',marketplace:'OZON',canonical_sku:'123',month:'2026-09-01',unit_cost:2700,cogs:10800,net_financial_units:4,cost_status:'COMPLETE'}]});
+assert.equal(canonical.financial_economics.cogs,10800,'approved monthly COGS must not be recomputed from older Finance counters');
+assert.equal(canonical.sku_rows[0].cost_units,4);
+const expired=await load({sku:[row],cost_history:[{...history[0],valid_to:'2026-09-01'}],unit_costs:[{article:row.article,unit_cost:2700}]});
+assert.equal(expired.financial_economics.cogs,null,'expired cost must not fall back to an older unbounded dictionary');
+const unknown=await load({sku:[row],cost_history:[],unit_costs:[]});
+assert.equal(unknown.financial_economics.cogs,null,'missing cost for sold goods must remain unavailable');
+const validZero=await load({sku:[row],cost_history:[{...history[0],unit_cost:0}]});
+assert.equal(validZero.financial_economics.cogs,0);
+const wrongAccount=await load({sku:[row],cost_history:[{...history[0],account_id:'other'}]});
+assert.equal(wrongAccount.financial_economics.cogs,null);
+console.log('PASS: SKU/article matching, zero-unit expense rows, approved monthly COGS, cost validity, missing/zero costs and account isolation');

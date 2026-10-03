@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/live-loader.test.mjs"
+    "test": "node tests/live-loader.test.mjs && node tests/costs.test.mjs"
   }
 }
