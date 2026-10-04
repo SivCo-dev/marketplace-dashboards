@@ -73,8 +73,8 @@ function renderAllocation(){
   ["result_after_cogs","Остаётся",rate(f.result_after_cogs,sales),"remain"]
  ];
  if(numberOrNull(sales)==null||sales<=0){$("#allocationBar").innerHTML='<div class="empty compact">Нет данных для структуры 100 ₽</div>';$("#allocationCards").innerHTML="";return;}
- $("#allocationBar").innerHTML='<div class="stack">'+parts.map(([,label,value,tone])=>'<span class="'+tone+'" style="width:'+clamp(value)+'%" title="'+e(label)+': '+pct(value)+'"></span>').join("")+'</div><div class="stack-labels">'+parts.map(([,label,value,tone])=>'<span class="'+tone+'"><strong>'+((value??0)/100*100).toLocaleString("ru-RU",{maximumFractionDigits:1})+' ₽</strong><small>'+e(label)+'</small></span>').join("")+'</div>';
- $("#allocationCards").innerHTML=parts.map(([,label,value,tone])=>'<div class="allocation-card '+tone+'"><i></i><span><strong>'+((value??0)/100*100).toLocaleString("ru-RU",{maximumFractionDigits:1})+' ₽</strong><small>'+e(label)+'</small><b>'+pct(value)+'</b></span></div>').join("");
+ $("#allocationBar").innerHTML='<div class="stack">'+parts.map(([,label,value,tone])=>'<span class="'+tone+'" style="width:'+clamp(value)+'%" title="'+e(label)+': '+pct(value)+'"></span>').join("")+'</div><div class="stack-labels">'+parts.map(([,label,value,tone])=>'<span class="'+tone+'"><strong>'+(value==null?'—':value.toLocaleString("ru-RU",{maximumFractionDigits:1})+' ₽')+'</strong><small>'+e(label)+'</small></span>').join("")+'</div>';
+ $("#allocationCards").innerHTML=parts.map(([,label,value,tone])=>'<div class="allocation-card '+tone+'"><i></i><span><strong>'+(value==null?'—':value.toLocaleString("ru-RU",{maximumFractionDigits:1})+' ₽')+'</strong><small>'+e(label)+'</small><b>'+pct(value)+'</b></span></div>').join("");
 }
 
 function renderComparison(){
