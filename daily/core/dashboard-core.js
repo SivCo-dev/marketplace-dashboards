@@ -340,7 +340,7 @@ function trend(){
  let closedDates=periodDates(0),previousDates=prevPeriodDates(),closedRows=dailyFor(closedDates),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows).sort((a,b)=>a.report_date.localeCompare(b.report_date)),prevRows=dailyFor(previousDates),mode=E("trendMode").value,field=mode==="gmv"?"gmv":mode==="orders"?"orders":"units",label=mode==="gmv"?"Оборот, ₽":mode==="orders"?"Заказы":"Штуки";
  if(mode==="orders"&&curRows.some(row=>row.orders===null)){
  E("trend").setAttribute("viewBox","0 0 900 260");E("trend").innerHTML="<text x='450' y='130' text-anchor='middle' fill='#667085'>Нет полной детализации заказов за выбранный период</text>";
- globalThis._trendCur=[];E("trendDayDetail").innerHTML="<span class='neu'>Оборот и штуки доступны в других режимах графика.</span>";renderTrendSummary();return;
+ globalThis._trendCur=[];E("trendDayDetail").innerHTML="<span class='neu'>Оборот и штуки доступны в других режимах графика.</span>";renderTrendSummary(closedDates,previousDates);return;
  }
  let ff=currentFilters(),scope=[];if(ff.category!=="ALL")scope.push(ff.category);if(ff.brand!=="ALL")scope.push(ff.brand);if(ff.q)scope.push("поиск: "+ff.q);E("trendDesc").textContent=(mode==="gmv"?"Оборот заказов по дням":mode==="orders"?"Количество заказов по дням":"Заказанные штуки по дням")+" • LIVE не входит в расчёты"+(scope.length?" • "+scope.join(" • "):"");
  let vals=curRows.concat(prevRows).map(function(x){return N(x[field])}),max=Math.max.apply(null,[1].concat(vals)),W=900,H=260,pl=62,pr=18,pt=20,pb=34,st=(W-pl-pr)/Math.max(1,curRows.length-1);
