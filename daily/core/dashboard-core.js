@@ -33,7 +33,7 @@ function dashboardLayout(config){
 
 
 
-let CONFIG=null;const API=null,OZON_API=null;let D=null,selected=null,detailTab="overview";const E=id=>document.getElementById(id),N=v=>Number(v||0),R=v=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0}).format(N(v))+" ₽",I=v=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0}).format(N(v)),P=v=>(v==null||!isFinite(Number(v)))?"—":Number(v).toFixed(1)+"%",C=v=>N(v)>0?"pos":N(v)<0?"neg":"neu",S=v=>N(v)>0?"+":"",X=s=>String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+let CONFIG=null;const API=null,OZON_API=null;let D=null,selected=null,detailTab="overview";const E=id=>document.getElementById(id),N=v=>Number(v||0),R=v=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0}).format(N(v))+" ₽",I=v=>v==null?"—":new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0}).format(N(v)),P=v=>(v==null||!isFinite(Number(v)))?"—":Number(v).toFixed(1)+"%",C=v=>N(v)>0?"pos":N(v)<0?"neg":"neu",S=v=>N(v)>0?"+":"",X=s=>String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
 function normArticle(v){return String(v||"").toLowerCase().replace(/[^a-zа-я0-9]+/gi,"")}
 function canonicalKey(x){return String((x&&x.canonical_sku)||(x&&x.external_sku)||(x&&x.article)||(x&&x.sku)||"")}
 function refMap(){let m=new Map();for(const r of D.refs||[]){if(r.article)m.set(String(r.article).toLowerCase(),r);if(r.sku)m.set(String(r.sku),r)}return m}
@@ -239,18 +239,27 @@ function prevPeriodDates(){let cur=periodDates(0),prev=periodDates(1);return pre
 function dailyFor(ds,marketplaceOverride=null){
  let s=new Set(ds),f=currentFilters();if(marketplaceOverride)f={...f,marketplace:marketplaceOverride};
  if(hasEntityFilter(f)){
-   let m=new Map();
+   const totals=new Map(), detail=new Map();
+   for(const x of skuFor(ds)){
+     if(marketplaceOverride&&rowMarketplace(x)!==marketplaceOverride)continue;
+     const a=totals.get(x.report_date)||{report_date:x.report_date,orders:null,units:0,gmv:0,sku_set:new Set(),is_live:false,is_reconstructed:false};
+     a.units+=N(x.units);a.gmv+=N(x.gmv);a.sku_set.add(String(x.article||x.sku).toLowerCase());a.is_live=a.is_live||!!x.is_live;a.is_reconstructed=a.is_reconstructed||!!x.is_reconstructed;
+     totals.set(x.report_date,a);
+   }
    for(const x of (D.lines||[])){
      if(!s.has(x.report_date))continue;
-     let d=dimFor(x.cabinet,x.sku),y={...x,master_category:d.master_category||"Прочие",category:d.category||"Без категории",brand:d.brand||"Без бренда"};
+     const d=dimFor(x.cabinet,x.sku),y={...x,master_category:d.master_category||"Прочие",category:d.category||"Без категории",brand:d.brand||"Без бренда"};
      if(!entityMatch(y,f))continue;
-     let a=m.get(y.report_date);
-     if(!a)a={report_date:x.report_date,orders_set:new Set(),sku_set:new Set(),units:0,gmv:0,is_live:false,is_reconstructed:false};
-     a.orders_set.add(String(y.cabinet)+"|"+String(y.order_key));a.sku_set.add(String(y.article||y.sku).toLowerCase());
-     a.units+=N(y.units);a.gmv+=N(y.gmv);a.is_live=a.is_live||!!y.is_live;m.set(y.report_date,a)
+     const a=detail.get(x.report_date)||{orders_set:new Set(),units:0,gmv:0};
+     a.orders_set.add([rowMarketplace(y),y.cabinet,y.order_key].join("|"));a.units+=N(y.units);a.gmv+=N(y.gmv);detail.set(x.report_date,a);
    }
-   return [...m.values()].map(a=>({report_date:a.report_date,orders:a.orders_set.size,units:a.units,gmv:a.gmv,distinct_skus:a.sku_set.size,is_live:a.is_live,is_reconstructed:false})).sort((a,b)=>a.report_date.localeCompare(b.report_date))
+   return [...totals.values()].map(a=>{
+     const b=detail.get(a.report_date);
+     const complete=b&&Math.abs(a.units-b.units)<1e-8&&Math.abs(a.gmv-b.gmv)<1e-8;
+     return {report_date:a.report_date,orders:complete?b.orders_set.size:null,orders_complete:!!complete,units:a.units,gmv:a.gmv,distinct_skus:a.sku_set.size,is_live:a.is_live,is_reconstructed:a.is_reconstructed};
+   }).sort((a,b)=>a.report_date.localeCompare(b.report_date))
  }
+
  let m=new Map();
  for(const x of (D.daily||[])){
    if(!s.has(x.report_date))continue;
@@ -274,7 +283,7 @@ function skuFor(ds){
  }
  return out
 }
-function aggregateDaily(rows){return{orders:rows.reduce((s,x)=>s+N(x.orders),0),units:rows.reduce((s,x)=>s+N(x.units),0),gmv:rows.reduce((s,x)=>s+N(x.gmv),0)}}
+function aggregateDaily(rows){return{orders:rows.some(x=>x.orders===null)?null:rows.reduce((s,x)=>s+N(x.orders),0),units:rows.reduce((s,x)=>s+N(x.units),0),gmv:rows.reduce((s,x)=>s+N(x.gmv),0)}}
 function aggregateSku(ds){
  const m=new Map();
  for(const x of skuFor(ds)){
@@ -307,7 +316,7 @@ function aggregateSku(ds){
  }
  return [...m.values()]
 }
-function dp(a,b){return N(b)!==0?(N(a)/N(b)-1)*100:null}function prevMap(){let m=new Map();for(const x of aggregateSku(prevPeriodDates()))m.set(x.key,x);return m}
+function dp(a,b){return a==null||b==null?null:N(b)!==0?(N(a)/N(b)-1)*100:null}function prevMap(){let m=new Map();for(const x of aggregateSku(prevPeriodDates()))m.set(x.key,x);return m}
 function kpis(){
  let cur=aggregateDaily(dailyFor(periodDates(0))),pre=aggregateDaily(dailyFor(prevPeriodDates())),days=periodDates(0).length,avgPrice=cur.units?cur.gmv/cur.units:0;
  let arr=[["GMV заказов",R(cur.gmv),dp(cur.gmv,pre.gmv)],["Заказано, шт",I(cur.units),dp(cur.units,pre.units)],["Заказов",I(cur.orders),dp(cur.orders,pre.orders)],["Средняя цена",R(avgPrice),pre.units?dp(avgPrice,pre.gmv/pre.units):null],["GMV / день",R(days?cur.gmv/days:0),null]];
@@ -329,6 +338,10 @@ function renderTrendSummary(closedDates,previousDates){
 }
 function trend(){
  let closedDates=periodDates(0),previousDates=prevPeriodDates(),closedRows=dailyFor(closedDates),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows).sort((a,b)=>a.report_date.localeCompare(b.report_date)),prevRows=dailyFor(previousDates),mode=E("trendMode").value,field=mode==="gmv"?"gmv":mode==="orders"?"orders":"units",label=mode==="gmv"?"Оборот, ₽":mode==="orders"?"Заказы":"Штуки";
+ if(mode==="orders"&&curRows.some(row=>row.orders===null)){
+ E("trend").setAttribute("viewBox","0 0 900 260");E("trend").innerHTML="<text x='450' y='130' text-anchor='middle' fill='#667085'>Нет полной детализации заказов за выбранный период</text>";
+ globalThis._trendCur=[];E("trendDayDetail").innerHTML="<span class='neu'>Оборот и штуки доступны в других режимах графика.</span>";renderTrendSummary(closedDates,previousDates);return;
+ }
  let ff=currentFilters(),scope=[];if(ff.category!=="ALL")scope.push(ff.category);if(ff.brand!=="ALL")scope.push(ff.brand);if(ff.q)scope.push("поиск: "+ff.q);E("trendDesc").textContent=(mode==="gmv"?"Оборот заказов по дням":mode==="orders"?"Количество заказов по дням":"Заказанные штуки по дням")+" • LIVE не входит в расчёты"+(scope.length?" • "+scope.join(" • "):"");
  let vals=curRows.concat(prevRows).map(function(x){return N(x[field])}),max=Math.max.apply(null,[1].concat(vals)),W=900,H=260,pl=62,pr=18,pt=20,pb=34,st=(W-pl-pr)/Math.max(1,curRows.length-1);
  function xp(i){return pl+i*st}function yp(v){return H-pb-(N(v)/max)*(H-pt-pb)}
@@ -945,7 +958,7 @@ globalThis.openSku=function(key){
 body+=buildSkuDynamics(key,a);
  E("detail").innerHTML=body;setDetailTab(detailTab)
 }
-function render(){kpis();trend();tables();if(CONFIG?.onRender){let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap();CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:aggregateSku(ds).map(a=>({...a,risk:riskFor(a,pm),stock:stockFor(a),channels:channelShareText(a)})),filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})}}function setup(){
+function render(){if(!CONFIG?.onRender){kpis();tables()}else if(selected){openSku(selected)}trend();if(CONFIG?.onRender){let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap();CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:aggregateSku(ds).map(a=>({...a,risk:riskFor(a,pm),stock:stockFor(a),channels:channelShareText(a)})),filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})}}function setup(){
  rebuildDimMap();rebuildStockMap();rebuildLinkMap();rebuildPositionMap();rebuildContentMap();rebuildYandexAnalytics();E("q").value="";E("q").setAttribute("autocomplete","off");populateMarketplaceFilter();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();E("skuQuickSearch").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();openQuickSku()}};
  E("cabinet").onchange=()=>{populateDimensionFilters();render()};
  E("marketplace").onchange=()=>{applyMarketplacePageTheme();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();render()};
@@ -973,7 +986,7 @@ function installInteractions(root){
 export async function startDashboard(config){
  validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.3";
  const root=document.getElementById("app");root.innerHTML=dashboardLayout(config);installInteractions(root);
- try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
+ try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});if(Array.isArray(payload.meta?.accounts)){config.accounts=[...config.accounts,...payload.meta.accounts.filter(a=>!config.accounts.some(b=>a.account_id===b.account_id))]}D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
  catch(e){E("load").classList.add("hide");E("err").classList.remove("hide");E("err").textContent="Ошибка загрузки: "+e.message;throw e}
 }
 
@@ -996,12 +1009,12 @@ export { aggregateSkuForTests as aggregateSku };
 export function calculateKpis(rows,closedDayCount){let gmv=rows.reduce((s,r)=>s+N(r.gmv),0),units=rows.reduce((s,r)=>s+N(r.units),0),orders=rows.reduce((s,r)=>s+N(r.orders),0);return{gmv,units,orders,averagePrice:units?gmv/units:0,gmvPerDay:closedDayCount?gmv/closedDayCount:0}}
 export function buildTrendSeries(rows){let map=new Map;for(const row of rows){let p=map.get(row.report_date)||{report_date:row.report_date,gmv:0,units:0,orders:0,is_live:false};p.gmv+=N(row.gmv);p.units+=N(row.units);p.orders+=N(row.orders);p.is_live||=isLiveValue(row);map.set(row.report_date,p)}return[...map.values()].sort((a,b)=>a.report_date.localeCompare(b.report_date))}
 export function calculateTrendPeriodTotals(currentRows,previousRows=[],closedDayCount=0){
- const sum=rows=>rows.reduce((a,row)=>{a.gmv+=N(row.gmv);a.units+=N(row.units);a.orders+=N(row.orders);return a},{gmv:0,units:0,orders:0});
- const group=rows=>{let out={};for(const row of rows){let mk=String(row.marketplace||row.market||row.source_marketplace||"ALL").toUpperCase(),a=out[mk]||(out[mk]={gmv:0,units:0,orders:0});a.gmv+=N(row.gmv);a.units+=N(row.units);a.orders+=N(row.orders)}return out};
+ const sum=rows=>rows.reduce((a,row)=>{a.gmv+=N(row.gmv);a.units+=N(row.units);a.orders=a.orders===null||row.orders===null?null:a.orders+N(row.orders);return a},{gmv:0,units:0,orders:0});
+ const group=rows=>{let out={};for(const row of rows){let mk=String(row.marketplace||row.market||row.source_marketplace||"ALL").toUpperCase(),a=out[mk]||(out[mk]={gmv:0,units:0,orders:0});a.gmv+=N(row.gmv);a.units+=N(row.units);a.orders=a.orders===null||row.orders===null?null:a.orders+N(row.orders)}return out};
  return{closedDayCount,total:{current:sum(currentRows),previous:sum(previousRows)},markets:{current:group(currentRows),previous:group(previousRows)}}
 }
 export function calculateTrendDayComparison(day,periodTotal,closedDayCount,isLive=false){
- let count=Math.max(0,N(closedDayCount)),average={gmv:count?N(periodTotal.gmv)/count:0,units:count?N(periodTotal.units)/count:0,orders:count?N(periodTotal.orders)/count:0};
+ let count=Math.max(0,N(closedDayCount)),average={gmv:count?N(periodTotal.gmv)/count:0,units:count?N(periodTotal.units)/count:0,orders:periodTotal.orders===null?null:count?N(periodTotal.orders)/count:0};
  let deltas={};for(const key of ["gmv","units","orders"])deltas[key]=isLive?null:dp(day[key],average[key]);return{average,deltas,isLive:!!isLive}
 }
 
