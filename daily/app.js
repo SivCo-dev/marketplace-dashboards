@@ -1,10 +1,10 @@
-import {startDashboard} from './core/dashboard-core.js?v=20261004verifiedfilters';
+import {startDashboard} from './core/dashboard-core.js?v=20261004compact';
 import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
 const configs={W:w,CPR:cpr,ORANGE:orange};
 const query=new URLSearchParams(location.search),tenant=configs[query.get('tenant')]?query.get('tenant'):'W';
-const config={...configs[tenant],theme:{accent:'#355846'},onRender:paint};
+const config={...configs[tenant],data_url:configs[tenant].data_url+"&format=columnar",theme:{accent:'#355846'},onRender:paint};
 const $=id=>document.getElementById(id),num=v=>Number(v||0),fmt=v=>v==null?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(num(v)),money=v=>fmt(v)+' ₽';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const pct=(a,b)=>a==null||b==null?null:num(b)?(num(a)/num(b)-1)*100:null;
