@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {selectUnclosedChartDates,buildPeriodSelection,calculateKpis} from '../../core/dashboard-core.js';
+import {selectUnclosedChartDates,buildPeriodSelection,calculateKpis} from '../core/dashboard-core.js';
 const rows=Array.from({length:10},(_,i)=>({report_date:new Date(Date.UTC(2026,8,25+i)).toISOString().slice(0,10),is_live:i>=2,gmv:100,units:2,orders:1}));
 const all=rows.map(r=>r.report_date),live=new Set(rows.filter(r=>r.is_live).map(r=>r.report_date));
 test('every unclosed date stays visible between last closed day and current LIVE date',()=>{const selection=buildPeriodSelection(rows,rows,'14');assert.deepEqual(selectUnclosedChartDates(all,live,selection.currentDates,'14'),all.slice(2));assert.deepEqual(calculateKpis(selection.currentRows,selection.currentDates.length),{gmv:200,units:4,orders:2,averagePrice:50,gmvPerDay:100});});

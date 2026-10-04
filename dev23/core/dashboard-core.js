@@ -217,7 +217,7 @@ function isLiveRow(x){return x&&(x.is_live===true||String(x.is_live).toLowerCase
 function liveDateSet(){return new Set([].concat(D.daily||[],D.sku_daily||[],D.lines||[]).filter(isLiveRow).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))}
 function allDates(){return [...new Set([].concat(D.daily||[],D.sku_daily||[]).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))].sort()}
 function dates(){let live=liveDateSet();return allDates().filter(d=>!live.has(d))}
-function chartLiveDates(){let live=liveDateSet(),v=E("days").value,first=periodDates(0)[0];return [...live].filter(d=>allDates().includes(d)&&(/^\d{4}-\d{2}$/.test(v)?d.startsWith(v):!first||d>=first)).sort()}
+function chartLiveDates(){let live=liveDateSet();return [...live].filter(d=>allDates().includes(d)).sort().slice(-1)}
 function periodDates(offset=0){
  let ds=dates(),v=E("days").value;
  if(v==="MONTH"){
@@ -328,7 +328,7 @@ function renderTrendSummary(closedDates,previousDates){
  E("trendSummary").innerHTML="<div class='trend-summary-total'><div class='trend-summary-title'>Итог за "+closedDates.length+" закрытых дней</div>"+trendMetricsHtml(current,previous,true,true)+"</div><div class='trend-market-list'>"+markets.map(mk=>trendMarketCardHtml(mk,trendStatsFor(closedDates,mk),trendStatsFor(previousDates,mk),true,false,true)).join("")+"</div>"
 }
 function trend(){
- let closedDates=periodDates(0),previousDates=prevPeriodDates(),closedRows=dailyFor(closedDates),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows).sort((a,b)=>a.report_date.localeCompare(b.report_date)),prevRows=dailyFor(previousDates),mode=E("trendMode").value,field=mode==="gmv"?"gmv":"units",label=mode==="gmv"?"Оборот, ₽":"Штуки";
+ let closedDates=periodDates(0),previousDates=prevPeriodDates(),closedRows=dailyFor(closedDates),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows),prevRows=dailyFor(previousDates),mode=E("trendMode").value,field=mode==="gmv"?"gmv":"units",label=mode==="gmv"?"Оборот, ₽":"Штуки";
  let ff=currentFilters(),scope=[];if(ff.category!=="ALL")scope.push(ff.category);if(ff.brand!=="ALL")scope.push(ff.brand);if(ff.q)scope.push("поиск: "+ff.q);E("trendDesc").textContent=(mode==="gmv"?"Оборот заказов по дням":"Заказанные штуки по дням")+" • LIVE не входит в расчёты"+(scope.length?" • "+scope.join(" • "):"");
  let vals=curRows.concat(prevRows).map(function(x){return N(x[field])}),max=Math.max.apply(null,[1].concat(vals)),W=900,H=260,pl=62,pr=18,pt=20,pb=34,st=(W-pl-pr)/Math.max(1,curRows.length-1);
  function xp(i){return pl+i*st}function yp(v){return H-pb-(N(v)/max)*(H-pt-pb)}
@@ -340,9 +340,9 @@ function trend(){
  prev.forEach(function(r,i){z+="<circle cx='"+xp(i)+"' cy='"+yp(r[field])+"' r='3' fill='var(--a)' opacity='.22'/>"});
  let pts=closedRows.map(function(r,i){return xp(i)+","+yp(r[field])});
  if(pts.length>1)z+="<polyline fill='none' stroke='var(--a)' stroke-width='4' points='"+pts.join(" ")+"'/>";
- curRows.forEach(function(r,i){let val=N(r[field]),live=isLiveRow(r);z+="<circle class='trend-dot' data-trend-index='"+i+"' cx='"+xp(i)+"' cy='"+yp(val)+"' r='"+(live?6:5)+"' fill='"+(live?"#f47b20":"var(--a)")+"'/><text x='"+xp(i)+"' y='"+(H-8)+"' text-anchor='middle' font-size='9' fill='#667085'>"+r.report_date.slice(5)+"</text>";if(curRows.length<=14)z+="<text x='"+xp(i)+"' y='"+Math.max(12,yp(val)-9)+"' text-anchor='middle' font-size='9' font-weight='700'>"+(mode==="gmv"?Math.round(val/1000)+"k":Math.round(val))+"</text>";if(live&&r.report_date===liveRows.at(-1)?.report_date)z+="<text x='"+xp(i)+"' y='13' text-anchor='middle' font-size='8' font-weight='800' fill='#c4320a'>LIVE</text>"});
+ curRows.forEach(function(r,i){let val=N(r[field]),live=isLiveRow(r);z+="<circle class='trend-dot' data-trend-index='"+i+"' cx='"+xp(i)+"' cy='"+yp(val)+"' r='"+(live?6:5)+"' fill='"+(live?"#f47b20":"var(--a)")+"'/><text x='"+xp(i)+"' y='"+(H-8)+"' text-anchor='middle' font-size='9' fill='#667085'>"+r.report_date.slice(5)+"</text>";if(curRows.length<=14)z+="<text x='"+xp(i)+"' y='"+Math.max(12,yp(val)-9)+"' text-anchor='middle' font-size='9' font-weight='700'>"+(mode==="gmv"?Math.round(val/1000)+"k":Math.round(val))+"</text>";if(live)z+="<text x='"+xp(i)+"' y='13' text-anchor='middle' font-size='8' font-weight='800' fill='#c4320a'>LIVE</text>"});
  E("trend").setAttribute("viewBox","0 0 "+W+" "+H);E("trend").innerHTML=z;globalThis._trendCur=curRows;globalThis._trendClosedCount=closedRows.length;
- E("trendPeriodNote").textContent="Итог за "+closedRows.length+" закрытых дней"+(liveRows.length>1?" • "+(liveRows.length-1)+" дней ожидают закрытия; оранжевые точки не входят в итог":"");E("trendDayDetail").innerHTML="<span class='neu'>Нажми на точку, чтобы посмотреть выбранный день.</span>";renderTrendSummary(closedDates,previousDates)
+ E("trendPeriodNote").textContent="Итог за "+closedRows.length+" закрытых дней";E("trendDayDetail").innerHTML="<span class='neu'>Нажми на точку, чтобы посмотреть выбранный день.</span>";renderTrendSummary(closedDates,previousDates)
 }
 globalThis.showTrendPoint=function(i){
  let c=(globalThis._trendCur||[])[i];if(!c)return;let live=isLiveRow(c),closedDays=globalThis._trendClosedCount||periodDates(0).length,currentTotal=trendStatsFor(periodDates(0)),comparison=calculateTrendDayComparison(c,currentTotal,closedDays,live);
