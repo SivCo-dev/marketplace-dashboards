@@ -132,7 +132,7 @@ function currentFilters(){return{cab:E("cabinet").value,marketplace:E("marketpla
 function dimFor(cab,sku){return DIM.get(dimKey(cab,sku))||{master_category:"Прочие",category:"Без категории",brand:"Без бренда"}}
 function textMatch(article,name,sku,q){return !q||((article||"")+" "+(name||"")+" "+(sku||"")).toLowerCase().includes(q)}
 function entityMatch(x,f){return(f.cab==="ALL"||x.cabinet===f.cab)&&(f.marketplace==="ALL"||rowMarketplace(x)===f.marketplace)&&(f.masterCategory==="ALL"||x.master_category===f.masterCategory)&&(f.category==="ALL"||x.category===f.category)&&(f.brand==="ALL"||x.brand===f.brand)&&textMatch(x.article,x.product_name,x.sku,f.q)}
-function hasEntityFilter(f=currentFilters()){return f.marketplace!=="ALL"||f.masterCategory!=="ALL"||f.category!=="ALL"||f.brand!=="ALL"||!!f.q}
+function hasEntityFilter(f=currentFilters()){return f.masterCategory!=="ALL"||f.category!=="ALL"||f.brand!=="ALL"||!!f.q}
 let skuSearchCollapsed=false;
 globalThis.toggleSkuSearch=function(forceOpen){
  let box=E("skuSearchBox");if(!box)return;
