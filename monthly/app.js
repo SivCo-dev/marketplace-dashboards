@@ -1,6 +1,6 @@
-import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002orange";
+import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261004periods";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
-import {createScopeLoader} from "./live-v2.js?v=20261003scope2";
+import {createScopeLoader} from "./live-v2.js?v=20261004parallel";
 
 const $=s=>document.querySelector(s);
 const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all"};
@@ -193,7 +193,7 @@ $("#tenantSelect").innerHTML=Object.entries(TENANTS).map(([id,config])=>'<option
 $("#monthSelect").innerHTML=MONTHS.map(value=>'<option value="'+value+'">'+e(monthLabel(value))+'</option>').join("");
 $("#marketSelect").innerHTML=MARKETPLACES.map(item=>'<option value="'+item.id+'">'+e(item.label)+'</option>').join("");
 $("#tenantSelect").value=TENANTS[query.get("tenant")]?query.get("tenant"):"W";
-$("#monthSelect").value=MONTHS.includes(query.get("month"))?query.get("month"):"2026-09";
+$("#monthSelect").value=MONTHS.includes(query.get("month"))?query.get("month"):(MONTHS[1]||MONTHS[0]);
 state.market=MARKETPLACES.some(item=>item.id===query.get("marketplace"))?query.get("marketplace"):"ALL";
 $("#marketSelect").value=state.market;
 let loader;
