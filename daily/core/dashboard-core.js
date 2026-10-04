@@ -983,10 +983,20 @@ function installInteractions(root){
    if(target.dataset.action==="open-quick-sku")return globalThis.openQuickSku();
  },true)
 }
+export function expandDashboardTransport(payload){
+ if(payload?._transport!=="columnar-v1")return payload;
+ const expand=value=>Object.fromEntries(Object.entries(value).filter(([key])=>key!=="_transport").map(([key,item])=>[
+ key,item&&Array.isArray(item.columns)&&Array.isArray(item.rows)
+ ? item.rows.map(row=>Array.isArray(row)?Object.fromEntries(item.columns.map((name,i)=>[name,row[i]])):Object.fromEntries(Object.entries(row).map(([i,v])=>[item.columns[Number(i)],v])))
+ : key==="_ozon_enrichment"?expand(item):item
+ ]));
+ return expand(payload);
+}
+
 export async function startDashboard(config){
  validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.3";
  const root=document.getElementById("app");root.innerHTML=dashboardLayout(config);installInteractions(root);
- try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});if(Array.isArray(payload.meta?.accounts)){config.accounts=[...config.accounts,...payload.meta.accounts.filter(a=>!config.accounts.some(b=>a.account_id===b.account_id))]}D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
+ try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=expandDashboardTransport(await response.json());let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});if(Array.isArray(payload.meta?.accounts)){config.accounts=[...payload.meta.accounts.map(a=>({...a,cabinet:a.cabinet||config.accounts.find(b=>b.account_id===a.account_id)?.cabinet||""})),...config.accounts.filter(a=>!payload.meta.accounts.some(b=>a.account_id===b.account_id||(a.marketplace===b.marketplace&&a.cabinet===b.cabinet)))]}D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
  catch(e){E("load").classList.add("hide");E("err").classList.remove("hide");E("err").textContent="Ошибка загрузки: "+e.message;throw e}
 }
 
