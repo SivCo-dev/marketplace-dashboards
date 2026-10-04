@@ -126,14 +126,15 @@ export function adaptScope(scope){
  return validatePayload(payload);
 }
 
-export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000}={}){
- const bundle={exported_at:null,payloads:[],tenant_status:Object.fromEntries(TENANTS.map(tenant=>[tenant,{status:"idle"}])),scope_status:{}};
+export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000,tenantIds=TENANTS}={}){
+ const allowedTenants=[...new Set(tenantIds.filter(id=>/^[A-Z0-9_-]{1,32}$/.test(id)))];
+ const bundle={exported_at:null,payloads:[],tenant_status:Object.fromEntries(allowedTenants.map(tenant=>[tenant,{status:"idle"}])),scope_status:{}};
  const inflight=new Map();
  const publish=()=>{bundle.exported_at=new Date().toISOString();onUpdate(bundle);};
  const put=payload=>{bundle.payloads=bundle.payloads.filter(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)!==scopeKey(payload.metadata.tenant_id,payload.metadata.month,payload.metadata.marketplace));bundle.payloads.push(payload);};
  async function loadScope(tenant,month,market="ALL"){
   tenant=String(tenant).toUpperCase();market=String(market).toUpperCase();
-  if(!TENANTS.includes(tenant)||!MONTHS.includes(month)||!MARKETS.includes(market))throw new Error("Недопустимый monthly scope");
+  if(!allowedTenants.includes(tenant)||!MONTHS.includes(month)||!MARKETS.includes(market))throw new Error("Недопустимый monthly scope");
   const key=scopeKey(tenant,month,market);
   const existing=bundle.payloads.find(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===key);
   if(existing&&!(existing.metadata.marketplace_close_status==="LIVE"&&Date.now()-(existing.metadata.loaded_at_ms||0)>300000))return existing;
@@ -157,7 +158,7 @@ export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000
  }
  async function loadTenant(tenant,months=MONTHS){
   tenant=String(tenant).toUpperCase();
-  if(!TENANTS.includes(tenant))throw new Error("Недопустимый tenant");
+  if(!allowedTenants.includes(tenant))throw new Error("Недопустимый tenant");
   months=[...new Set(months)].filter(month=>MONTHS.includes(month));
   if(!months.length)return bundle;
   const missing=months.filter(month=>!bundle.payloads.some(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===scopeKey(tenant,month,"ALL")));
