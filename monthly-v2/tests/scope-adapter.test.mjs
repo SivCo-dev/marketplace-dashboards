@@ -46,3 +46,27 @@ assert.equal(loader.bundle.tenant_status.ORANGE.status,"error");
 assert.equal(loader.bundle.payloads.filter(item=>item.metadata.tenant_id==="W").length,4);
 assert.ok(updates.some(update=>update.tenant_status.W.status==="ready"&&update.tenant_status.ORANGE.status!=="ready"));
 console.log("PASS: monthly-scope-v2.2 mapping, NULL cost semantics and tenant failure isolation");
+
+// Same canonical SKU across cabinets/markets is one product; unknown COGS stays unknown.
+const combined=scope();
+combined.sku=[
+ {...combined.sku[0],sku:'OP-70TUW+RAR',article:'OP-70TUW+RAR',sales:813776,sold_units:7,economic_units:7},
+ {...combined.sku[0],sku:'OP-70TUW+RAR',article:'OP-70TUW+RAR',account_id:'yandex_orange_ipt',marketplace:'YANDEX',sales:494340,sold_units:6,economic_units:6,accepted_display_cogs:null},
+ {...combined.sku[0],sku:'OP-70TUW+RAR',article:'OP-70TUW+RAR',account_id:'ozon_orange_psk',sales:68919,sold_units:1,economic_units:1},
+ {...combined.sku[0],sku:'OTHER',article:'OP-70TUW+RAR',sales:1}
+];
+const grouped=adaptScope(combined).sku_rows;
+assert.equal(grouped.length,2,'Different canonical SKU must not merge merely by displayed article');
+const canonical=grouped.find(row=>row.canonical_sku==='OP-70TUW+RAR');
+assert.equal(canonical.sales,1377035);
+assert.equal(canonical.sale_units_display,14);
+assert.equal(canonical.source_rows.length,3);
+assert.equal(canonical.cogs,null);
+assert.equal(canonical.result_after_cogs,null);
+assert.equal(canonical.marketplace,'ALL');
+const ozonOnly=adaptScope({...combined,sku:combined.sku.filter(row=>row.marketplace==='OZON')}).sku_rows.find(row=>row.canonical_sku==='OP-70TUW+RAR');
+assert.equal(ozonOnly.sale_units_display,8);
+assert.equal(ozonOnly.sales,882695);
+assert.equal(ozonOnly.cogs,60);
+assert.equal(ozonOnly.unit_cost,7.5);
+console.log('PASS: canonical aggregation, marketplace scope, distinct identity and partial cost');

@@ -31,6 +31,7 @@ function adaptRow(row,scope){
   canonical_sku:String(row.sku??row.article??""),
   article:row.article??row.sku??"",
   product_name:row.product_name??row.article??row.sku??"",
+  cabinet:row.cabinet??row.account_id??null,
   account_id:row.account_id??null,
   marketplace:String(row.marketplace??scope.metadata?.marketplace??"ALL").toUpperCase(),
   category_id:row.master_category??null,
@@ -60,10 +61,32 @@ function adaptRow(row,scope){
  };
 }
 
+// Aggregate only exact canonical identities after account-level economics are calculated.
+export function aggregateCanonicalRows(rows){
+ const groups=new Map();
+ for(const row of rows){
+  const key=row.canonical_sku||row.row_id;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push(row);
+ }
+ const additive=['sales','returns','net_sales','financial_sale_units','financial_return_units','financial_net_units','sale_units_display','return_writeoff_units','physical_returned_units','written_off_units','compensated_units',...GROUPS,'marketplace_expenses','result_without_compensation','compensation','cogs','cost_units','result_after_cogs','business_expenses','final_business_result'];
+ const total=(sources,key)=>sources.some(row=>row[key]==null)?null:sources.reduce((value,row)=>value+row[key],0);
+ return [...groups.values()].map(sources=>{
+  const row={...sources[0],row_id:sources[0].canonical_sku||sources[0].row_id,source_rows:sources};
+  for(const key of additive)row[key]=total(sources,key);
+  row.account_id=sources.every(item=>item.account_id===sources[0].account_id)?sources[0].account_id:null;
+  row.marketplace=sources.every(item=>item.marketplace===sources[0].marketplace)?sources[0].marketplace:'ALL';
+  row.unit_cost=row.cogs==null?null:row.cost_units>0?row.cogs/row.cost_units:sources.every(item=>item.unit_cost===sources[0].unit_cost)?sources[0].unit_cost:null;
+  row.cost_status=sources.every(item=>item.cost_status==='NOT_APPLICABLE')?'NOT_APPLICABLE':sources.every(item=>item.cost_status==='COMPLETE'||item.cost_status==='NOT_APPLICABLE')?'COMPLETE':'UNAVAILABLE';
+  row.expense_structure=Object.fromEntries(['direct','allocated_shared'].map(kind=>[kind,Object.fromEntries(GROUPS.map(key=>[key,sources.reduce((value,item)=>value+n(item.expense_structure[kind][key]),0)]))]));
+  return row;
+ });
+}
+
 export function adaptScope(scope){
  if(scope?.contract_version!=="monthly-scope-v2.2")throw new Error("Неподдерживаемый контракт monthly scope");
  const sourceRows=Array.isArray(scope.sku)?scope.sku:[];
- const rows=sourceRows.map(row=>adaptRow(row,scope));
+ const rows=aggregateCanonicalRows(sourceRows.map(row=>adaptRow(row,scope)));
  const totals=scope.totals??{};
  const business=scope.business_economics??{};
  const status=scope.period_state?.status??"MISSING";
