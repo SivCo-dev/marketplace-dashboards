@@ -1,10 +1,16 @@
-import {startDashboard} from './core/dashboard-core.js?v=20261004compact';
+import {startDashboard} from './core/dashboard-core.js?v=20261004finish';
 import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
-const configs={W:w,CPR:cpr,ORANGE:orange};
-const query=new URLSearchParams(location.search),tenant=configs[query.get('tenant')]?query.get('tenant'):'W';
-const config={...configs[tenant],data_url:configs[tenant].data_url+"&format=columnar",theme:{accent:'#355846'},onRender:paint};
+import {loadReportRegistry,dailyConfigsFromRegistry} from '../core/runtime-registry.js?v=20261004finish';
+const initialQuery=new URLSearchParams(location.search);
+const requestedTenant=/^[A-Z0-9_-]{1,32}$/.test(initialQuery.get('tenant')||'')?initialQuery.get('tenant'):'W';
+const initialResponse=fetch('https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/dashboard-data-dev23?tenant='+requestedTenant+'&format=columnar',{cache:'no-cache'});
+initialResponse.catch(()=>{});
+let configs={W:w,CPR:cpr,ORANGE:orange};
+try{const runtime=dailyConfigsFromRegistry(await loadReportRegistry(),configs);if(Object.keys(runtime).length)configs=runtime}catch(error){console.warn('Report registry unavailable',error.message)}
+const query=new URLSearchParams(location.search),tenant=configs[query.get('tenant')]?query.get('tenant'):configs.W?'W':Object.keys(configs)[0];
+const config={...configs[tenant],data_url:configs[tenant].data_url+"&format=columnar",theme:{accent:'#355846'},onRender:paint,data_response:tenant===requestedTenant?initialResponse:null};
 const $=id=>document.getElementById(id),num=v=>Number(v||0),fmt=v=>v==null?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(num(v)),money=v=>fmt(v)+' ₽';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const pct=(a,b)=>a==null||b==null?null:num(b)?(num(a)/num(b)-1)*100:null;
@@ -45,7 +51,7 @@ drawer.addEventListener('close',()=>{document.body.classList.remove('drawer-open
 $('focusTabs').onclick=e=>{const b=e.target.closest('[data-focus]');if(!b)return;focus=b.dataset.focus;limit=25;paint(view)};
 $('breakdownSwitch').onclick=e=>{const b=e.target.closest('[data-breakdown]');if(!b)return;breakdown=b.dataset.breakdown;paint(view)};
 $('showMore').onclick=()=>{limit+=25;paint(view)};
-shell.insertAdjacentHTML('beforeend','<footer class="page-footer"><span>Данные из текущих сохранённых отчётов V2</span><a href="'+(tenant==='ORANGE'?'../':tenant==='W'?'../w.html':'../cpr.html')+'">Открыть прежний ежедневный дашборд ↗</a></footer>');
+shell.insertAdjacentHTML('beforeend','<footer class="page-footer"><span>Данные из текущих сохранённых отчётов V2</span>'+({ORANGE:'../',W:'../w.html',CPR:'../cpr.html'}[tenant]?'<a href="'+{ORANGE:'../',W:'../w.html',CPR:'../cpr.html'}[tenant]+'">Открыть прежний ежедневный дашборд ↗</a>':'')+'</footer>');
 await pending;
 document.title=config.display_name+' · Ежедневный отчёт';
 function paint(data){
