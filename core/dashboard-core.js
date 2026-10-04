@@ -217,7 +217,7 @@ function isLiveRow(x){return x&&(x.is_live===true||String(x.is_live).toLowerCase
 function liveDateSet(){return new Set([].concat(D.daily||[],D.sku_daily||[],D.lines||[]).filter(isLiveRow).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))}
 function allDates(){return [...new Set([].concat(D.daily||[],D.sku_daily||[]).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))].sort()}
 function dates(){let live=liveDateSet();return allDates().filter(d=>!live.has(d))}
-function chartLiveDates(){let live=liveDateSet();return [...live].filter(d=>allDates().includes(d)).sort().slice(-1)}
+function chartLiveDates(){return selectUnclosedChartDates(allDates(),liveDateSet(),periodDates(0),E("days").value)}
 function periodDates(offset=0){
  let ds=dates(),v=E("days").value;
  if(v==="MONTH"){
@@ -328,8 +328,8 @@ function renderTrendSummary(closedDates,previousDates){
  E("trendSummary").innerHTML="<div class='trend-summary-total'><div class='trend-summary-title'>Итог за "+closedDates.length+" закрытых дней</div>"+trendMetricsHtml(current,previous,true,true)+"</div><div class='trend-market-list'>"+markets.map(mk=>trendMarketCardHtml(mk,trendStatsFor(closedDates,mk),trendStatsFor(previousDates,mk),true,false,true)).join("")+"</div>"
 }
 function trend(){
- let closedDates=periodDates(0),previousDates=prevPeriodDates(),closedRows=dailyFor(closedDates),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows),prevRows=dailyFor(previousDates),mode=E("trendMode").value,field=mode==="gmv"?"gmv":"units",label=mode==="gmv"?"Оборот, ₽":"Штуки";
- let ff=currentFilters(),scope=[];if(ff.category!=="ALL")scope.push(ff.category);if(ff.brand!=="ALL")scope.push(ff.brand);if(ff.q)scope.push("поиск: "+ff.q);E("trendDesc").textContent=(mode==="gmv"?"Оборот заказов по дням":"Заказанные штуки по дням")+" • LIVE не входит в расчёты"+(scope.length?" • "+scope.join(" • "):"");
+ let closedDates=periodDates(0),previousDates=prevPeriodDates(),closedRows=dailyFor(closedDates),liveRows=dailyFor(chartLiveDates()).filter(isLiveRow),curRows=closedRows.concat(liveRows).sort((a,b)=>a.report_date.localeCompare(b.report_date)),prevRows=dailyFor(previousDates),mode=E("trendMode").value,field=mode==="gmv"?"gmv":mode==="orders"?"orders":"units",label=mode==="gmv"?"Оборот, ₽":mode==="orders"?"Заказы":"Штуки";
+ let ff=currentFilters(),scope=[];if(ff.category!=="ALL")scope.push(ff.category);if(ff.brand!=="ALL")scope.push(ff.brand);if(ff.q)scope.push("поиск: "+ff.q);E("trendDesc").textContent=(mode==="gmv"?"Оборот заказов по дням":mode==="orders"?"Количество заказов по дням":"Заказанные штуки по дням")+" • LIVE не входит в расчёты"+(scope.length?" • "+scope.join(" • "):"");
  let vals=curRows.concat(prevRows).map(function(x){return N(x[field])}),max=Math.max.apply(null,[1].concat(vals)),W=900,H=260,pl=62,pr=18,pt=20,pb=34,st=(W-pl-pr)/Math.max(1,curRows.length-1);
  function xp(i){return pl+i*st}function yp(v){return H-pb-(N(v)/max)*(H-pt-pb)}
  let z="",ticks=4;
@@ -340,9 +340,9 @@ function trend(){
  prev.forEach(function(r,i){z+="<circle cx='"+xp(i)+"' cy='"+yp(r[field])+"' r='3' fill='var(--a)' opacity='.22'/>"});
  let pts=closedRows.map(function(r,i){return xp(i)+","+yp(r[field])});
  if(pts.length>1)z+="<polyline fill='none' stroke='var(--a)' stroke-width='4' points='"+pts.join(" ")+"'/>";
- curRows.forEach(function(r,i){let val=N(r[field]),live=isLiveRow(r);z+="<circle class='trend-dot' data-trend-index='"+i+"' cx='"+xp(i)+"' cy='"+yp(val)+"' r='"+(live?6:5)+"' fill='"+(live?"#f47b20":"var(--a)")+"'/><text x='"+xp(i)+"' y='"+(H-8)+"' text-anchor='middle' font-size='9' fill='#667085'>"+r.report_date.slice(5)+"</text>";if(curRows.length<=14)z+="<text x='"+xp(i)+"' y='"+Math.max(12,yp(val)-9)+"' text-anchor='middle' font-size='9' font-weight='700'>"+(mode==="gmv"?Math.round(val/1000)+"k":Math.round(val))+"</text>";if(live)z+="<text x='"+xp(i)+"' y='13' text-anchor='middle' font-size='8' font-weight='800' fill='#c4320a'>LIVE</text>"});
+ curRows.forEach(function(r,i){let val=N(r[field]),live=isLiveRow(r);z+="<circle class='trend-dot' data-trend-index='"+i+"' cx='"+xp(i)+"' cy='"+yp(val)+"' r='"+(live?6:5)+"' fill='"+(live?"#f47b20":"var(--a)")+"'/><text x='"+xp(i)+"' y='"+(H-8)+"' text-anchor='middle' font-size='9' fill='#667085'>"+r.report_date.slice(5)+"</text>";if(curRows.length<=14)z+="<text x='"+xp(i)+"' y='"+Math.max(12,yp(val)-9)+"' text-anchor='middle' font-size='9' font-weight='700'>"+(mode==="gmv"?Math.round(val/1000)+"k":Math.round(val))+"</text>";if(live&&r.report_date===liveRows.at(-1)?.report_date)z+="<text x='"+xp(i)+"' y='13' text-anchor='middle' font-size='8' font-weight='800' fill='#c4320a'>LIVE</text>"});
  E("trend").setAttribute("viewBox","0 0 "+W+" "+H);E("trend").innerHTML=z;globalThis._trendCur=curRows;globalThis._trendClosedCount=closedRows.length;
- E("trendPeriodNote").textContent="Итог за "+closedRows.length+" закрытых дней";E("trendDayDetail").innerHTML="<span class='neu'>Нажми на точку, чтобы посмотреть выбранный день.</span>";renderTrendSummary(closedDates,previousDates)
+ E("trendPeriodNote").textContent="Итог за "+closedRows.length+" закрытых дней"+(liveRows.length>1?" • "+(liveRows.length-1)+" дней ожидают закрытия и показаны оранжевыми точками; в итог не включены":"");E("trendDayDetail").innerHTML="<span class='neu'>Нажми на точку, чтобы посмотреть выбранный день.</span>";renderTrendSummary(closedDates,previousDates)
 }
 globalThis.showTrendPoint=function(i){
  let c=(globalThis._trendCur||[])[i];if(!c)return;let live=isLiveRow(c),closedDays=globalThis._trendClosedCount||periodDates(0).length,currentTotal=trendStatsFor(periodDates(0)),comparison=calculateTrendDayComparison(c,currentTotal,closedDays,live);
@@ -945,7 +945,7 @@ globalThis.openSku=function(key){
 body+=buildSkuDynamics(key,a);
  E("detail").innerHTML=body;setDetailTab(detailTab)
 }
-function render(){kpis();trend();tables()}function setup(){
+function render(){kpis();trend();tables();if(CONFIG?.onRender){let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap();CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:aggregateSku(ds).map(a=>({...a,risk:riskFor(a,pm),stock:stockFor(a),channels:channelShareText(a)})),filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})}}function setup(){
  rebuildDimMap();rebuildStockMap();rebuildLinkMap();rebuildPositionMap();rebuildContentMap();rebuildYandexAnalytics();E("q").value="";E("q").setAttribute("autocomplete","off");populateMarketplaceFilter();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();E("skuQuickSearch").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();openQuickSku()}};
  E("cabinet").onchange=()=>{populateDimensionFilters();render()};
  E("marketplace").onchange=()=>{applyMarketplacePageTheme();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();render()};
@@ -1003,4 +1003,12 @@ export function calculateTrendPeriodTotals(currentRows,previousRows=[],closedDay
 export function calculateTrendDayComparison(day,periodTotal,closedDayCount,isLive=false){
  let count=Math.max(0,N(closedDayCount)),average={gmv:count?N(periodTotal.gmv)/count:0,units:count?N(periodTotal.units)/count:0,orders:count?N(periodTotal.orders)/count:0};
  let deltas={};for(const key of ["gmv","units","orders"])deltas[key]=isLive?null:dp(day[key],average[key]);return{average,deltas,isLive:!!isLive}
+}
+
+// Show every unclosed day without treating it as a closed financial report.
+export function selectUnclosedChartDates(all,live,closed,period){
+ const values=all.filter(d=>live.has(d)).sort();
+ if(/^\d{4}-\d{2}$/.test(period))return values.filter(d=>d.startsWith(period));
+ if(period==="MONTH")return values.filter(d=>d.startsWith((all.at(-1)||"").slice(0,7)));
+ const first=closed[0];return first?values.filter(d=>d>=first):values;
 }

@@ -26,6 +26,7 @@ function availableMarkets(){
  return [...new Set((state.bundle?.payloads??[]).filter(p=>p.metadata.tenant_id===tenant()&&p.metadata.month===month()&&p.metadata.marketplace!=="ALL"&&p.metadata.data_available!==false).map(p=>p.metadata.marketplace))];
 }
 function renderHeader(){
+ const dailyLink=$("#dailyReportLink");if(dailyLink){const target=new URL("../daily/",location.href);target.searchParams.set("tenant",tenant());dailyLink.href=target;}
  const p=state.payload,m=p?.metadata??{},available=availableMarkets();
  $text("#pageTitle",(TENANTS[tenant()]?.label??tenant())+" · "+monthLabel(month()).replace(/^./,c=>c.toUpperCase()));
  $text("#monthStatus",p?(m.marketplace_close_status==="CLOSED"?"Закрыт · ревизия "+m.base_close_revision:m.marketplace_close_status==="LIVE"?"LIVE · текущий месяц":"Нет данных"):"Нет данных");
