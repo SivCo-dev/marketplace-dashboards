@@ -954,7 +954,7 @@ globalThis.openSku=function(key){
 body+=buildSkuDynamics(key,a);
  E("detail").innerHTML=body;setDetailTab(detailTab)
 }
-function render(){kpis();trend();tables();if(CONFIG?.onRender){let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap();CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:aggregateSku(ds).map(a=>({...a,risk:riskFor(a,pm),stock:stockFor(a),channels:channelShareText(a)})),filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})}}function setup(){
+function render(){if(!CONFIG?.onRender){kpis();tables()}trend();if(CONFIG?.onRender){let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap();CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:aggregateSku(ds).map(a=>({...a,risk:riskFor(a,pm),stock:stockFor(a),channels:channelShareText(a)})),filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})}}function setup(){
  rebuildDimMap();rebuildStockMap();rebuildLinkMap();rebuildPositionMap();rebuildContentMap();rebuildYandexAnalytics();E("q").value="";E("q").setAttribute("autocomplete","off");populateMarketplaceFilter();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();E("skuQuickSearch").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();openQuickSku()}};
  E("cabinet").onchange=()=>{populateDimensionFilters();render()};
  E("marketplace").onchange=()=>{applyMarketplacePageTheme();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();render()};
@@ -982,7 +982,7 @@ function installInteractions(root){
 export async function startDashboard(config){
  validateConfig(config);CONFIG=config;document.title=config.display_name+" — Orders Control 2.3";
  const root=document.getElementById("app");root.innerHTML=dashboardLayout(config);installInteractions(root);
- try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
+ try{const response=await fetch(config.data_url,{cache:"no-store",headers:config.data_headers||{}});if(!response.ok)throw new Error("Snapshot HTTP "+response.status);let payload=await response.json();let merged=mergeOzonEconomics(payload,payload._ozon_enrichment||{});if(Array.isArray(payload.meta?.accounts)){config.accounts=[...config.accounts,...payload.meta.accounts.filter(a=>!config.accounts.some(b=>a.account_id===b.account_id))]}D=normalizeDashboardPayload(merged,config);setup();E("load").classList.add("hide")}
  catch(e){E("load").classList.add("hide");E("err").classList.remove("hide");E("err").textContent="Ошибка загрузки: "+e.message;throw e}
 }
 
