@@ -1,13 +1,13 @@
-import {startDashboard} from './core/dashboard-core.js?v=20261004history';
+import {startDashboard} from './core/dashboard-core.js?v=20261004verifiedfilters';
 import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
 const configs={W:w,CPR:cpr,ORANGE:orange};
 const query=new URLSearchParams(location.search),tenant=configs[query.get('tenant')]?query.get('tenant'):'W';
 const config={...configs[tenant],theme:{accent:'#355846'},onRender:paint};
-const $=id=>document.getElementById(id),num=v=>Number(v||0),fmt=v=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(num(v)),money=v=>fmt(v)+' ₽';
+const $=id=>document.getElementById(id),num=v=>Number(v||0),fmt=v=>v==null?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(num(v)),money=v=>fmt(v)+' ₽';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
-const pct=(a,b)=>num(b)?(num(a)/num(b)-1)*100:null;
+const pct=(a,b)=>a==null||b==null?null:num(b)?(num(a)/num(b)-1)*100:null;
 const delta=v=>v==null?'<span class="muted">Нет сопоставимой истории</span>':'<span class="'+(v<0?'negative':'positive')+'">'+(v<0?'↓ ':'↑ ')+Math.abs(v).toFixed(1)+'%</span>';
 const date=v=>String(v||'').slice(8,10)+'.'+String(v||'').slice(5,7);
 let view,focus='all',breakdown='market',limit=25,lastFocus;
@@ -52,7 +52,7 @@ function paint(data){
  if(!data||!$('focusTabs'))return;view=data;
  const {current:c,previous:p,skus,currentDates:days,live,payload}=data;
  const risks=skus.filter(a=>a.risk.level>0),critical=risks.filter(a=>a.risk.level===3).length;
- const kpis=[['₽','Оборот заказов',money(c.gmv),days.length+' закрытых дней',delta(pct(c.gmv,p.gmv))],['▥','Заказано',fmt(c.units)+' шт',days.length?fmt(c.units/days.length)+' шт. в среднем за день':'Нет закрытых дней',delta(pct(c.units,p.units))],['○','Заказы',fmt(c.orders),'Средний чек '+(c.orders?money(c.gmv/c.orders):'—'),delta(pct(c.orders,p.orders))],['◇','Активные SKU',fmt(skus.length),'Товары с заказами за период','<span class="muted">Без LIVE-дней</span>'],['!','Точки внимания',fmt(risks.length)+' SKU',critical+' критичных · '+(risks.length-critical)+' требуют внимания','<span class="negative">По действующим правилам рисков</span>']];
+ const kpis=[['₽','Оборот заказов',money(c.gmv),days.length+' закрытых дней',delta(pct(c.gmv,p.gmv))],['▥','Заказано',fmt(c.units)+' шт',days.length?fmt(c.units/days.length)+' шт. в среднем за день':'Нет закрытых дней',delta(pct(c.units,p.units))],['○','Заказы',fmt(c.orders),c.orders==null?'Нет полной детализации заказов':'Средний чек '+(c.orders?money(c.gmv/c.orders):'—'),delta(pct(c.orders,p.orders))],['◇','Активные SKU',fmt(skus.length),'Товары с заказами за период','<span class="muted">Без LIVE-дней</span>'],['!','Точки внимания',fmt(risks.length)+' SKU',critical+' критичных · '+(risks.length-critical)+' требуют внимания','<span class="negative">По действующим правилам рисков</span>']];
  $('kpis').innerHTML=kpis.map(([icon,label,value,note,change])=>'<article class="card visual-kpi"><div class="kpi-label"><i>'+icon+'</i>'+label+'</div><strong>'+value+'</strong><small>'+note+'</small><div>'+change+'</div></article>').join('');
  const latest=live.at(-1),ts=payload.meta?.generated_at;
  $('dailyContext').textContent='● Обновлено '+(ts?new Date(ts).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' МСК':'—')+' · '+(days.length?date(days[0])+'–'+date(days.at(-1)):'Нет закрытых дней')+' · LIVE не входит в итог';
