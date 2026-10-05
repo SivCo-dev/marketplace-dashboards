@@ -2,9 +2,11 @@
 
 ## Release status
 
-Blocked. The proposed LIVE SQL migration was not installed, executed or merged.
-The complete Supabase runtime validation did not begin and cannot be reported as
-passing. Previous local PostgreSQL results remain local results.
+At the incident, rollout was blocked and the proposed SQL migration had not
+been installed. Recovery was subsequently verified. On 2026-10-06 MSK the
+independent Supabase gate passed and the SQL migration was deployed; see
+[validation and rollout evidence](ORANGE_LIVE_SUPABASE_VALIDATION.md). The failed
+same-project clone was never reused.
 
 ## Attempt and evidence
 
@@ -89,3 +91,4 @@ Do not repeat a full clone in the live database. Use an independently provisione
 test instance with verified free disk and WAL headroom, bounded copy batches,
 timeouts and capacity monitoring. A same-project private schema is insufficient
 resource isolation for this full-size workload.
+

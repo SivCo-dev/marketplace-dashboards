@@ -5,8 +5,9 @@
 The n8n-only `executeOnce=true` + `queryBatching=single` fix is already published
 and verified. It is independent of this pending SQL migration. No additional
 retry configuration was deployed. Local PostgreSQL checks passed; see
-[local validation](ORANGE_LIVE_LOCAL_VALIDATION.md). The paid Supabase branch is
-not approved and was not created.
+[local validation](ORANGE_LIVE_LOCAL_VALIDATION.md). The user approved a temporary Supabase branch within a $1 budget. The
+Supabase PostgreSQL 17 gate passed, the SQL migration is installed in Production,
+and the test branch was deleted. See [Supabase validation](ORANGE_LIVE_SUPABASE_VALIDATION.md).
 
 ## Safe SQL rollout
 
@@ -59,9 +60,9 @@ Also execute these isolated branch scenarios before approval:
   Changed SKU/dimension arrays must canonicalize correctly; an unchanged
   canonical LIVE payload must avoid a second full canonicalization.
 
-Store actual measurements and reconciliations in the PR. The local gate is
-complete; the isolated Supabase gate remains pending. SQL is not accepted for
-Production rollout yet. The independently authorized n8n-only fix is deployed.
+Store actual measurements and reconciliations in the PR. The local and isolated Supabase gates are
+complete. SQL was deployed after the Supabase gate; see the validation report
+for fixtures, timings, rollback and post-deployment evidence. The independently authorized n8n-only fix is deployed.
 
 ## Timeout diagnosis
 

@@ -17,6 +17,7 @@ declare
  changed dev21.dashboard_snapshots%rowtype;
  repeated dev21.dashboard_snapshots%rowtype;
  v bigint;h bigint;started timestamptz;closed jsonb;untouched jsonb;
+ revision_payload jsonb; revision_hash text;
 begin
  select * into original from dev21.dashboard_snapshots where tenant_id='ORANGE' and snapshot_kind='daily-full';
  perform pg_temp.check_true(dev21.canonicalize_orange_dashboard_payload_fast_v2(original.payload)=dev21.canonicalize_orange_dashboard_payload(original.payload),'Bulk canonicalization differs from reference');
@@ -27,11 +28,15 @@ begin
  closed:=pg_temp.closed_blocks(original.payload,d);
  select jsonb_agg(x order by x::text) into untouched from jsonb_array_elements(original.payload->'sku_daily')x
   where x->>'report_date'=d::text and not(x->>'marketplace'=r.marketplace and x->>'cabinet'=(select cabinet from config.account_runtime_v2 where account_id=r.account_id));
+ revision_payload:=r.payload||jsonb_build_object(
+   'quantity',((r.payload->>'quantity')::numeric+1),
+   'gross_amount',((r.payload->>'gross_amount')::numeric+1000));
+ revision_hash:=md5(revision_payload::text);
  insert into raw.ozon_orders_raw overriding system value
  select (jsonb_populate_record(null::raw.ozon_orders_raw,to_jsonb(r)||jsonb_build_object(
   'raw_order_id',(select max(raw_order_id)+1 from raw.ozon_orders_raw),'observed_at',clock_timestamp()+interval '1 hour',
-  'payload_hash','isolated-test-revision','payload',r.payload||jsonb_build_object(
-    'quantity',((r.payload->>'quantity')::numeric+1),'gross_amount',((r.payload->>'gross_amount')::numeric+1000))))).*;
+  'payload_hash',revision_hash,'payload',revision_payload,
+  'quantity',r.quantity+1,'gross_amount',r.gross_amount+1000))).*;
  started:=clock_timestamp();v:=dev21.refresh_live_snapshot_v2('ORANGE');
  select * into changed from dev21.dashboard_snapshots where tenant_id='ORANGE' and snapshot_kind='daily-full';
  perform pg_temp.check_true(v=original.snapshot_version+1,'Single-account revision did not publish once');
@@ -46,7 +51,7 @@ begin
  insert into live_scenario_results values('revision_replay',null);
  -- A source timestamp or numeric scale change must not affect non-cancelled data.
  update raw.ozon_orders_raw set payload=jsonb_set(jsonb_set(payload,'{source_updated_at}',to_jsonb(clock_timestamp()::text)),
- '{quantity}',to_jsonb(((payload->>'quantity')::numeric)::numeric(20,4))) where payload_hash='isolated-test-revision';
+ '{quantity}',to_jsonb(((payload->>'quantity')::numeric)::numeric(20,4))) where payload_hash=revision_hash;
  v:=dev21.refresh_live_snapshot_v2('ORANGE');
  perform pg_temp.check_true(v=changed.snapshot_version and h=(select count(*) from dev21.dashboard_snapshot_history),'Timestamp/numeric formatting caused publication');
  insert into live_scenario_results values('commercial_equivalent_revision',null);
@@ -94,7 +99,19 @@ begin
   perform pg_temp.check_true(dev21.refresh_live_snapshot_v2('ORANGE')=v,'Identity-only replay published twice');
   insert into live_scenario_results values('identity_only_and_replay',null);
  else
-  raise notice 'Identity mutation needs the branch ingestion revision path; local lookup case skipped';
+  select * into original from dev21.dashboard_snapshots where tenant_id='ORANGE' and snapshot_kind='daily-full';
+  update core.business_products_v2 p set canonical_article='__ISOLATED_CANONICAL_CHANGE__'
+   where p.product_key=(select m.product_key from core.marketplace_product_map_v2 m
+    where m.tenant_id=r.tenant_id and m.account_id=r.account_id and m.marketplace=r.marketplace
+     and m.source_marketplace_sku=r.line_item_key and m.valid_to is null limit 1);
+  perform pg_temp.check_true(found,'No real identity fixture matched the selected order');
+  v:=dev21.refresh_live_snapshot_v2('ORANGE');
+  select * into changed from dev21.dashboard_snapshots where tenant_id='ORANGE' and snapshot_kind='daily-full';
+  perform pg_temp.check_true(v=original.snapshot_version+1,'Real identity-only change did not publish');
+  perform pg_temp.check_true(changed.payload#>'{meta,live_source_fingerprints}'=original.payload#>'{meta,live_source_fingerprints}','Real identity-only change rebuilt order sources');
+  perform pg_temp.check_true(exists(select 1 from jsonb_array_elements(changed.payload->'sku_daily')x where x->>'sku'=r.line_item_key and x->>'canonical_sku'='__ISOLATED_CANONICAL_CHANGE__'),'Real identity-only change left stale canonical SKU');
+  perform pg_temp.check_true(dev21.refresh_live_snapshot_v2('ORANGE')=v,'Real identity-only replay published twice');
+  insert into live_scenario_results values('real_identity_only_and_replay',null);
  end if;
 
 end

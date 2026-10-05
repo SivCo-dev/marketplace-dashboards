@@ -56,7 +56,7 @@ finally:
 sql("""insert into raw.ozon_orders_raw overriding system value
  select (jsonb_populate_record(null::raw.ozon_orders_raw,to_jsonb(r)||jsonb_build_object(
  'raw_order_id',(select max(raw_order_id)+1 from raw.ozon_orders_raw),
- 'observed_at',clock_timestamp()+interval '1 hour','payload_hash','concurrency-test-revision',
+ 'observed_at',clock_timestamp()+interval '1 hour','payload_hash',md5('concurrency-test-revision'),
  'payload',r.payload||jsonb_build_object('quantity',((r.payload->>'quantity')::numeric+1),
  'gross_amount',((r.payload->>'gross_amount')::numeric+1000))))).*
  from raw.ozon_orders_raw r where tenant_id='ORANGE'
@@ -80,7 +80,7 @@ try:
     results.append({'scenario':'competing_builders','returned_versions':versions,
                     'effective_publications':1})
 finally:
-    sql("delete from raw.ozon_orders_raw where payload_hash='concurrency-test-revision'")
+    sql("delete from raw.ozon_orders_raw where payload_hash=md5('concurrency-test-revision')")
     sql("select dev21.refresh_live_snapshot_v2('ORANGE')")
 
 print(json.dumps(results, indent=2))
