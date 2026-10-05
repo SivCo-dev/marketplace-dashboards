@@ -271,8 +271,8 @@ function dailyFor(ds,marketplaceOverride=null){
  }
  return [...m.values()].sort((a,b)=>a.report_date.localeCompare(b.report_date))
 }
-function skuFor(ds){
- let s=new Set(ds),f=currentFilters(),out=[];
+function skuFor(ds,f=currentFilters()){
+ let s=new Set(ds),out=[];
  for(const x of (D.sku_daily||[])){
    if(!s.has(x.report_date)||(f.cab!=="ALL"&&x.cabinet!==f.cab)||(f.marketplace!=="ALL"&&rowMarketplace(x)!==f.marketplace))continue;
    let d=dimFor(x.cabinet,x.sku),y={...x,master_category:d.master_category||"Прочие",category:d.category||"Без категории",brand:d.brand||"Без бренда"};
@@ -285,11 +285,11 @@ function skuFor(ds){
  return out
 }
 function aggregateDaily(rows){return{orders:rows.some(x=>x.orders===null)?null:rows.reduce((s,x)=>s+N(x.orders),0),units:rows.reduce((s,x)=>s+N(x.units),0),gmv:rows.reduce((s,x)=>s+N(x.gmv),0)}}
-function aggregateSku(ds){
+function aggregateSku(ds,f=currentFilters()){
  const m=new Map();
- for(const x of skuFor(ds)){
+ for(const x of skuFor(ds,f)){
    let k=canonicalKey(x),mk=rowMarketplace(x);
-   let a=m.get(k)||{key:k,marketplace:mk,cabinet:x.cabinet,sku:x.sku,article:x.canonical_sku||x.article,canonical_sku:x.canonical_sku||x.article,product_name:x.product_name,category:x.category||"Без категории",brand:x.brand||"Без бренда",orders:0,units:0,gmv:0,live:false,reconstructed:false,commission_amount:0,logistics_amount:0,expected_received:0,known_cost_rows:0,known_cost_units:0,known_cost_gmv:0,latest_date:"",latest_gmv:0,latest_units:0,actual_logistics_units:0,forecast_logistics_units:0,actual_logistics_amount:0,forecast_logistics_amount:0,finance_commission_units:0,posting_commission_units:0,tariff_commission_units:0,finance_commission_amount:0,posting_commission_amount:0,tariff_commission_amount:0,current_price:null,tariff_rate_pct:null};
+   let a=m.get(k)||{key:k,marketplace:mk,cabinet:x.cabinet,sku:x.sku,article:x.canonical_sku||x.article,canonical_sku:x.canonical_sku||x.article,product_name:x.product_name,master_category:x.master_category||"Прочие",category:x.category||"Без категории",brand:x.brand||"Без бренда",orders:0,units:0,gmv:0,live:false,reconstructed:false,commission_amount:0,logistics_amount:0,expected_received:0,known_cost_rows:0,known_cost_units:0,known_cost_gmv:0,latest_date:"",latest_gmv:0,latest_units:0,actual_logistics_units:0,forecast_logistics_units:0,actual_logistics_amount:0,forecast_logistics_amount:0,finance_commission_units:0,posting_commission_units:0,tariff_commission_units:0,finance_commission_amount:0,posting_commission_amount:0,tariff_commission_amount:0,current_price:null,tariff_rate_pct:null};
    a.orders+=N(x.orders);a.units+=N(x.units);a.gmv+=N(x.gmv);a.live=a.live||!!x.is_live;a.reconstructed=a.reconstructed||!!x.is_reconstructed;
    if(String(x.report_date)>a.latest_date){a.latest_date=String(x.report_date);a.latest_gmv=N(x.gmv);a.latest_units=N(x.units);a.current_price=x.current_price==null?null:N(x.current_price)}
    else if(String(x.report_date)===a.latest_date){a.latest_gmv+=N(x.gmv);a.latest_units+=N(x.units)}
@@ -376,8 +376,8 @@ function allMarketAvgDailySales14d(a){
  }
  return units/14
 }
-function avgContentScore(a){
- let f=currentFilters(),art=normArticle(a.article),sku=String(a.sku||"");
+function avgContentScore(a,f=currentFilters()){
+ let art=normArticle(a.article),sku=String(a.sku||"");
  let arr=CONTENT.filter(c=>{
    if(f.marketplace!=="ALL"&&String(c.marketplace||"").toUpperCase()!==f.marketplace)return false;
    if(f.cab!=="ALL"&&c.cabinet!==f.cab)return false;
@@ -386,10 +386,10 @@ function avgContentScore(a){
  if(!arr.length)return null;
  return arr.reduce((s,c)=>s+N(c.content_score),0)/arr.length
 }
-function riskFor(a,pm){
+function riskFor(a,pm,f=currentFilters()){
  let p0=pm.get(a.key)||{},gmvPrev=N(p0.gmv),gmvPct=gmvPrev?((N(a.gmv)/gmvPrev)-1)*100:null;
  let pricePrev=N(p0.price),pricePct=pricePrev?((N(a.price)/pricePrev)-1)*100:null;
- let st=stockFor(a),stockQty=st?N(st.total_stock):null,contentScore=avgContentScore(a),level=0,reasons=[];
+ let st=stockFor(a),stockQty=st?N(st.total_stock):null,contentScore=avgContentScore(a,f),level=0,reasons=[];
  if(st&&stockQty<=0){level=3;reasons.push("нет остатка")}
  if(gmvPct!=null&&gmvPct<=-30){level=Math.max(level,2);reasons.push("GMV "+gmvPct.toFixed(0)+"%")}
  else if(gmvPct!=null&&gmvPct<=-15){level=Math.max(level,1);reasons.push("GMV "+gmvPct.toFixed(0)+"%")}
@@ -455,12 +455,13 @@ function mergeOzonEconomics(base,oz){
  base.content=[...(Array.isArray(base.content)?base.content:[]),...(Array.isArray(oz.content)?oz.content:[])];
  return base
 }
-function channelShareText(a){
- const allowed=new Set(periodDates(0)),f=currentFilters(),tot={OZON:0,YANDEX:0,WB:0};let sum=0;
+function channelShareText(a,f=currentFilters()){
+ const allowed=new Set(periodDates(0)),tot={OZON:0,YANDEX:0,WB:0};let sum=0;
  for(const x of (D.sku_daily||[])){
    let k=canonicalKey(x);
    if(k!==a.key||!allowed.has(x.report_date))continue;
    if(f.cab!=="ALL"&&x.cabinet!==f.cab)continue;
+   if(f.marketplace!=="ALL"&&rowMarketplace(x)!==f.marketplace)continue;
    let d=dimFor(x.cabinet,x.sku),master=d.master_category||"Прочие",cat=d.category||"Без категории",brand=d.brand||"Без бренда";
    if(f.masterCategory!=="ALL"&&master!==f.masterCategory)continue;
    if(f.category!=="ALL"&&cat!==f.category)continue;
@@ -959,6 +960,37 @@ globalThis.openSku=function(key){
 body+=buildSkuDynamics(key,a);
  E("detail").innerHTML=body;setDetailTab(detailTab)
 }
+
+function dailySkuWorkspace(local={}){
+ const f={
+   cab:"ALL",
+   marketplace:local.marketplace||"ALL",
+   masterCategory:local.masterCategory||"ALL",
+   category:"ALL",
+   brand:local.brand||"ALL",
+   q:""
+ };
+ const ds=periodDates(0),prev=prevPeriodDates();
+ const currentSku=aggregateSku(ds,f),pm=new Map(aggregateSku(prev,f).map(a=>[a.key,a])),currentMap=new Map(currentSku.map(a=>[a.key,a]));
+ const enrich=a=>{
+   let p=pm.get(a.key)||{},previousGmv=N(p.gmv),previousUnits=N(p.units),lostGmv=Math.max(0,previousGmv-N(a.gmv)),growthGmv=Math.max(0,N(a.gmv)-previousGmv);
+   let stock=stockFor(a),stockQty=stock?N(stock.total_stock):null,avg14=allMarketAvgDailySales14d(a),stockDays=stock&&avg14>0?stockQty/avg14:null;
+   return {...a,risk:riskFor(a,pm,f),stock,stockQty,stockDays,channels:channelShareText(a,f),previousGmv,previousUnits,lostGmv,growthGmv,problemImpact:Math.max(N(a.gmv),lostGmv)}
+ };
+ const skus=currentSku.map(enrich);
+ const declineSkus=[...pm.values()].filter(p=>N(p.units)>=2).map(p=>{
+   let base=currentMap.get(p.key)||{...p,gmv:0,units:0,orders:0,latest_gmv:0,latest_units:0},a=enrich(base);
+   return {...a,previousGmv:N(p.gmv),previousUnits:N(p.units),lostGmv:Math.max(0,N(p.gmv)-N(base.gmv)),growthGmv:0,problemImpact:Math.max(N(base.gmv),Math.max(0,N(p.gmv)-N(base.gmv)))}
+ }).filter(a=>a.lostGmv>0).sort((a,b)=>b.lostGmv-a.lostGmv);
+ const growthSkus=skus.filter(a=>a.previousUnits>=2&&a.growthGmv>0).sort((a,b)=>b.growthGmv-a.growthGmv);
+ const problemMap=new Map(skus.map(a=>[a.key,a]));for(const a of declineSkus)if(!problemMap.has(a.key))problemMap.set(a.key,a);
+ const problemSkus=[...problemMap.values()].filter(a=>a.risk.level>0).sort((a,b)=>b.problemImpact-a.problemImpact||b.risk.level-a.risk.level||b.gmv-a.gmv);
+ const orgFilter={cab:"ALL",marketplace:"ALL",masterCategory:"ALL",category:"ALL",brand:"ALL",q:""};
+ const orgGmv=aggregateSku(ds,orgFilter).reduce((sum,a)=>sum+N(a.gmv),0);
+ return{skus,declineSkus,growthSkus,problemSkus,orgGmv};
+}
+globalThis.getDailySkuWorkspace=dailySkuWorkspace;
+
 function render(){if(!CONFIG?.onRender){kpis();tables()}else if(selected){openSku(selected)}trend();if(CONFIG?.onRender){
  let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap(),currentSku=aggregateSku(ds),currentMap=new Map(currentSku.map(a=>[a.key,a]));
  let enrichedCurrent=currentSku.map(a=>{
