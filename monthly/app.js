@@ -1,6 +1,6 @@
 import {TENANTS as DEFAULT_TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261004periods";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
-import {createScopeLoader} from "./live-v2.js?v=20261004canonical";
+import {createScopeLoader} from "./live-v2.js?v=20261005import";
 
 import {loadReportRegistry} from '../core/runtime-registry.js?v=20261004finish';
 let TENANTS={...DEFAULT_TENANTS};
@@ -59,8 +59,8 @@ function renderSummary(){
   ["◫","После всех расходов",f.final_business_result,"С компенсациями · после себестоимости и бизнес-расходов",deltaText(metricRate(p,"final_business_result"),metricRate(prev,"final_business_result"),"pp"),signedClass(f.final_business_result)]
  ];
  $("#overview").innerHTML=kpis.map(([icon,label,value,note,delta,tone="neutral"])=>'<article class="kpi '+tone+'"><div class="kpi-label"><i>'+icon+'</i><span>'+e(label)+'</span></div><strong>'+money(value)+'</strong><small>'+e(note)+'</small><em class="'+(delta.startsWith("↑")?"up":delta.startsWith("↓")?"down":"unavailable")+'">'+e(delta)+'</em></article>').join("");
- $("#contextLine").innerHTML=p?'<span><i class="status-dot"></i>'+e(m.marketplace_close_status==="CLOSED"?"База месяца зафиксирована":m.marketplace_close_status==="LIVE"?"Данные месяца продолжают поступать":"Данные месяца ещё не поступили")+'</span><span>Компенсации: '+e(m.compensation_status==="PENDING"?"ожидаются":m.compensation_status==="COMPLETE"?"завершены":"нет данных")+'</span><span>Бизнес-расходы: '+e(m.business_expense_status==="COMPLETE"?"учтены":m.business_expense_status==="NOT_APPLICABLE"?"не применяются":"не доступны")+'</span>':"";
- $text("#compensationBadge",p?"Компенсации: "+money(f.compensation)+" · "+(m.compensation_status==="PENDING"?"ожидаются":"статус "+m.compensation_status):"");
+ $("#contextLine").innerHTML=p?'<span><i class="status-dot"></i>'+e(m.marketplace_close_status==="CLOSED"?"База месяца зафиксирована":m.marketplace_close_status==="LIVE"?"Данные месяца продолжают поступать":"Данные месяца ещё не поступили")+'</span><span>Компенсации: '+e(m.compensation_status==="PENDING"?"ожидаются":m.compensation_status==="COMPLETE"?"завершены":m.compensation_status==="PARTIAL"?"загружены частично":"нет данных")+'</span><span>Бизнес-расходы: '+e(m.business_expense_status==="COMPLETE"?"учтены":m.business_expense_status==="NOT_APPLICABLE"?"не применяются":"не доступны")+'</span>':"";
+ $text("#compensationBadge",p?"Компенсации: "+money(f.compensation)+" · "+(m.compensation_status==="PENDING"?"ожидаются":m.compensation_status==="PARTIAL"?"загружены частично":m.compensation_status==="COMPLETE"?"завершены":"нет данных"):"");
  $("#technicalState").textContent=p?JSON.stringify(m,null,2):"Нет данных выбранной площадки";
 }
 

@@ -41,8 +41,8 @@ function adaptRow(row,scope){
   financial_return_units:n(row.return_operations),
   financial_net_units:economicUnits,
   sale_units_display:n(row.sale_operations??row.sold_units),
-  return_writeoff_units:n(row.return_operations)+n(row.disposal_units),
-  physical_returned_units:null,
+  return_writeoff_units:n(row.returned_units??row.return_operations)+n(row.disposal_units),
+  physical_returned_units:nullable(row.returned_units),
   written_off_units:n(row.disposal_units),
   compensated_units:n(row.compensated_units),
   ...Object.fromEntries(GROUPS.map(key=>[key,direct[key]+allocated[key]])),
@@ -56,7 +56,7 @@ function adaptRow(row,scope){
   business_expenses:n(row.allocated_business_expenses),
   final_business_result:nullable(row.profit_after_business),
   cost_status:costStatus,
-  compensation_status:scope.period_state?.status==="ACCEPTED_CLOSED"?"COMPLETE":"PENDING",
+  compensation_status:row.import_fields?.compensation_amount!=null?"COMPLETE":scope.period_state?.status==="ACCEPTED_CLOSED"?"COMPLETE":"PENDING",
   expense_structure:{direct,allocated_shared:allocated}
  };
 }
@@ -113,7 +113,7 @@ export function adaptScope(scope){
    marketplace_close_status:closeState,
    base_close_revision:scope.metadata?.revision??null,
    overall_readiness:status,
-   compensation_status:status==="ACCEPTED_CLOSED"?"COMPLETE":status==="PRELIMINARY"?"PENDING":"UNAVAILABLE",
+   compensation_status:sourceRows.some(r=>r.import_fields?.compensation_amount!=null)?(sourceRows.every(r=>r.import_fields?.compensation_amount!=null||r.marketplace!=="OZON")?"COMPLETE":"PARTIAL"):status==="ACCEPTED_CLOSED"?"COMPLETE":status==="PRELIMINARY"?"PENDING":"UNAVAILABLE",
    cost_status:business.cost_status??"MISSING",
    business_expense_status:sourceRows.length?"COMPLETE":"UNAVAILABLE",
    data_available:hasData,

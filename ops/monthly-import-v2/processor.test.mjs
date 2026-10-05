@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {findTables,numberValue,normalizeRows,allocate} from './processor.mjs';
+assert.equal(numberValue('1 234,56 ₽'),1234.56);assert.throws(()=>numberValue('123abc'));
+const matrix=[['Отчёт'],['','Артикул продавца','','Сумма компенсации','Утилизировано, шт'],['','A','',100,2],['','Итого','',100,2]];
+const table=findTables([{name:'Лист1',matrix}])[0];assert.equal(table.mapping.article,1);assert.equal(table.mapping.compensation_amount,3);
+const n=normalizeRows(matrix,table.row,table.mapping);assert.equal(n.rows.length,1);
+const base=[{sku:'A',article:'A',account_id:'o',marketplace:'OZON',master_category:'Зеркала',sales:1},{sku:'B',article:'B',account_id:'o',marketplace:'OZON',master_category:'Зеркала',sales:2},{sku:'C',article:'C',account_id:'other',marketplace:'OZON',master_category:'Зеркала',sales:10000}];
+const context={payload:{sku:base},products:[]};
+const p=allocate(n,context,{account_id:'o',tenant_id:'ORANGE'});assert.deepEqual(p.errors,[]);assert.equal(p.patches.find(r=>r.sku==='A').values.compensation_amount,33.33);assert.equal(p.patches.find(r=>r.sku==='B').values.compensation_amount,66.67);assert.equal(p.patches.find(r=>r.sku==='A').values.disposal_units,2);assert.equal(p.patches.find(r=>r.sku==='B').values.disposal_units,undefined);assert.equal(p.patches.some(r=>r.sku==='C'),false);
+const direct=allocate(n,context,{account_id:'o',tenant_id:'CPR'});assert.equal(direct.patches.length,1);assert.equal(direct.patches[0].values.compensation_amount,100);
+const unknown=allocate({...n,rows:[{...n.rows[0],article:'UNKNOWN'}]},context,{account_id:'o',tenant_id:'ORANGE'});assert(unknown.errors.length);
+const noSales=allocate(n,{payload:{sku:base.map(r=>({...r,sales:0}))}}, {account_id:'o',tenant_id:'ORANGE'});assert(noSales.errors.length);
+const negative=allocate({...n,fields:['decompensation_amount'],rows:[{article:'A',source_row:1,decompensation_amount:-0.01}]},context,{account_id:'o',tenant_id:'ORANGE'});assert.equal(negative.allocated.decompensation_amount,-0.01);assert.deepEqual(negative.errors,[]);
+const tall=[['Артикул','Тип операции','Сумма','Количество'],['A','Компенсация',100,1],['A','Декомпенсация',20,''],['A','Утилизация','',2],['A','Списание','',3]];const t=findTables([{name:'Т',matrix:tall}])[0];const nt=normalizeRows(tall,0,t.mapping);assert.deepEqual(nt.errors,[]);assert.equal(nt.rows[1].decompensation_amount,-20);assert.equal(nt.rows[2].disposal_units,2);assert.equal(nt.rows[3].written_off_units,3);
+console.log('Import parser/allocation: passed (blank columns, totals, tall/wide, exact cents, scopes, unresolved/no-sales)');
