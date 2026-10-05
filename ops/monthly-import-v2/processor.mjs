@@ -23,10 +23,26 @@ export function guessMapping(headers){
   mapped.sku=headers.findIndex(h=>norm(h)==='sku');
   mapped.written_off_units=headers.findIndex(h=>/^количество(?:,? шт\.?)?$/.test(norm(h)));
  }
+ const financeType=financialReportType(headers);
+ if(financeType){
+  for(const key of Object.keys(mapped))mapped[key]=-1;
+  mapped.article=headers.findIndex(h=>norm(h)==='артикул');
+  mapped.sku=headers.findIndex(h=>norm(h)==='sku');
+  if(financeType==='decompensation')mapped.decompensation_amount=headers.findIndex(h=>/итого.*компенсац.*к удержанию/.test(norm(h)));
+  else {
+   mapped.compensation_amount=headers.findIndex(h=>/^итого к начислению/.test(norm(h)));
+   mapped.compensated_units=headers.findIndex(h=>norm(h)==='кол-во');
+  }
+ }
  return mapped;
 }
 export function isWarehouseReturn(headers){return headers.some(h=>norm(h)==='количество возвращаемых товаров')&&headers.some(h=>norm(h)==='статус возврата');}
 export function isWarehouseWriteoff(headers){return headers.some(h=>norm(h)==='причина списания')&&headers.some(h=>norm(h)==='утилизация');}
+export function financialReportType(headers){
+ if(headers.some(h=>/итого.*компенсац.*к удержанию/.test(norm(h))))return 'decompensation';
+ if(headers.some(h=>/^итого к начислению/.test(norm(h)))&&headers.some(h=>norm(h)==='тип компенсации'))return 'compensation';
+ return null;
+}
 export function findTables(sheets){
  return sheets.map(({name,matrix})=>{let best={score:-1,row:0};for(let row=0;row<Math.min(60,matrix.length);row++){const headers=matrix[row].map(v=>String(v??'').trim());const mapping=guessMapping(headers);const score=Object.values(mapping).filter(v=>v>=0).length+((mapping.article>=0||mapping.sku>=0)?3:0);if(score>best.score)best={name,row,headers,mapping,score};}return {...best,matrix};}).filter(t=>t.score>=4);
 }
@@ -38,10 +54,14 @@ export function numberValue(v){
 }
 export function normalizeRows(matrix,headerRow,mapping,type='auto'){
  const rows=[],errors=[];const present=new Set(metrics.filter(k=>Number(mapping[k])>=0));
+ const financialReport=financialReportType(matrix[headerRow]||[]);
  if(Number(mapping.article)<0&&Number(mapping.sku)<0)throw Error('Выберите колонку артикула или SKU');
  const used=Object.values(mapping).filter(v=>Number(v)>=0).map(Number);if(new Set(used).size!==used.length)throw Error('Одна колонка сопоставлена нескольким полям');
  for(let i=headerRow+1;i<matrix.length;i++){
   const raw=matrix[i];if(!raw.some(v=>String(v??'').trim()))continue;
+  // Signed Ozon reports finish the table with a total, followed by signatures.
+  // Only this recognized format has this explicit end-of-table marker.
+  if(financialReport&&raw.slice(0,3).some(v=>/^(всего|итого)(\s|:|$)/i.test(String(v??'').trim())))break;
   const get=k=>Number(mapping[k])>=0?raw[Number(mapping[k])]:null;
   const article=String(get('article')??'').trim(),sku=String(get('sku')??'').trim();
   if(/^(итого|всего|total)(\s|:|$)/i.test(article||sku))continue;
