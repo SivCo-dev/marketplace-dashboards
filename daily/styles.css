@@ -101,3 +101,14 @@ body{--a:#355846}
 .category-total{margin-top:9px;padding:12px 10px;background:#f0f3eb;border-radius:8px}
 .category-total .category-line-top b{font-size:12px}
 .category-total .category-line-top strong{font-size:16px}
+
+/* Keep category totals visible and long lists scrollable in Orange. */
+@media (min-width:901px) {
+  .sales-overview .breakdown-panel[data-mode="category"] {display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  .sales-overview .breakdown-panel[data-mode="category"] #breakdownCards {display:flex;flex-direction:column;flex:1 1 0;min-height:0}
+  .sales-overview .category-lines {display:flex;flex-direction:column;flex:1 1 0;min-height:0}
+  .sales-overview .category-lines-scroll {overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1 1 0;padding-right:4px}
+  .sales-overview .category-total {flex-shrink:0}
+}
+@media (max-width:900px) {.category-lines-scroll{max-height:380px;overflow-y:auto}}
+.category-lines-scroll:focus-visible{outline:2px solid #658568;outline-offset:2px}
