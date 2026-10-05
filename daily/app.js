@@ -24,11 +24,10 @@ const coreStatus=document.createElement('span');coreStatus.id='status';coreStatu
 const toolbar=document.querySelector('.toolbar'),organization=document.createElement('div');
 organization.innerHTML='<label for="organization">Организация</label><select id="organization">'+Object.entries(configs).map(([id,c])=>'<option value="'+id+'" '+(id===tenant?'selected':'')+'>'+esc(c.display_name)+'</option>').join('')+'</select>';
 toolbar.prepend(organization);
-const extras=document.createElement('details');extras.className='extra-filters';extras.innerHTML='<summary>Доп. фильтры <span id="filterCount"></span></summary><div class="extra-grid"></div>';
-extras.lastElementChild.append($('cabinetFilterWrap')); // Category, master category and brand remain visible.
+// The cabinet select stays in the main toolbar and is hidden by core when only one exists.
 const search=$('q').parentElement; search.className='sku-search-field';search.querySelector('label').textContent='Поиск товара';$('q').placeholder='Найти товар, SKU или артикул…';
 const periodControl=$('days').parentElement;toolbar.append(periodControl); // Move period after category.
-toolbar.append(extras);toolbar.className='toolbar visual-filters';
+toolbar.className='toolbar visual-filters';
 $('organization').onchange=()=>{const url=new URL(location.href);url.searchParams.set('tenant',$('organization').value);location.assign(url)};
 // A previously persisted ?period=14 was the old default, not a deliberate new selection.
 // Use 30 on initial load; the dropdown remains fully interactive afterwards.
@@ -67,7 +66,6 @@ function paint(data){
  const latest=live.at(-1),ts=payload.meta?.generated_at;
  $('dailyContext').textContent='● Обновлено '+(ts?new Date(ts).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' МСК':'—')+' · '+(days.length?date(days[0])+'–'+date(days.at(-1)):'Нет закрытых дней')+' · LIVE не входит в итог';
  $('liveContext').textContent=latest?'LIVE · '+date(latest.report_date)+' · '+money(latest.gmv):'LIVE-данных нет';
- $('filterCount').textContent=['cab','masterCategory','brand'].filter(k=>data.filters[k]!=='ALL').length||'';
  const url=new URL(location.href);url.searchParams.set('tenant',tenant);url.searchParams.set('period',$('days').value);history.replaceState(null,'',url);
  const monthUrl=new URL('../monthly/',location.href);monthUrl.searchParams.set('tenant',tenant);if(data.filters.marketplace!=='ALL')monthUrl.searchParams.set('marketplace',data.filters.marketplace);$('monthlyLink').href=monthUrl;
  const groups=new Map();
