@@ -30,7 +30,9 @@ const search=$('q').parentElement; search.className='sku-search-field';search.qu
 const periodControl=$('days').parentElement;toolbar.append(periodControl); // Move period after category.
 toolbar.append(extras);toolbar.className='toolbar visual-filters';
 $('organization').onchange=()=>{const url=new URL(location.href);url.searchParams.set('tenant',$('organization').value);location.assign(url)};
-$('days').value=query.get('period')||'30';if(!$('days').value)$('days').value='30';
+// A previously persisted ?period=14 was the old default, not a deliberate new selection.
+// Use 30 on initial load; the dropdown remains fully interactive afterwards.
+$('days').value='30';
 const status=document.createElement('div');status.className='state-strip';status.innerHTML='<div id="dailyContext"></div><span id="liveContext"></span>';document.querySelector('#kpis').after(status);
 const trend=document.querySelector('.trend-card');trend.querySelector('.ttl').textContent='Динамика заказов';
 const opt=document.createElement('option');opt.value='orders';opt.textContent='Заказы';$('trendMode').append(opt);
