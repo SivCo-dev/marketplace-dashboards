@@ -16,7 +16,7 @@ const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replac
 const pct=(a,b)=>a==null||b==null?null:num(b)?(num(a)/num(b)-1)*100:null;
 const delta=v=>v==null?'<span class="muted">Нет сопоставимой истории</span>':'<span class="'+(v<0?'negative':'positive')+'">'+(v<0?'↓ ':'↑ ')+Math.abs(v).toFixed(1)+'%</span>';
 const date=v=>String(v||'').slice(8,10)+'.'+String(v||'').slice(5,7);
-let view,focus='all',breakdown=null,limit=25,lastFocus;
+let view,focus='all',breakdown=null,limit=25,lastFocus;const skuLocal={masterCategory:'ALL',marketplace:'ALL',brand:'ALL',stock:'ALL',q:''};let skuSort={key:'gmv',dir:'desc'};
 const pending=startDashboard(config); // Shared calculations, canonical SKU mapping and SKU card economics.
 const shell=document.querySelector('.shell'),header=document.querySelector('.header');
 header.innerHTML='<div><div class="eyebrow">АНАЛИТИКА ПРОДАЖ</div><h1>'+esc(config.display_name)+' · Ежедневный отчёт <span class="live-badge">● LIVE</span></h1><p class="muted">Оперативная динамика по маркетплейсам и товарам</p></div><nav class="view-switch" aria-label="Вид отчёта"><span aria-current="page">По дням</span><a id="monthlyLink" href="../monthly/?tenant='+tenant+'">По месяцам</a></nav>';
@@ -25,7 +25,7 @@ const toolbar=document.querySelector('.toolbar'),organization=document.createEle
 organization.innerHTML='<label for="organization">Организация</label><select id="organization">'+Object.entries(configs).map(([id,c])=>'<option value="'+id+'" '+(id===tenant?'selected':'')+'>'+esc(c.display_name)+'</option>').join('')+'</select>';
 toolbar.prepend(organization);
 // The cabinet select stays in the main toolbar and is hidden by core when only one exists.
-const search=$('q').parentElement; search.className='sku-search-field';search.querySelector('label').textContent='Поиск товара';$('q').placeholder='Найти товар, SKU или артикул…';
+const coreSearch=$('q').parentElement;coreSearch.hidden=true;$('q').value='';
 const periodControl=$('days').parentElement;toolbar.append(periodControl); // Move period after category.
 toolbar.className='toolbar visual-filters';
 $('organization').onchange=()=>{const url=new URL(location.href);url.searchParams.set('tenant',$('organization').value);location.assign(url)};
@@ -41,8 +41,8 @@ const overview=document.createElement('div');overview.className='sales-overview'
 $('trendSummary').hidden=true;
 const panels=[...document.querySelectorAll('.work-left > .card')];panels.slice(0,3).forEach(p=>p.hidden=true);
 const skuPanel=panels.at(-1);skuPanel.classList.add('visual-products');skuPanel.querySelector('.desc').innerHTML='Один список товаров для анализа продаж, рисков и динамики <span id="cnt" hidden></span>';
-const controls=document.createElement('div');controls.className='product-controls';controls.innerHTML='<div class="focus-tabs" id="focusTabs"></div><div class="product-search"></div>';
-controls.lastElementChild.append(search);skuPanel.querySelector('.section-head').after(controls);
+const controls=document.createElement('div');controls.className='product-controls sku-workspace-controls';controls.innerHTML='<div class="focus-tabs" id="focusTabs"></div><div class="sku-local-toolbar"><label>Мастер-категория<select id="skuMaster"><option value="ALL">Все мастер-категории</option></select></label><label>Маркетплейс<select id="skuMarket"><option value="ALL">Все маркетплейсы</option></select></label><label>Бренд<select id="skuBrand"><option value="ALL">Все бренды</option></select></label><label>Остаток<select id="skuStock"><option value="ALL">Все остатки</option><option value="zero">Нет остатка</option><option value="lt14">До 14 дней</option><option value="lt30">До 30 дней</option><option value="gt30">Более 30 дней</option><option value="positive">Есть остаток</option></select></label><label class="sku-local-search">Поиск<input id="skuSearch" type="text" autocomplete="off" placeholder="Артикул, SKU или название"></label></div>';
+skuPanel.querySelector('.section-head').after(controls);
 const footer=document.createElement('div');footer.className='table-footer';footer.innerHTML='<span id="tableCount"></span><button type="button" id="showMore">Показать ещё</button>';skuPanel.append(footer);$('allSkuLimit').hidden=true;
 const detail=$('detail'),right=document.querySelector('.work-right');right.hidden=true;
 const drawer=document.createElement('dialog');drawer.id='productDrawer';drawer.setAttribute('aria-label','Карточка товара');drawer.innerHTML='<div class="drawer-head"><span class="eyebrow">КАРТОЧКА ТОВАРА</span><button type="button" id="drawerClose" aria-label="Закрыть карточку">✕</button></div><div class="drawer-scroll"></div>';drawer.lastElementChild.append(detail);$('app').append(drawer);
