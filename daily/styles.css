@@ -84,3 +84,20 @@ body{--a:#355846}
 @media (max-width:650px) {
   .sales-overview #breakdownCards {grid-template-columns:1fr}
 }
+
+/* Revenue categories as compact ledger rows rather than cards. */
+.sales-overview .breakdown-panel[data-mode="category"] #breakdownCards{
+ display:block;
+}
+.category-lines{width:100%;min-width:0}
+.category-line{padding:10px 2px;border-bottom:1px solid var(--line)}
+.category-line-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;min-width:0}
+.category-line-top .category-name{min-width:0;overflow-wrap:anywhere;font-size:12px;font-weight:650}
+.category-line-top strong{flex-shrink:0;font-size:14px;font-weight:750;white-space:nowrap;font-variant-numeric:tabular-nums}
+.category-line-meta{display:flex;justify-content:space-between;gap:8px;margin-top:5px;color:var(--muted);font-size:10px;line-height:1.4}
+.category-line-meta span:last-child{text-align:right}
+.category-line-track{height:4px;background:#e7eae2;border-radius:5px;margin-top:7px;overflow:hidden}
+.category-line-track i{display:block;height:100%;background:#829e78;border-radius:5px}
+.category-total{margin-top:9px;padding:12px 10px;background:#f0f3eb;border-radius:8px}
+.category-total .category-line-top b{font-size:12px}
+.category-total .category-line-top strong{font-size:16px}
