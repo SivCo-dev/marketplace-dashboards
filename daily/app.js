@@ -69,11 +69,18 @@ function paint(data){
  const url=new URL(location.href);url.searchParams.set('tenant',tenant);url.searchParams.set('period',$('days').value);history.replaceState(null,'',url);
  const monthUrl=new URL('../monthly/',location.href);monthUrl.searchParams.set('tenant',tenant);if(data.filters.marketplace!=='ALL')monthUrl.searchParams.set('marketplace',data.filters.marketplace);$('monthlyLink').href=monthUrl;
  const groups=new Map();
- for(const r of data.skuRows){const key=breakdownMode==='market'?r.marketplace:r.category;const g=groups.get(key)||{gmv:0,units:0};g.gmv+=num(r.gmv);g.units+=num(r.units);groups.set(key,g)}
+ for(const r of data.skuRows){const key=breakdownMode==='market'?r.marketplace:(r.category||'Без категории');const g=groups.get(key)||{gmv:0,units:0};g.gmv+=num(r.gmv);g.units+=num(r.units);groups.set(key,g)}
  const marketNames={OZON:'Ozon',WB:'Wildberries',YANDEX:'Яндекс Маркет'};
  breakdownPanel.dataset.mode=breakdownMode;
- const items=breakdownMode==='market'?data.marketTotals.filter(g=>data.filters.marketplace==='ALL'||g.marketplace===data.filters.marketplace).map(g=>[g.marketplace,g]):[...groups].sort((a,b)=>b[1].gmv-a[1].gmv).slice(0,6);
- $('breakdownCards').innerHTML=items.map(([key,g])=>'<article class="breakdown-card"><div><span class="market-icon '+esc(key.toLowerCase())+'">'+esc(breakdownMode==='market'?key.slice(0,2):'◇')+'</span><b>'+esc(marketNames[key]||key)+'</b><small>'+ (c.gmv?(g.gmv/c.gmv*100).toFixed(1):'0')+'% оборота</small></div><strong>'+money(g.gmv)+'</strong><div class="progress"><i style="width:'+Math.max(0,Math.min(100,c.gmv?g.gmv/c.gmv*100:0))+'%"></i></div><p>'+fmt(g.units)+' шт <span>'+(g.units?money(g.gmv/g.units):'—')+' / шт</span></p></article>').join('')||'<p class="muted">Нет данных за выбранный период</p>';
+ const items=breakdownMode==='market'?data.marketTotals.filter(g=>data.filters.marketplace==='ALL'||g.marketplace===data.filters.marketplace).map(g=>[g.marketplace,g]):[...groups].sort((a,b)=>b[1].gmv-a[1].gmv);
+ if(breakdownMode==='category'){
+  const total=items.reduce((acc,[,g])=>({gmv:acc.gmv+g.gmv,units:acc.units+g.units}),{gmv:0,units:0});
+  const share=v=>total.gmv?(v/total.gmv*100).toFixed(1)+'%':'0%';
+  const rows=items.map(([key,g])=>'<div class="category-line"><div class="category-line-top"><span class="category-name" title="'+esc(key)+'">'+esc(key)+'</span><strong>'+money(g.gmv)+'</strong></div><div class="category-line-meta"><span>'+share(g.gmv)+' оборота</span><span>'+fmt(g.units)+' шт · '+(g.units?money(g.gmv/g.units):'—')+' / шт</span></div><div class="category-line-track"><i style="width:'+Math.max(0,Math.min(100,total.gmv?g.gmv/total.gmv*100:0))+'%"></i></div></div>').join('');
+  $('breakdownCards').innerHTML=items.length?'<div class="category-lines">'+rows+'<div class="category-total"><div class="category-line-top"><b>Итого</b><strong>'+money(total.gmv)+'</strong></div><div class="category-line-meta"><span>100% оборота</span><span>'+fmt(total.units)+' шт · '+(total.units?money(total.gmv/total.units):'—')+' / шт</span></div></div></div>':'<p class="muted">Нет данных за выбранный период</p>';
+ }else{
+  $('breakdownCards').innerHTML=items.map(([key,g])=>'<article class="breakdown-card"><div><span class="market-icon '+esc(key.toLowerCase())+'">'+esc(key.slice(0,2))+'</span><b>'+esc(marketNames[key]||key)+'</b><small>'+(c.gmv?(g.gmv/c.gmv*100).toFixed(1):'0')+'% оборота</small></div><strong>'+money(g.gmv)+'</strong><div class="progress"><i style="width:'+Math.max(0,Math.min(100,c.gmv?g.gmv/c.gmv*100:0))+'%"></i></div><p>'+fmt(g.units)+' шт <span>'+(g.units?money(g.gmv/g.units):'—')+' / шт</span></p></article>').join('')||'<p class="muted">Нет данных за выбранный период</p>';
+ }
  for(const b of $('breakdownSwitch').querySelectorAll('button'))b.classList.toggle('active',b.dataset.breakdown===breakdownMode);
  const counts={all:skus.length,top:Math.min(25,skus.filter(s=>s.units>=2).length),risk:risks.length,up:skus.filter(s=>s.risk.gmvPct>0).length,down:skus.filter(s=>s.risk.gmvPct<0).length};
  $('focusTabs').innerHTML=[['all','Все'],['top','Топ по обороту'],['risk','Проблемные'],['up','Рост'],['down','Падение']].map(([id,label])=>'<button type="button" data-focus="'+id+'" aria-pressed="'+(focus===id)+'" class="'+(focus===id?'active':'')+'">'+label+' <span>'+counts[id]+'</span></button>').join('');
