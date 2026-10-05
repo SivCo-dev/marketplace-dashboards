@@ -17,9 +17,16 @@ export function guessMapping(headers){
   mapped.sku=headers.findIndex(h=>norm(h)==='sku');
   mapped.returned_units=returned;
  }
+ if(headers.some(h=>norm(h)==='причина списания')&&headers.some(h=>norm(h)==='утилизация')){
+  for(const key of Object.keys(mapped))mapped[key]=-1;
+  mapped.article=headers.findIndex(h=>norm(h)==='артикул');
+  mapped.sku=headers.findIndex(h=>norm(h)==='sku');
+  mapped.written_off_units=headers.findIndex(h=>/^количество(?:,? шт\.?)?$/.test(norm(h)));
+ }
  return mapped;
 }
 export function isWarehouseReturn(headers){return headers.some(h=>norm(h)==='количество возвращаемых товаров')&&headers.some(h=>norm(h)==='статус возврата');}
+export function isWarehouseWriteoff(headers){return headers.some(h=>norm(h)==='причина списания')&&headers.some(h=>norm(h)==='утилизация');}
 export function findTables(sheets){
  return sheets.map(({name,matrix})=>{let best={score:-1,row:0};for(let row=0;row<Math.min(60,matrix.length);row++){const headers=matrix[row].map(v=>String(v??'').trim());const mapping=guessMapping(headers);const score=Object.values(mapping).filter(v=>v>=0).length+((mapping.article>=0||mapping.sku>=0)?3:0);if(score>best.score)best={name,row,headers,mapping,score};}return {...best,matrix};}).filter(t=>t.score>=4);
 }

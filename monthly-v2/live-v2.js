@@ -2,7 +2,7 @@ import {validatePayload} from "./core.js?v=20261003scope1";
 
 const BASE="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v2";
 const TENANTS=["W","CPR","ORANGE"];
-const MONTHS=["2026-07","2026-08","2026-09","2026-10"];
+import {MONTHS} from "./config.js?v=20261004periods";
 const MARKETS=["ALL","OZON","WB","YANDEX"];
 const GROUPS=["commission","logistics","storage","promotion","other"];
 const n=value=>Number(value||0);
@@ -25,6 +25,9 @@ function adaptRow(row,scope){
  const cogs=nullable(row.accepted_display_cogs);
  const economicUnits=n(row.economic_units??row.sold_units);
  const costStatus=economicUnits===0?"NOT_APPLICABLE":cogs==null?"UNAVAILABLE":"COMPLETE";
+ const importedReturns=n(row.import_fields?.returned_units??row.returned_units);
+ const writeoffs=n(row.disposal_units);
+ const operationalUnits=importedReturns+writeoffs;
  return {
   row_id:[row.account_id,row.marketplace,row.sku].join("|"),
   product_id:null,
@@ -40,8 +43,8 @@ function adaptRow(row,scope){
   financial_sale_units:n(row.sale_operations??row.sold_units),
   financial_return_units:n(row.return_operations),
   financial_net_units:economicUnits,
-  sale_units_display:n(row.sale_operations??row.sold_units),
-  return_writeoff_units:n(row.returned_units??row.return_operations)+n(row.disposal_units),
+  sale_units_display:n(row.sale_operations??row.sold_units)+operationalUnits,
+  return_writeoff_units:n(row.return_operations)+operationalUnits,
   physical_returned_units:nullable(row.returned_units),
   written_off_units:n(row.disposal_units),
   compensated_units:n(row.compensated_units),
@@ -149,17 +152,18 @@ export function adaptScope(scope){
  return validatePayload(payload);
 }
 
-export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000}={}){
- const bundle={exported_at:null,payloads:[],tenant_status:Object.fromEntries(TENANTS.map(tenant=>[tenant,{status:"idle"}])),scope_status:{}};
+export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000,tenantIds=TENANTS}={}){
+ const allowedTenants=[...new Set(tenantIds.filter(id=>/^[A-Z0-9_-]{1,32}$/.test(id)))];
+ const bundle={exported_at:null,payloads:[],tenant_status:Object.fromEntries(allowedTenants.map(tenant=>[tenant,{status:"idle"}])),scope_status:{}};
  const inflight=new Map();
  const publish=()=>{bundle.exported_at=new Date().toISOString();onUpdate(bundle);};
  const put=payload=>{bundle.payloads=bundle.payloads.filter(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)!==scopeKey(payload.metadata.tenant_id,payload.metadata.month,payload.metadata.marketplace));bundle.payloads.push(payload);};
  async function loadScope(tenant,month,market="ALL"){
   tenant=String(tenant).toUpperCase();market=String(market).toUpperCase();
-  if(!TENANTS.includes(tenant)||!MONTHS.includes(month)||!MARKETS.includes(market))throw new Error("Недопустимый monthly scope");
+  if(!allowedTenants.includes(tenant)||!MONTHS.includes(month)||!MARKETS.includes(market))throw new Error("Недопустимый monthly scope");
   const key=scopeKey(tenant,month,market);
   const existing=bundle.payloads.find(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===key);
-  if(existing)return existing;
+  if(existing&&!(existing.metadata.marketplace_close_status==="LIVE"&&Date.now()-(existing.metadata.loaded_at_ms||0)>300000))return existing;
   if(inflight.has(key))return inflight.get(key);
   const promise=(async()=>{
    bundle.scope_status[key]={status:"loading"};publish();
@@ -169,7 +173,7 @@ export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000
     const response=await fetcher(`${BASE}?${params}`,{cache:"no-store",signal:controller.signal});
     if(!response.ok)throw new Error(`Ошибка загрузки ${tenant}/${market}: ${response.status}`);
     const scope=await response.json();
-    const payload=adaptScope(scope);put(payload);
+    const payload=adaptScope(scope);payload.metadata.loaded_at_ms=Date.now();put(payload);
     bundle.scope_status[key]={status:"ready",refreshed_at:payload.metadata.refreshed_at};publish();return payload;
    }catch(error){
     const message=controller.signal.aborted?`Превышено время загрузки ${tenant}/${market}`:String(error?.message??error);
@@ -180,17 +184,13 @@ export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000
  }
  async function loadTenant(tenant,months=MONTHS){
   tenant=String(tenant).toUpperCase();
-  if(!TENANTS.includes(tenant))throw new Error("Недопустимый tenant");
+  if(!allowedTenants.includes(tenant))throw new Error("Недопустимый tenant");
   months=[...new Set(months)].filter(month=>MONTHS.includes(month));
   if(!months.length)return bundle;
   const missing=months.filter(month=>!bundle.payloads.some(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===scopeKey(tenant,month,"ALL")));
-  if(!missing.length)return bundle;
+  if(!missing.length){await Promise.all(months.map(month=>loadScope(tenant,month,"ALL")));return bundle;}
   bundle.tenant_status[tenant]={status:"loading"};publish();
-  const results=[];
-  for(const month of missing){
-   try{results.push({status:"fulfilled",value:await loadScope(tenant,month,"ALL")});}
-   catch(reason){results.push({status:"rejected",reason});}
-  }
+  const results=await Promise.allSettled(missing.map(month=>loadScope(tenant,month,"ALL")));
   const ready=results.filter(result=>result.status==="fulfilled").map(result=>result.value);
   const totalReady=months.filter(month=>bundle.payloads.some(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===scopeKey(tenant,month,"ALL"))).length;
   if(!totalReady){
