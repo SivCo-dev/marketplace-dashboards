@@ -83,3 +83,20 @@ const after=adaptScope(operational);item=after.sku_rows[0];assert.equal(item.sal
 assert.deepEqual(after.financial_economics,before.financial_economics);assert.equal(item.cost_units,126);assert.equal(item.result_after_cogs,before.sku_rows[0].result_after_cogs);
 assert.deepEqual(adaptScope(operational),after,'Repeated adaptation must not add the import twice');
 console.log('PASS: additive warehouse returns/writeoffs, stable net units and financial results');
+
+// Historical inventory losses affect COGS only, never the received-per-sale divisor.
+const historical=scope('CPR','2026-08');
+historical.sku[0]={...historical.sku[0],sale_operations:205,return_operations:14,sold_units:191,economic_units:237,accepted_unit_cost:2700,accepted_display_cogs:639900,disposal_units:13,compensated_units:28,returns_without_compensation:5,final_without_compensation:1082572.63,final_with_compensation:1220528.28,net_compensation_amount:137955.65};
+const historicalPayload=adaptScope(historical),historicalRow=historicalPayload.sku_rows[0];
+assert.equal(historicalRow.financial_net_units,191);
+assert.equal(historicalPayload.units.financial_net_units,191);
+assert.equal(historicalRow.sale_units_display-historicalRow.return_writeoff_units,191);
+assert.equal(historicalRow.cost_units,237);
+assert.equal(historicalRow.cogs,639900);
+assert.equal(historicalRow.result_after_cogs,580628.28);
+assert.equal(Math.round((historicalRow.result_without_compensation+historicalRow.compensation)/historicalRow.financial_net_units),6390);
+const noSold=scope();delete noSold.sku[0].sold_units;noSold.sku[0].sale_operations=4;noSold.sku[0].return_operations=1;noSold.sku[0].economic_units=8;
+assert.equal(adaptScope(noSold).sku_rows[0].financial_net_units,3);
+const zeroSold=scope();zeroSold.sku[0].sold_units=0;zeroSold.sku[0].economic_units=3;
+assert.equal(adaptScope(zeroSold).sku_rows[0].financial_net_units,0);
+console.log('PASS: historical COGS loss units stay separate from net-sale per-unit calculations');

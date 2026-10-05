@@ -1,6 +1,6 @@
 import {TENANTS as DEFAULT_TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261004periods";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
-import {createScopeLoader} from "./live-v2.js?v=20261005units2";
+import {createScopeLoader} from "./live-v2.js?v=20261006netunits";
 
 import {loadReportRegistry} from '../core/runtime-registry.js?v=20261004finish';
 let TENANTS={...DEFAULT_TENANTS};

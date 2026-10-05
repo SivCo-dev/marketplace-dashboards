@@ -24,6 +24,8 @@ function adaptRow(row,scope){
  const resultWithoutCompensation=nullable(row.final_without_compensation)??(resultWithCompensation==null?null:resultWithCompensation-compensation);
  const cogs=nullable(row.accepted_display_cogs);
  const economicUnits=n(row.economic_units??row.sold_units);
+ // Net financial sales are independent of the inventory quantity used for COGS.
+ const netSoldUnits=n(row.sold_units??(n(row.sale_operations)-n(row.return_operations)));
  const costStatus=economicUnits===0?"NOT_APPLICABLE":cogs==null?"UNAVAILABLE":"COMPLETE";
  const importedReturns=n(row.import_fields?.returned_units??row.returned_units);
  const writeoffs=n(row.disposal_units);
@@ -42,7 +44,7 @@ function adaptRow(row,scope){
   sales:n(row.sales),returns:n(row.returns),net_sales:n(row.net_sales),
   financial_sale_units:n(row.sale_operations??row.sold_units),
   financial_return_units:n(row.return_operations),
-  financial_net_units:economicUnits,
+  financial_net_units:netSoldUnits,
   sale_units_display:n(row.sale_operations??row.sold_units)+operationalUnits,
   return_writeoff_units:n(row.return_operations)+operationalUnits,
   physical_returned_units:nullable(row.returned_units),
@@ -140,7 +142,7 @@ export function adaptScope(scope){
   units:{
    financial_sale_units:hasData?(sum(sourceRows,"sale_operations")||sum(sourceRows,"sold_units")):null,
    financial_return_units:hasData?sum(sourceRows,"return_operations"):null,
-   financial_net_units:hasData?sum(sourceRows,"economic_units"):null,
+   financial_net_units:hasData?rows.reduce((total,row)=>total+n(row.financial_net_units),0):null,
    ordered_units:null,delivered_units:null,returned_units:null,
    written_off_units:hasData?sum(sourceRows,"disposal_units"):null,
    operational_metrics_status:hasData?"PARTIAL":"UNAVAILABLE"
