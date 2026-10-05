@@ -4,3 +4,27 @@ body{background:linear-gradient(120deg,#f8f6ef,#f5f3eb);font-family:Inter,Arial,
 @media(max-width:650px){.shell{padding:16px}.header{align-items:flex-start;gap:16px}.header h1{font-size:24px}.view-switch a,.view-switch span{padding:10px 13px}.visual-filters{grid-template-columns:1fr 1fr;padding:12px}.visual-filters .extra-filters{grid-column:1/-1}.grid5{grid-template-columns:1fr 1fr}.visual-kpi{padding:13px;min-height:130px}.visual-kpi strong{font-size:21px}.visual-kpi:last-child{grid-column:1/-1}.state-strip{align-items:flex-start;flex-direction:column;font-size:10px;line-height:1.6}.pad{padding:16px}#breakdownCards{grid-template-columns:1fr}.trend-chart-column #trend{height:230px}.section-head{flex-wrap:wrap}.product-controls{align-items:stretch;flex-direction:column}.focus-tabs button{padding:9px}.product-cell b{max-width:240px}.visual-products table{min-width:1000px}.page-footer{gap:12px;line-height:1.6}#productDrawer{width:100vw;height:100dvh;max-height:100dvh;border-radius:0}.drawer-scroll{padding:16px}.drawer-head{padding:16px}.drawer-scroll .ov-matrix{font-size:10px}.kpi4,.passport{grid-template-columns:1fr 1fr}.hero-value{font-size:28px}}
 
 body{--a:#355846}
+
+/* Desktop first-screen fit: compact header, filters and KPI without chart scaling. */
+@media (min-width:1101px) {
+  .shell { padding-top:18px; }
+  .header { margin-bottom:12px; }
+  .header h1 { margin-top:4px; font-size:27px; }
+  .header p { margin-top:5px; }
+  .view-switch a,.view-switch span { padding:9px 16px; }
+  .live-badge { padding:6px 9px; }
+  .visual-filters { padding:10px 12px; gap:9px; margin-bottom:9px; }
+  .visual-filters label { margin-bottom:3px; }
+  .visual-filters select { height:34px; }
+  .extra-filters summary { padding:9px 12px; }
+  .extra-filters[open] .extra-grid { top:38px; }
+  .grid5 { margin-bottom:6px; }
+  .visual-kpi { padding:12px 15px; min-height:105px; }
+  .visual-kpi strong { font-size:26px; margin:8px 0 3px; }
+  .visual-kpi small { margin-bottom:7px; }
+  .kpi-label i { width:24px; height:24px; }
+  .state-strip { margin:8px 2px 10px; }
+  #liveContext { padding:5px 11px; }
+  .trend-card.pad { padding:12px 16px; }
+  .trend-card .section-head p { margin:3px 0 6px; }
+}
