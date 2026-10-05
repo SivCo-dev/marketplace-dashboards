@@ -18,4 +18,6 @@ const wn=normalizeRows(warehouse,wt.row,wt.mapping);assert.deepEqual(wn.errors,[
 const variants={payload:{sku:[{sku:'123',article:'A',account_id:'o',marketplace:'OZON',sales:10}]},products:[{sku:'456',offer_id:'A',account_id:'o'}]};
 const resolved=allocate(wn,variants,{account_id:'o',tenant_id:'CPR'});assert.deepEqual(resolved.errors,[]);assert.equal(resolved.patches[0].sku,'123');assert.equal(resolved.allocated.returned_units,2);
 const ambiguous=allocate({...wn,rows:[{...wn.rows[0],sku:''}]},variants,{account_id:'o',tenant_id:'CPR'});assert(ambiguous.errors.some(e=>e.error==='Артикул неоднозначен'));
+const disposal=[['Дата','Наименование товара','SKU','Артикул','Количество, шт.','Утилизация','Компенсация, руб.','Статус компенсации','Причина списания'],['29.09.2026','Товар','123','A',1,-375,'-','Без компенсации','Повреждение']];
+const dt=findTables([{name:'Списания',matrix:disposal}])[0];const dn=normalizeRows(disposal,dt.row,dt.mapping);assert.deepEqual(dn.fields,['written_off_units']);assert.deepEqual(dn.errors,[]);assert.equal(dn.rows[0].written_off_units,1);
 console.log('Import parser/allocation: passed (blank columns, totals, tall/wide, exact cents, scopes, unresolved/no-sales)');

@@ -70,3 +70,16 @@ assert.equal(ozonOnly.sales,882695);
 assert.equal(ozonOnly.cogs,60);
 assert.equal(ozonOnly.unit_cost,7.5);
 console.log('PASS: canonical aggregation, marketplace scope, distinct identity and partial cost');
+
+// Operational warehouse events add equally to gross sales and returns;
+// the Finance quantities, money and cost basis remain authoritative.
+const operational=scope('CPR');
+operational.sku[0]={...operational.sku[0],sale_operations:137,return_operations:11,sold_units:126,economic_units:126,returned_units:28,import_fields:{returned_units:28},disposal_units:0};
+const before=adaptScope(operational);
+let item=before.sku_rows[0];assert.equal(item.sale_units_display,165);assert.equal(item.return_writeoff_units,39);assert.equal(item.sale_units_display-item.return_writeoff_units,126);
+assert.equal(item.financial_sale_units,137);assert.equal(item.financial_return_units,11);assert.equal(item.financial_net_units,126);
+operational.sku[0].disposal_units=6;operational.sku[0].import_fields.written_off_units=6;
+const after=adaptScope(operational);item=after.sku_rows[0];assert.equal(item.sale_units_display,171);assert.equal(item.return_writeoff_units,45);assert.equal(item.sale_units_display-item.return_writeoff_units,126);
+assert.deepEqual(after.financial_economics,before.financial_economics);assert.equal(item.cost_units,126);assert.equal(item.result_after_cogs,before.sku_rows[0].result_after_cogs);
+assert.deepEqual(adaptScope(operational),after,'Repeated adaptation must not add the import twice');
+console.log('PASS: additive warehouse returns/writeoffs, stable net units and financial results');

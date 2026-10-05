@@ -25,6 +25,9 @@ function adaptRow(row,scope){
  const cogs=nullable(row.accepted_display_cogs);
  const economicUnits=n(row.economic_units??row.sold_units);
  const costStatus=economicUnits===0?"NOT_APPLICABLE":cogs==null?"UNAVAILABLE":"COMPLETE";
+ const importedReturns=n(row.import_fields?.returned_units??row.returned_units);
+ const writeoffs=n(row.disposal_units);
+ const operationalUnits=importedReturns+writeoffs;
  return {
   row_id:[row.account_id,row.marketplace,row.sku].join("|"),
   product_id:null,
@@ -40,8 +43,8 @@ function adaptRow(row,scope){
   financial_sale_units:n(row.sale_operations??row.sold_units),
   financial_return_units:n(row.return_operations),
   financial_net_units:economicUnits,
-  sale_units_display:n(row.sale_operations??row.sold_units),
-  return_writeoff_units:n(row.returned_units??row.return_operations)+n(row.disposal_units),
+  sale_units_display:n(row.sale_operations??row.sold_units)+operationalUnits,
+  return_writeoff_units:n(row.return_operations)+operationalUnits,
   physical_returned_units:nullable(row.returned_units),
   written_off_units:n(row.disposal_units),
   compensated_units:n(row.compensated_units),

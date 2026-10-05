@@ -1,6 +1,6 @@
 import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002orange";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
-import {createScopeLoader} from "./live-v2.js?v=20261005import";
+import {createScopeLoader} from "./live-v2.js?v=20261005units2";
 
 const $=s=>document.querySelector(s);
 const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all"};

@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2.95.3";
 import * as XLSX from "npm:@e965/xlsx@0.20.3";
-import {findTables, guessMapping, isWarehouseReturn, normalizeRows, allocate, norm} from "./processor.mjs";
+import {findTables, guessMapping, isWarehouseReturn, isWarehouseWriteoff, normalizeRows, allocate, norm} from "./processor.mjs";
 const origins=new Set(['https://sivco-dev.github.io','http://127.0.0.1:4173','http://localhost:4173','null']);
 const sha=async(s:string|Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof s==='string'?new TextEncoder().encode(s):s))).map(b=>b.toString(16).padStart(2,'0')).join('');
 Deno.serve(async(req:Request)=>{
@@ -53,7 +53,8 @@ Deno.serve(async(req:Request)=>{
   const table=tables.find((t:any)=>t.name===input.sheet);if(!table)throw Error('Выберите лист файла');
   const headerRow=Number(input.header_row);if(!Number.isInteger(headerRow)||headerRow<0||headerRow>=table.matrix.length)throw Error('Некорректная строка заголовка');
   const standardReturn=isWarehouseReturn(table.matrix[headerRow]||[]);
-  const normalized=normalizeRows(table.matrix,headerRow,standardReturn?guessMapping(table.matrix[headerRow]):input.mapping,standardReturn?'return':input.type||'auto');
+  const standardWriteoff=isWarehouseWriteoff(table.matrix[headerRow]||[]);
+  const normalized=normalizeRows(table.matrix,headerRow,standardReturn||standardWriteoff?guessMapping(table.matrix[headerRow]):input.mapping,standardReturn?'return':standardWriteoff?'writeoff':input.type||'auto');
   if(!normalized.rows.length)throw Error(normalized.errors.length?'Не удалось прочитать строки: '+normalized.errors.slice(0,3).map((e:any)=>'строка '+e.row+' — '+e.error).join('; '):'Нет строк данных для распределения');
   const context=await rpc('monthly_upload_context_v2',{p_tenant:input.tenant,p_month:input.month+'-01',p_account:input.account_id});
   const preview=allocate(normalized,context,account);
