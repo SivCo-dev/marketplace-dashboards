@@ -48,3 +48,39 @@ body{--a:#355846}
 @media (max-width:650px) {
   .visual-filters {grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Desktop sales overview: readable 30-day chart beside marketplace/category distribution. */
+@media (min-width:1101px) {
+  .sales-overview {
+    display:grid;
+    grid-template-columns:minmax(0,1.75fr) minmax(335px,1fr);
+    gap:10px;
+    align-items:stretch;
+    margin-bottom:10px;
+  }
+  .sales-overview > .card {min-width:0;margin-bottom:0}
+  .sales-overview .trend-chart-column #trend {height:270px}
+  .sales-overview .trend-card .section-head {align-items:center}
+  .sales-overview .breakdown-panel {padding:12px 14px}
+  .sales-overview .breakdown-panel .section-head {display:block}
+  .sales-overview .breakdown-panel .section-head h2 {font-size:16px}
+  .sales-overview .breakdown-panel .section-head p {margin:4px 0 9px;font-size:10px}
+  .sales-overview #breakdownSwitch {display:flex;width:100%;margin-bottom:10px}
+  .sales-overview #breakdownSwitch button {flex:1;white-space:nowrap}
+  .sales-overview #breakdownCards {grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .sales-overview .breakdown-panel[data-mode="market"] #breakdownCards {grid-template-columns:1fr}
+  .sales-overview .breakdown-card {padding:9px 10px;min-width:0}
+  .sales-overview .breakdown-card > div:first-child {grid-template-columns:24px minmax(0,1fr);gap:3px 7px}
+  .sales-overview .breakdown-card .market-icon {width:23px;height:23px;font-size:8px}
+  .sales-overview .breakdown-card b {font-size:10px;overflow-wrap:anywhere}
+  .sales-overview .breakdown-card small {font-size:9px}
+  .sales-overview .breakdown-card > strong {font-size:16px;margin:7px 0 7px;white-space:nowrap}
+  .sales-overview .breakdown-card p {margin-top:6px;font-size:9px;gap:5px}
+}
+@media (max-width:1100px) {
+  .sales-overview {display:block}
+  .sales-overview #breakdownCards {grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:650px) {
+  .sales-overview #breakdownCards {grid-template-columns:1fr}
+}
