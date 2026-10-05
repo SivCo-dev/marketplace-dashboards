@@ -28,3 +28,9 @@ body{--a:#355846}
   .trend-card.pad { padding:10px 16px; }
   .trend-card .section-head p { margin:3px 0 6px; }
 }
+
+/* Responsive visible organization, master category, category, brand and period. */
+.visual-filters{grid-template-columns:repeat(auto-fit,minmax(125px,1fr))}
+.visual-filters>div{min-width:0}
+@media(max-width:1100px){.visual-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.visual-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
