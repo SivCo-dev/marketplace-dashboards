@@ -51,12 +51,12 @@ function deltaText(current,previous,mode="amount"){
 function renderSummary(){
  const p=state.payload,f=finance(),m=p?.metadata??{},prev=previousPayload(),pf=prev?.financial_economics??{};
  const kpis=[
-  ["₽","Валовые продажи",f.sales,p?.sku_rows?.length?`${p.sku_rows.length} SKU`:"—",deltaText(f.sales,pf.sales)],
-  ["↩","Возвраты, ₽ (Finance)",f.returns,pct(rate(f.returns,f.sales))+" от валовых",deltaText(metricRate(p,"returns"),metricRate(prev,"returns"),"pp"),"danger"],
-  ["▣","Чистые продажи",f.net_sales,pct(rate(f.net_sales,f.sales))+" от валовых",deltaText(f.net_sales,pf.net_sales)],
-  ["≋","Расходы маркетплейса",f.marketplace_expenses,pct(rate(f.marketplace_expenses,f.sales))+" от продаж",deltaText(metricRate(p,"marketplace_expenses"),metricRate(prev,"marketplace_expenses"),"pp"),"danger"],
-  ["▥","Результат МП",f.result_without_compensation,pct(rate(f.result_without_compensation,f.sales))+" от продаж",deltaText(metricRate(p,"result_without_compensation"),metricRate(prev,"result_without_compensation"),"pp"),"positive"],
-  ["◫","После COGS",f.result_after_cogs,pct(rate(f.result_after_cogs,f.sales))+" от продаж",deltaText(metricRate(p,"result_after_cogs"),metricRate(prev,"result_after_cogs"),"pp"),signedClass(f.result_after_cogs)]
+  ["₽","Продажи",f.sales,p?.sku_rows?.length?`${p.sku_rows.length} SKU · до возвратов`:"До возвратов",deltaText(f.sales,pf.sales)],
+  ["↩","Возвраты/списания",f.returns,pct(rate(f.returns,f.sales))+" от продаж",deltaText(metricRate(p,"returns"),metricRate(prev,"returns"),"pp"),"danger"],
+  ["≋","Расходы МП",f.marketplace_expenses,pct(rate(f.marketplace_expenses,f.sales))+" от продаж",deltaText(metricRate(p,"marketplace_expenses"),metricRate(prev,"marketplace_expenses"),"pp"),"danger"],
+  ["▥","Результат без компенсаций",f.result_without_compensation,pct(rate(f.result_without_compensation,f.sales))+" от продаж",deltaText(metricRate(p,"result_without_compensation"),metricRate(prev,"result_without_compensation"),"pp"),signedClass(f.result_without_compensation)],
+  ["＋","Результат с компенсациями",f.result_with_compensation,"Компенсации: "+money(f.compensation),deltaText(metricRate(p,"result_with_compensation"),metricRate(prev,"result_with_compensation"),"pp"),signedClass(f.result_with_compensation)],
+  ["◫","После всех расходов",f.final_business_result,"С компенсациями · после себестоимости и бизнес-расходов",deltaText(metricRate(p,"final_business_result"),metricRate(prev,"final_business_result"),"pp"),signedClass(f.final_business_result)]
  ];
  $("#overview").innerHTML=kpis.map(([icon,label,value,note,delta,tone="neutral"])=>'<article class="kpi '+tone+'"><div class="kpi-label"><i>'+icon+'</i><span>'+e(label)+'</span></div><strong>'+money(value)+'</strong><small>'+e(note)+'</small><em class="'+(delta.startsWith("↑")?"up":delta.startsWith("↓")?"down":"unavailable")+'">'+e(delta)+'</em></article>').join("");
  $("#contextLine").innerHTML=p?'<span><i class="status-dot"></i>'+e(m.marketplace_close_status==="CLOSED"?"База месяца зафиксирована":m.marketplace_close_status==="LIVE"?"Данные месяца продолжают поступать":"Данные месяца ещё не поступили")+'</span><span>Компенсации: '+e(m.compensation_status==="PENDING"?"ожидаются":m.compensation_status==="COMPLETE"?"завершены":"нет данных")+'</span><span>Бизнес-расходы: '+e(m.business_expense_status==="COMPLETE"?"учтены":m.business_expense_status==="NOT_APPLICABLE"?"не применяются":"не доступны")+'</span>':"";
