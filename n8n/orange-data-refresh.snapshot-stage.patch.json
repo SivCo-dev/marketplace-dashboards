@@ -1,0 +1,35 @@
+{
+  "workflowId": "PW1FufvB4uVhyB28",
+  "workflowName": "Orange 2.2 | Data Refresh",
+  "productionApplied": false,
+  "reason": "The Ozon child workflow emits four items. Without single batching, the Postgres snapshot node executes the same builder four times.",
+  "nodes": [
+    {
+      "name": "DEV 2.2 | Fast Snapshot Orange Intraday",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT dev21.refresh_live_snapshot_v2('ORANGE',(CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Moscow')::date) AS snapshot_version;",
+        "options": { "queryBatching": "single" }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 15000
+    },
+    {
+      "name": "DEV 2.2 | Fast Snapshot Orange Morning",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT dev21.refresh_live_snapshot_v2('ORANGE',((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Moscow')::date-1)) AS snapshot_version;",
+        "options": { "queryBatching": "single" }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 15000
+    }
+  ],
+  "invariants": [
+    "Retry only the snapshot Postgres node; never retry the Ozon ingestion subworkflow.",
+    "The last complete daily-full snapshot remains the fallback while a build is skipped, retried, or fails.",
+    "Publish the workflow only after the database migration and staging checks pass."
+  ]
+}
