@@ -49,7 +49,7 @@ Deno.serve(async(req:Request)=>{
   if(financialReport&&hint.includes('772393697710')&&hint.includes('галко александр дмитриевич')){
    const cpr=catalog.accounts.find((a:any)=>a.account_id==='ozon_cpr');if(cpr&&!matched.includes(cpr))matched.push(cpr);
   }
-  const reportDates=financialReport?tables.flatMap((t:any)=>t.matrix.slice(0,t.row).flat().map((v:any)=>norm(v)).filter((v:string)=>/^отчет/.test(v)).flatMap((v:string)=>[...v.matchAll(/\bот\s+\d{2}\.(\d{2})\.(20\d{2})/g)].map(m=>m[2]+'-'+m[1]))):[];
+  const reportDates=financialReport?tables.flatMap((t:any)=>t.matrix.slice(0,t.row).flat().map((v:any)=>norm(v)).filter((v:string)=>/^отчет/.test(v)).flatMap((v:string)=>[...v.matchAll(/(?:^|\s)от\s+\d{2}\.(\d{2})\.(20\d{2})/g)].map(m=>m[2]+'-'+m[1]))):[];
   const months=[...new Set(financialReport?reportDates:[...hint.matchAll(/(20\d{2})[-_. /](0[1-9]|1[0-2])(?:[-_. /]\d{2})?/g)].map(m=>m[1]+'-'+m[2]))];
   if(action==='parse')return reply(200,{tables,hints:{account_ids:matched.map((a:any)=>a.account_id),months},filename:input.filename});
   if(!account||!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.month))throw Error('Выберите кабинет и месяц');
