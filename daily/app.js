@@ -25,12 +25,12 @@ const toolbar=document.querySelector('.toolbar'),organization=document.createEle
 organization.innerHTML='<label for="organization">Организация</label><select id="organization">'+Object.entries(configs).map(([id,c])=>'<option value="'+id+'" '+(id===tenant?'selected':'')+'>'+esc(c.display_name)+'</option>').join('')+'</select>';
 toolbar.prepend(organization);
 const extras=document.createElement('details');extras.className='extra-filters';extras.innerHTML='<summary>Доп. фильтры <span id="filterCount"></span></summary><div class="extra-grid"></div>';
-for(const id of ['cabinetFilterWrap','masterCategory','brand'])extras.lastElementChild.append(id==='cabinetFilterWrap'?$(id):$(id).parentElement);
+extras.lastElementChild.append($('cabinetFilterWrap')); // Category, master category and brand remain visible.
 const search=$('q').parentElement; search.className='sku-search-field';search.querySelector('label').textContent='Поиск товара';$('q').placeholder='Найти товар, SKU или артикул…';
 const periodControl=$('days').parentElement;toolbar.append(periodControl); // Move period after category.
 toolbar.append(extras);toolbar.className='toolbar visual-filters';
 $('organization').onchange=()=>{const url=new URL(location.href);url.searchParams.set('tenant',$('organization').value);location.assign(url)};
-$('days').value=query.get('period')||'14';if(!$('days').value)$('days').value='14';
+$('days').value=query.get('period')||'30';if(!$('days').value)$('days').value='30';
 const status=document.createElement('div');status.className='state-strip';status.innerHTML='<div id="dailyContext"></div><span id="liveContext"></span>';document.querySelector('#kpis').after(status);
 const trend=document.querySelector('.trend-card');trend.querySelector('.ttl').textContent='Динамика заказов';
 const opt=document.createElement('option');opt.value='orders';opt.textContent='Заказы';$('trendMode').append(opt);
