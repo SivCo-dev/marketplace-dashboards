@@ -34,17 +34,17 @@ test('columnar-v1 keeps source freshness fields as metadata', () => {
   assert.deepEqual(unpackRows(packRows(health)), health);
 });
 
-test('Orange n8n patch batches once and retries only snapshot nodes', async () => {
+test('Orange deployed n8n patch executes each snapshot once', async () => {
   const patch = JSON.parse(await readFile(
     new URL('../n8n/orange-data-refresh.snapshot-stage.patch.json', import.meta.url),
     'utf8',
   ));
-  assert.equal(patch.productionApplied, false);
+  assert.equal(patch.productionApplied, true);
   assert.equal(patch.nodes.length, 2);
   for (const node of patch.nodes) {
     assert.equal(node.parameters.options.queryBatching, 'single');
-    assert.equal(node.retryOnFail, true);
-    assert.equal(node.maxTries, 3);
+    assert.equal(node.executeOnce, true);
+    assert.equal(Object.hasOwn(node, 'retryOnFail'), false);
     assert.match(node.parameters.query, /refresh_live_snapshot_v2/);
     assert.doesNotMatch(node.parameters.query, /Ozon|ingest/i);
   }

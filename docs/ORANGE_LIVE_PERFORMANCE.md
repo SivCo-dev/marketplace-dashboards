@@ -1,6 +1,6 @@
 # Orange LIVE snapshot performance
 
-Date: 2026-10-05 (Europe/Moscow). Production was inspected read-only; no production migration or workflow edit was applied.
+Date: 2026-10-05 (Europe/Moscow). Production SQL was inspected read-only. The n8n-only single-call fix is deployed; the SQL migration remains unapplied.
 
 ## Incident finding
 
@@ -18,8 +18,7 @@ The expensive path was:
 
 These are component-level production read-only measurements, **not** the runtime
 of `refresh_live_snapshot_v2` or evidence that the whole publication meets 60s.
-The complete SQL runtime gate is still pending execution on a seeded development
-branch. No end-to-end improvement or production acceptance is claimed yet.
+Local complete-call checks now pass; see [local validation](ORANGE_LIVE_LOCAL_VALIDATION.md). The isolated Supabase runtime gate remains pending. Local results do not establish a Production SQL performance SLA.
 
 All plans used `EXPLAIN (ANALYZE, BUFFERS, TIMING OFF)` on read-only queries.
 
@@ -28,8 +27,8 @@ All plans used `EXPLAIN (ANALYZE, BUFFERS, TIMING OFF)` on read-only queries.
 | Orange current-day order aggregation | 2,875.6 ms; 187,223 shared hits | 12.8 ms with predicates before `DISTINCT ON` (about 225x faster) |
 | Historical expected/actual check from 2026-09-28 | 1,122.7 ms; 187,083 shared hits; 535 temp blocks | Removed from LIVE; retained for deferred reconciliation |
 | Ozon latest-stock discovery and aggregation | 1,443.8 ms; 161,584 rows scanned; external merge | Rebuilt only when the stock checkpoint changes; supporting latest-by-type index added |
-| Snapshot trigger/canonicalization | 53-108 s per repeated call in incident logs | Current-day SKU rows canonicalized once; payload marker prevents full trigger replay |
-| Duplicate snapshot calls per n8n run | 4 | `queryBatching: single`, plus source fingerprints and advisory lock |
+| Snapshot trigger/canonicalization | 53-108 s per repeated call in incident logs | Current-day SKU rows plus a bulk full canonicalizer; content and lookup checkpoints prevent duplicate trigger work |
+| Duplicate snapshot calls per n8n run | 4 | Deployed `executeOnce: true` + `queryBatching: single`; SQL fingerprints/lock remain proposed |
 
 Snapshot sizes at the incident point:
 
@@ -56,19 +55,22 @@ Snapshot sizes at the incident point:
 - Heartbeat-only refreshes update health metadata and check changed stocks without
   rebuilding order arrays. The publisher keeps version, history, `published_at`,
   `generated_at`, `data_as_of` and `source_as_of` unchanged for equal non-meta content.
-- A copied `canonicalization_version` alone no longer bypasses canonicalization.
-  A content hash of the canonical SKU and dimension arrays validates the shortcut;
-  full/closed-day publishers changing either array go through canonicalization.
+- Canonical bypass requires content and identity/category/brand source checkpoints.
+  A bulk canonicalizer matches the existing reference and resolves lookup-only
+  changes before comparing commercial payload/version.
 - `supabase/tests/orange_live_snapshot_v2_runtime.sql` measures the complete call
   externally with `clock_timestamp()`, including triggers and publication writes.
   It covers Orange/W/CPR, unchanged calls, heartbeat-only calls, timestamp stability,
   raw/daily/SKU/line reconciliation and copied-marker safety. It fails if fixture
   data is absent. `meta.build_timings_ms.pre_publish_total` remains a component
   metric, not the end-to-end gate.
-- Local columnar/metadata/n8n patch tests passed. **Branch SQL runtime tests have
-  not run**. Single-cabinet mutations, concurrent calls, stock changes and failure
-  fallback remain mandatory branch checks before approval.
-- Production and n8n remain unchanged. Merge/rollout is still blocked until the
-  seeded branch gate passes and the results are reviewed.
+- Local PostgreSQL migration, all SQL suites, account/stock/identity mutations,
+  concurrency, failure fallback and rollback passed. Actual fixture limitations
+  and times are recorded in ORANGE_LIVE_LOCAL_VALIDATION.md.
+- Production SQL is unchanged. The n8n-only fix is deployed and verified:
+  execution 4251 (single batching only) took 288.978 s, including 265.425 s for
+  four builder calls; execution 4253 (Execute Once) took 104.329 s, including
+  80.818 s for one builder call. Schedules, SQL and retries were unchanged.
+- SQL merge/rollout still requires the isolated Supabase runtime gate.
 
 The Supabase project is PostgreSQL 17.6.1. The 2026-09 Supabase PostgreSQL minor-release notice should be reviewed before deployment because projects using `ltree`, `pgcrypto`, `btree_gist`, or custom operators may require follow-up reindexing or validation; this migration does not use those extensions.

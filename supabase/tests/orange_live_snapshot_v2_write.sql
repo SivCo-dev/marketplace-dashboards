@@ -63,10 +63,13 @@ begin
   where s.tenant_id='ORANGE' and s.snapshot_kind='daily-full'
     and (x->>'report_date')::date=(current_timestamp at time zone 'Europe/Moscow')::date;
 
-  select sum(gmv) gmv,sum(units) units,count(distinct order_key)::numeric orders
-  into v_raw
-  from dev21.live_order_rows_v2('ORANGE',(current_timestamp at time zone 'Europe/Moscow')::date)
-  where coalesce(order_state,'')<>'cancelled' or source_updated_at::date>report_date;
+  -- Order keys may collide between cabinets; sum per-account counts.
+  select sum(gmv) gmv,sum(units) units,sum(orders) orders into v_raw
+  from (select account_id,sum(gmv) gmv,sum(units) units,
+    count(distinct order_key)::numeric orders
+    from dev21.live_order_rows_v2('ORANGE',(current_timestamp at time zone 'Europe/Moscow')::date)
+    where coalesce(order_state,'')<>'cancelled' or source_updated_at::date>report_date
+    group by account_id) q;
   if row(v_snapshot.gmv,v_snapshot.units,v_snapshot.orders)
      is distinct from row(v_raw.gmv,v_raw.units,v_raw.orders) then
     raise exception 'published LIVE totals differ from raw: snapshot=% raw=%',

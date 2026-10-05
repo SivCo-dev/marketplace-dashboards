@@ -126,6 +126,9 @@ end;
 $function$;
 
 drop function if exists dev21.publish_live_snapshot_v2(text,jsonb,timestamptz);
+drop function if exists dev21.ensure_orange_canonical_payload_v2(jsonb);
+drop function if exists dev21.orange_canonical_source_checkpoint_v2();
+drop function if exists dev21.canonicalize_orange_dashboard_payload_fast_v2(jsonb);
 drop function if exists dev21.enrich_live_snapshot_fast_v2(text,date,jsonb);
 drop function if exists dev21.live_order_rows_v2(text,date);
 

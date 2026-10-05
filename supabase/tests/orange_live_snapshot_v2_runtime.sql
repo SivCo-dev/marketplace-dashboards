@@ -30,6 +30,10 @@ begin
      (current_timestamp at time zone 'Europe/Moscow')::date)) then
    raise exception 'Missing runtime source fixtures for %',v_tenant;
   end if;
+  -- Force the first measured call to build orders, even on a previously tested clone.
+  update dev21.dashboard_snapshots set payload=jsonb_set(payload,
+    '{meta,live_source_fingerprints}','{}'::jsonb,true)
+    where tenant_id=v_tenant and snapshot_kind='daily-full';
   started:=clock_timestamp();
   first_version:=dev21.refresh_live_snapshot_v2(v_tenant);
   if first_version is null then raise exception 'No completed snapshot for %',v_tenant;end if;
@@ -66,6 +70,8 @@ begin
   end if;
 
   update raw.order_source_success_v2 s set last_success_at=clock_timestamp()+interval '1 minute'
+   where s.account_id in(select account_id from config.marketplace_accounts where tenant_id=v_tenant);
+  update dev21.source_refresh_status s set last_success_at=clock_timestamp()+interval '1 minute'
    where s.account_id in(select account_id from config.marketplace_accounts where tenant_id=v_tenant);
   update public.orange_marketplace_load_status_1x set last_success=clock_timestamp()+interval '1 minute'
    where v_tenant='ORANGE';

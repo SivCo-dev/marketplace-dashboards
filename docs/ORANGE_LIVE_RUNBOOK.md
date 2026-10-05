@@ -1,6 +1,14 @@
 # Orange LIVE runbook
 
-## Safe rollout
+## Current status
+
+The n8n-only `executeOnce=true` + `queryBatching=single` fix is already published
+and verified. It is independent of this pending SQL migration. No additional
+retry configuration was deployed. Local PostgreSQL checks passed; see
+[local validation](ORANGE_LIVE_LOCAL_VALIDATION.md). The paid Supabase branch is
+not approved and was not created.
+
+## Safe SQL rollout
 
 1. Create/rebase a Supabase development branch from Production after confirming
    the branch billing rate. Branch creation copies migrations, **not production
@@ -8,13 +16,16 @@
    verify all prerequisites exist before timing. Do not use empty-branch results
    or a production write as a replacement for this gate.
 2. Apply `supabase/migrations/20261005191734_orange_live_snapshot_optimization.sql` to the branch only.
-3. Run `supabase/tests/orange_live_snapshot_v2.sql`, the branch-only transactional
+3. Run `supabase/tests/orange_live_snapshot_v2.sql`, the isolated transactional
    tests `supabase/tests/orange_live_snapshot_v2_write.sql` and
-   `supabase/tests/orange_live_snapshot_v2_runtime.sql`, and
+   `supabase/tests/orange_live_snapshot_v2_runtime.sql`,
+   `supabase/tests/orange_live_snapshot_v2_scenarios.sql`, and
    `node --test tests/columnar-contract.test.mjs`.
 4. Run one branch-only Orange refresh twice. The second call must return the same version quickly and must not add a history row.
 5. Compare Orange/W/CPR GMV, units, orders, `daily`, `sku_daily`, `lines`, stocks, canonical SKU, master category, `source_health`, and the `format=columnar` response against Production for fixed dates.
-6. Apply the n8n node patch only after the migration is approved. Publish the n8n workflow after verifying `queryBatching=single` and node-only retry.
+6. Preserve the already-deployed n8n `executeOnce=true` + `queryBatching=single`
+   settings. Query batching alone is insufficient. Do not add a retry policy
+   or change ingestion schedules as part of this SQL rollout.
 7. Deploy the database migration during a quiet window. Do not increase `statement_timeout` as the primary remedy.
 
 ## Mandatory runtime gate before merge
@@ -38,8 +49,8 @@ Also execute these isolated branch scenarios before approval:
   equal. Repeat it to verify no second publication.
 - Capture changed available/reserved stock with unchanged orders. Stocks update
   without rebuilding order blocks. Repeat with the same source checkpoint.
-- In connection A acquire `pg_advisory_xact_lock(hashtextextended(
-  'snapshot|ORANGE|daily-full',0))` inside a transaction. In connection B call the
+- In connection A acquire `pg_advisory_xact_lock(hashtext(
+  'ORANGE|daily-full'))` inside a transaction. In connection B call the
   LIVE builder; it must return the completed version promptly, without writes.
   Release A, then run two competing builders and check one effective publication.
 - Deliberately fail readiness or a branch fixture build in a subtransaction.
@@ -48,8 +59,9 @@ Also execute these isolated branch scenarios before approval:
   Changed SKU/dimension arrays must canonicalize correctly; an unchanged
   canonical LIVE payload must avoid a second full canonicalization.
 
-Store actual measured results and reconciliations in the PR. Until those checks
-run, the PR remains unaccepted and neither Production nor n8n may be changed.
+Store actual measurements and reconciliations in the PR. The local gate is
+complete; the isolated Supabase gate remains pending. SQL is not accepted for
+Production rollout yet. The independently authorized n8n-only fix is deployed.
 
 ## Timeout diagnosis
 
@@ -94,7 +106,12 @@ order by snapshot_version desc
 limit 5;
 ```
 
-The dashboard must continue serving the latest row with `is_complete=true` if a new build fails. Alert when no completed snapshot has `published_at` by 11:00, 17:00, or 22:00 MSK, or when any `source_health[].freshness_state` is not `fresh`. Telegram delivery should consume that alert result; it must not trigger ingestion.
+The dashboard must continue serving the latest row with `is_complete=true` if a new build fails. Monitor `meta.freshness_checked_at`, successful source-refresh clocks and readiness
+against 11:00, 17:00 and 22:00 MSK. Unchanged orders deliberately preserve
+`published_at`; it is not a heartbeat. `no_new_commercial_events` means a
+successful loader without newer commercial events and alone is not an outage.
+Missing/stale/failed source refreshes or a missing complete snapshot need an
+alert. Alert delivery must not trigger ingestion.
 
 ## Rollback
 

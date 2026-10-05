@@ -13,12 +13,12 @@ begin
     select count(*) rows,sum(units) units,sum(gmv) gmv,count(distinct order_key) orders
     into v_expected
     from core.daily_order_rows_v2
-    where tenant_id=v_tenant and report_date=date '2026-10-05'
+    where tenant_id=v_tenant and report_date=(current_timestamp at time zone 'Europe/Moscow')::date
       and (coalesce(order_state,'')<>'cancelled' or source_updated_at::date>report_date);
 
     select count(*) rows,sum(units) units,sum(gmv) gmv,count(distinct order_key) orders
     into v_actual
-    from dev21.live_order_rows_v2(v_tenant,date '2026-10-05')
+    from dev21.live_order_rows_v2(v_tenant,(current_timestamp at time zone 'Europe/Moscow')::date)
     where coalesce(order_state,'')<>'cancelled' or source_updated_at::date>report_date;
 
     if row(v_expected.rows,v_expected.units,v_expected.gmv,v_expected.orders)
@@ -56,6 +56,8 @@ begin
   from dev21.dashboard_snapshots s
   cross join lateral jsonb_array_elements(coalesce(s.payload->'daily','[]'::jsonb)) d
   where s.snapshot_kind='daily-full' and s.is_complete
+    and d->>'report_date'=((current_timestamp at time zone 'Europe/Moscow')::date)::text
+    and (coalesce((d->>'units')::numeric,0)<>0 or coalesce((d->>'gmv')::numeric,0)<>0 or coalesce((d->>'orders')::numeric,0)<>0)
     and not exists (
       select 1
       from jsonb_array_elements(coalesce(s.payload->'sku_daily','[]'::jsonb)) x
