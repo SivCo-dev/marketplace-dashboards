@@ -1,0 +1,52 @@
+{
+  "workflowId": "PW1FufvB4uVhyB28",
+  "workflowName": "Orange 2.2 | Data Refresh",
+  "productionApplied": true,
+  "reason": "queryBatching=single concatenates one SQL statement per input item. executeOnce=true limits each snapshot node to one input and one builder call.",
+  "nodes": [
+    {
+      "name": "DEV 2.2 | Fast Snapshot Orange Intraday",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT dev21.refresh_live_snapshot_v2('ORANGE',(CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Moscow')::date) AS snapshot_version;",
+        "options": {
+          "queryBatching": "single"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "name": "DEV 2.2 | Fast Snapshot Orange Morning",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT dev21.refresh_live_snapshot_v2('ORANGE',((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Moscow')::date-1)) AS snapshot_version;",
+        "options": {
+          "queryBatching": "single"
+        }
+      },
+      "executeOnce": true
+    }
+  ],
+  "invariants": [
+    "Execute each snapshot node once; query batching alone does not deduplicate SQL.",
+    "SQL functions and ingestion schedules are unchanged by this deployed patch.",
+    "The existing complete daily-full snapshot remains the fallback during a failed build.",
+    "Future SQL deployment and any additional retry policy require separate runtime validation."
+  ],
+  "activeVersionId": "30b7b436-9b02-4530-8142-763bb8a4e218",
+  "verification": {
+    "singleOnly": {
+      "executionId": "4251",
+      "workflowSeconds": 288.978,
+      "snapshotSeconds": 265.425,
+      "builderCalls": 4
+    },
+    "executeOnce": {
+      "executionId": "4253",
+      "workflowSeconds": 104.329,
+      "snapshotSeconds": 80.818,
+      "builderCalls": 1
+    },
+    "sqlMigrationApplied": false
+  }
+}
