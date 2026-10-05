@@ -63,7 +63,7 @@ function renderBreakdown(data){
  const groups=new Map();
  for(const r of data.skuRows){const key=breakdownMode==='market'?r.marketplace:(r.category||'Без категории');const g=groups.get(key)||{gmv:0,units:0};g.gmv+=num(r.gmv);g.units+=num(r.units);groups.set(key,g)}
  const marketNames={OZON:'Ozon',WB:'Wildberries',YANDEX:'Яндекс Маркет'};
- breakdownPanel.dataset.mode=breakdownMode;
+ breakdownPanel.dataset.breakdownView=breakdownMode;
  const items=breakdownMode==='market'?data.marketTotals.filter(g=>data.filters.marketplace==='ALL'||g.marketplace===data.filters.marketplace).map(g=>[g.marketplace,g]):[...groups].sort((a,b)=>b[1].gmv-a[1].gmv);
  if(breakdownMode==='category'){
   const total=items.reduce((acc,[,g])=>({gmv:acc.gmv+g.gmv,units:acc.units+g.units}),{gmv:0,units:0});
