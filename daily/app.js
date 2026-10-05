@@ -1,4 +1,4 @@
-import {startDashboard} from './core/dashboard-core.js?v=20261005sku-local2';
+import {startDashboard} from './core/dashboard-core.js?v=20261005sku-local3';
 import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
@@ -49,7 +49,7 @@ const drawer=document.createElement('dialog');drawer.id='productDrawer';drawer.s
 const originalOpen=globalThis.openSku;globalThis.openSku=key=>{originalOpen(key);if(!drawer.open){lastFocus=document.activeElement;drawer.showModal();document.body.classList.add('drawer-open');$('drawerClose').focus()}};
 $('drawerClose').onclick=()=>drawer.close();drawer.addEventListener('click',e=>{if(e.target===drawer){const b=drawer.getBoundingClientRect();if(e.clientX<b.left||e.clientY<b.top||e.clientX>b.right||e.clientY>b.bottom)drawer.close()}});
 drawer.addEventListener('close',()=>{document.body.classList.remove('drawer-open');lastFocus?.focus()});
-const defaultSkuSort=f=>f==='risk'?'problemImpact':f==='up'?'growthGmv':f==='down'?'lostGmv':'gmv';
+function defaultSkuSort(f){return f==='risk'?'problemImpact':f==='up'?'growthGmv':f==='down'?'lostGmv':'gmv'}
 $('focusTabs').onclick=e=>{const b=e.target.closest('[data-focus]');if(!b)return;focus=b.dataset.focus;limit=25;skuSort={key:defaultSkuSort(focus),dir:'desc'};renderSkuTable(view)};
 $('breakdownSwitch').onclick=e=>{const b=e.target.closest('[data-breakdown]');if(!b)return;breakdown=b.dataset.breakdown;renderBreakdown(view)};
 $('showMore').onclick=()=>{limit+=25;renderSkuTable(view)};
@@ -80,7 +80,7 @@ function renderBreakdown(data){
  for(const b of $('breakdownSwitch').querySelectorAll('button'))b.classList.toggle('active',b.dataset.breakdown===breakdownMode);
 }
 
-const marketLabel=v=>v==='OZON'?'Ozon':v==='WB'?'Wildberries':v==='YANDEX'?'Яндекс Маркет':v;
+function marketLabel(v){return v==='OZON'?'Ozon':v==='WB'?'Wildberries':v==='YANDEX'?'Яндекс Маркет':v}
 function fillSkuLocalOptions(data){
  const dims=(data?.payload?.dimensions||[]);
  const values=key=>[...new Set(dims.map(d=>String(d[key]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
@@ -94,13 +94,13 @@ function fillSkuLocalOptions(data){
  setOptions('skuMarket',values('marketplace'),'Все маркетплейсы',marketLabel);
  setOptions('skuBrand',values('brand'),'Все бренды');
 }
-const matchesSkuSearch=a=>!skuLocal.q||((a.article||'')+' '+(a.canonical_sku||'')+' '+(a.sku||'')+' '+(a.product_name||'')).toLowerCase().includes(skuLocal.q);
-const stockMatches=a=>skuLocal.stock==='ALL'
+function matchesSkuSearch(a){return !skuLocal.q||((a.article||'')+' '+(a.canonical_sku||'')+' '+(a.sku||'')+' '+(a.product_name||'')).toLowerCase().includes(skuLocal.q)}
+function stockMatches(a){return skuLocal.stock==='ALL'
  ||(skuLocal.stock==='zero'&&a.stockQty===0)
  ||(skuLocal.stock==='positive'&&a.stockQty>0)
  ||(skuLocal.stock==='lt14'&&a.stockQty>0&&a.stockDays!=null&&a.stockDays<=14)
  ||(skuLocal.stock==='lt30'&&a.stockQty>0&&a.stockDays!=null&&a.stockDays<=30)
- ||(skuLocal.stock==='gt30'&&a.stockQty>0&&a.stockDays!=null&&a.stockDays>30);
+ ||(skuLocal.stock==='gt30'&&a.stockQty>0&&a.stockDays!=null&&a.stockDays>30)}
 function sortValue(a,key){
  if(key==='delta')return a.risk?.gmvPct==null?-Infinity:num(a.risk.gmvPct);
  if(key==='stockQty')return a.stockQty==null?-Infinity:num(a.stockQty);
