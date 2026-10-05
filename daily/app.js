@@ -16,7 +16,7 @@ const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replac
 const pct=(a,b)=>a==null||b==null?null:num(b)?(num(a)/num(b)-1)*100:null;
 const delta=v=>v==null?'<span class="muted">Нет сопоставимой истории</span>':'<span class="'+(v<0?'negative':'positive')+'">'+(v<0?'↓ ':'↑ ')+Math.abs(v).toFixed(1)+'%</span>';
 const date=v=>String(v||'').slice(8,10)+'.'+String(v||'').slice(5,7);
-let view,focus='all',breakdown='market',limit=25,lastFocus;
+let view,focus='all',breakdown=null,limit=25,lastFocus;
 const pending=startDashboard(config); // Shared calculations, canonical SKU mapping and SKU card economics.
 const shell=document.querySelector('.shell'),header=document.querySelector('.header');
 header.innerHTML='<div><div class="eyebrow">АНАЛИТИКА ПРОДАЖ</div><h1>'+esc(config.display_name)+' · Ежедневный отчёт <span class="live-badge">● LIVE</span></h1><p class="muted">Оперативная динамика по маркетплейсам и товарам</p></div><nav class="view-switch" aria-label="Вид отчёта"><span aria-current="page">По дням</span><a id="monthlyLink" href="../monthly/?tenant='+tenant+'">По месяцам</a></nav>';
@@ -57,6 +57,8 @@ document.title=config.display_name+' · Ежедневный отчёт';
 function paint(data){
  if(!data||!$('focusTabs'))return;view=data;
  const {current:c,previous:p,skus,currentDates:days,live,payload}=data;
+ const activeMarkets=new Set(data.skuRows.filter(r=>num(r.gmv)!==0||num(r.units)!==0).map(r=>r.marketplace));
+ const breakdownMode=breakdown??((data.filters.marketplace!=='ALL'||activeMarkets.size===1)?'category':'market');
  const risks=skus.filter(a=>a.risk.level>0),critical=risks.filter(a=>a.risk.level===3).length;
  const kpis=[['₽','Оборот заказов',money(c.gmv),days.length+' закрытых дней',delta(pct(c.gmv,p.gmv))],['▥','Заказано',fmt(c.units)+' шт',days.length?fmt(c.units/days.length)+' шт. в среднем за день':'Нет закрытых дней',delta(pct(c.units,p.units))],['○','Заказы',fmt(c.orders),c.orders==null?'Нет полной детализации заказов':'Средний чек '+(c.orders?money(c.gmv/c.orders):'—'),delta(pct(c.orders,p.orders))],['◇','Активные SKU',fmt(skus.length),'Товары с заказами за период','<span class="muted">Без LIVE-дней</span>'],['!','Точки внимания',fmt(risks.length)+' SKU',critical+' критичных · '+(risks.length-critical)+' требуют внимания','<span class="negative">По действующим правилам рисков</span>']];
  $('kpis').innerHTML=kpis.map(([icon,label,value,note,change])=>'<article class="card visual-kpi"><div class="kpi-label"><i>'+icon+'</i>'+label+'</div><strong>'+value+'</strong><small>'+note+'</small><div>'+change+'</div></article>').join('');
@@ -67,11 +69,11 @@ function paint(data){
  const url=new URL(location.href);url.searchParams.set('tenant',tenant);url.searchParams.set('period',$('days').value);history.replaceState(null,'',url);
  const monthUrl=new URL('../monthly/',location.href);monthUrl.searchParams.set('tenant',tenant);if(data.filters.marketplace!=='ALL')monthUrl.searchParams.set('marketplace',data.filters.marketplace);$('monthlyLink').href=monthUrl;
  const groups=new Map();
- for(const r of data.skuRows){const key=breakdown==='market'?r.marketplace:r.category;const g=groups.get(key)||{gmv:0,units:0};g.gmv+=num(r.gmv);g.units+=num(r.units);groups.set(key,g)}
+ for(const r of data.skuRows){const key=breakdownMode==='market'?r.marketplace:r.category;const g=groups.get(key)||{gmv:0,units:0};g.gmv+=num(r.gmv);g.units+=num(r.units);groups.set(key,g)}
  const marketNames={OZON:'Ozon',WB:'Wildberries',YANDEX:'Яндекс Маркет'};
- const items=breakdown==='market'?data.marketTotals.filter(g=>data.filters.marketplace==='ALL'||g.marketplace===data.filters.marketplace).map(g=>[g.marketplace,g]):[...groups].sort((a,b)=>b[1].gmv-a[1].gmv).slice(0,6);
- $('breakdownCards').innerHTML=items.map(([key,g])=>'<article class="breakdown-card"><div><span class="market-icon '+esc(key.toLowerCase())+'">'+esc(breakdown==='market'?key.slice(0,2):'◇')+'</span><b>'+esc(marketNames[key]||key)+'</b><small>'+ (c.gmv?(g.gmv/c.gmv*100).toFixed(1):'0')+'% оборота</small></div><strong>'+money(g.gmv)+'</strong><div class="progress"><i style="width:'+Math.max(0,Math.min(100,c.gmv?g.gmv/c.gmv*100:0))+'%"></i></div><p>'+fmt(g.units)+' шт <span>'+(g.units?money(g.gmv/g.units):'—')+' / шт</span></p></article>').join('')||'<p class="muted">Нет данных за выбранный период</p>';
- for(const b of $('breakdownSwitch').querySelectorAll('button'))b.classList.toggle('active',b.dataset.breakdown===breakdown);
+ const items=breakdownMode==='market'?data.marketTotals.filter(g=>data.filters.marketplace==='ALL'||g.marketplace===data.filters.marketplace).map(g=>[g.marketplace,g]):[...groups].sort((a,b)=>b[1].gmv-a[1].gmv).slice(0,6);
+ $('breakdownCards').innerHTML=items.map(([key,g])=>'<article class="breakdown-card"><div><span class="market-icon '+esc(key.toLowerCase())+'">'+esc(breakdownMode==='market'?key.slice(0,2):'◇')+'</span><b>'+esc(marketNames[key]||key)+'</b><small>'+ (c.gmv?(g.gmv/c.gmv*100).toFixed(1):'0')+'% оборота</small></div><strong>'+money(g.gmv)+'</strong><div class="progress"><i style="width:'+Math.max(0,Math.min(100,c.gmv?g.gmv/c.gmv*100:0))+'%"></i></div><p>'+fmt(g.units)+' шт <span>'+(g.units?money(g.gmv/g.units):'—')+' / шт</span></p></article>').join('')||'<p class="muted">Нет данных за выбранный период</p>';
+ for(const b of $('breakdownSwitch').querySelectorAll('button'))b.classList.toggle('active',b.dataset.breakdown===breakdownMode);
  const counts={all:skus.length,top:Math.min(25,skus.filter(s=>s.units>=2).length),risk:risks.length,up:skus.filter(s=>s.risk.gmvPct>0).length,down:skus.filter(s=>s.risk.gmvPct<0).length};
  $('focusTabs').innerHTML=[['all','Все'],['top','Топ по обороту'],['risk','Проблемные'],['up','Рост'],['down','Падение']].map(([id,label])=>'<button type="button" data-focus="'+id+'" aria-pressed="'+(focus===id)+'" class="'+(focus===id?'active':'')+'">'+label+' <span>'+counts[id]+'</span></button>').join('');
  let list=skus.filter(a=>focus==='risk'?a.risk.level>0:focus==='up'?a.risk.gmvPct>0:focus==='down'?a.risk.gmvPct<0:focus==='top'?a.units>=2:true).sort((a,b)=>focus==='risk'?b.risk.level-a.risk.level||b.gmv-a.gmv:focus==='up'?b.risk.gmvPct-a.risk.gmvPct:focus==='down'?a.risk.gmvPct-b.risk.gmvPct:b.gmv-a.gmv);if(focus==='top')list=list.slice(0,25);
