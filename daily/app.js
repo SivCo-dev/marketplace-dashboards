@@ -36,7 +36,7 @@ const status=document.createElement('div');status.className='state-strip';status
 const trend=document.querySelector('.trend-card');trend.querySelector('.ttl').textContent='Динамика заказов';
 const opt=document.createElement('option');opt.value='orders';opt.textContent='Заказы';$('trendMode').append(opt);
 const breakdownPanel=document.createElement('section');breakdownPanel.className='card pad breakdown-panel';breakdownPanel.innerHTML='<div class="section-head"><div><h2>Где формируется оборот</h2><p class="muted">Доля и вклад основных направлений</p></div><div class="seg" id="breakdownSwitch"><button type="button" class="active" data-breakdown="market">Маркетплейсы</button><button type="button" data-breakdown="category">Категории</button></div></div><div id="breakdownCards"></div>';
-trend.after(breakdownPanel);
+const overview=document.createElement('div');overview.className='sales-overview';trend.before(overview);overview.append(trend,breakdownPanel);
 // Keep the core DOM contract for every filter and card control, including hidden analysis tables.
 $('trendSummary').hidden=true;
 const panels=[...document.querySelectorAll('.work-left > .card')];panels.slice(0,3).forEach(p=>p.hidden=true);
@@ -71,6 +71,7 @@ function paint(data){
  const groups=new Map();
  for(const r of data.skuRows){const key=breakdownMode==='market'?r.marketplace:r.category;const g=groups.get(key)||{gmv:0,units:0};g.gmv+=num(r.gmv);g.units+=num(r.units);groups.set(key,g)}
  const marketNames={OZON:'Ozon',WB:'Wildberries',YANDEX:'Яндекс Маркет'};
+ breakdownPanel.dataset.mode=breakdownMode;
  const items=breakdownMode==='market'?data.marketTotals.filter(g=>data.filters.marketplace==='ALL'||g.marketplace===data.filters.marketplace).map(g=>[g.marketplace,g]):[...groups].sort((a,b)=>b[1].gmv-a[1].gmv).slice(0,6);
  $('breakdownCards').innerHTML=items.map(([key,g])=>'<article class="breakdown-card"><div><span class="market-icon '+esc(key.toLowerCase())+'">'+esc(breakdownMode==='market'?key.slice(0,2):'◇')+'</span><b>'+esc(marketNames[key]||key)+'</b><small>'+ (c.gmv?(g.gmv/c.gmv*100).toFixed(1):'0')+'% оборота</small></div><strong>'+money(g.gmv)+'</strong><div class="progress"><i style="width:'+Math.max(0,Math.min(100,c.gmv?g.gmv/c.gmv*100:0))+'%"></i></div><p>'+fmt(g.units)+' шт <span>'+(g.units?money(g.gmv/g.units):'—')+' / шт</span></p></article>').join('')||'<p class="muted">Нет данных за выбранный период</p>';
  for(const b of $('breakdownSwitch').querySelectorAll('button'))b.classList.toggle('active',b.dataset.breakdown===breakdownMode);
