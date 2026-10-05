@@ -30,6 +30,7 @@ function adaptRow(row,scope){
  const importedReturns=n(row.import_fields?.returned_units??row.returned_units);
  const writeoffs=n(row.disposal_units);
  const operationalUnits=importedReturns+writeoffs;
+ const incomeUnits=n(row.income_units??(netSoldUnits+operationalUnits));
  return {
   row_id:[row.account_id,row.marketplace,row.sku].join("|"),
   product_id:null,
@@ -45,6 +46,7 @@ function adaptRow(row,scope){
   financial_sale_units:n(row.sale_operations??row.sold_units),
   financial_return_units:n(row.return_operations),
   financial_net_units:netSoldUnits,
+  income_units:incomeUnits,
   sale_units_display:n(row.sale_operations??row.sold_units)+operationalUnits,
   return_writeoff_units:n(row.return_operations)+operationalUnits,
   physical_returned_units:nullable(row.returned_units),
@@ -74,7 +76,7 @@ export function aggregateCanonicalRows(rows){
   if(!groups.has(key))groups.set(key,[]);
   groups.get(key).push(row);
  }
- const additive=['sales','returns','net_sales','financial_sale_units','financial_return_units','financial_net_units','sale_units_display','return_writeoff_units','physical_returned_units','written_off_units','compensated_units',...GROUPS,'marketplace_expenses','result_without_compensation','compensation','cogs','cost_units','result_after_cogs','business_expenses','final_business_result'];
+ const additive=['sales','returns','net_sales','financial_sale_units','financial_return_units','financial_net_units','income_units','sale_units_display','return_writeoff_units','physical_returned_units','written_off_units','compensated_units',...GROUPS,'marketplace_expenses','result_without_compensation','compensation','cogs','cost_units','result_after_cogs','business_expenses','final_business_result'];
  const total=(sources,key)=>sources.some(row=>row[key]==null)?null:sources.reduce((value,row)=>value+row[key],0);
  return [...groups.values()].map(sources=>{
   const row={...sources[0],row_id:sources[0].canonical_sku||sources[0].row_id,source_rows:sources};
@@ -143,6 +145,7 @@ export function adaptScope(scope){
    financial_sale_units:hasData?(sum(sourceRows,"sale_operations")||sum(sourceRows,"sold_units")):null,
    financial_return_units:hasData?sum(sourceRows,"return_operations"):null,
    financial_net_units:hasData?rows.reduce((total,row)=>total+n(row.financial_net_units),0):null,
+   income_units:hasData?rows.reduce((total,row)=>total+n(row.income_units),0):null,
    ordered_units:null,delivered_units:null,returned_units:null,
    written_off_units:hasData?sum(sourceRows,"disposal_units"):null,
    operational_metrics_status:hasData?"PARTIAL":"UNAVAILABLE"
