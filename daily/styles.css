@@ -123,3 +123,5 @@ body{--a:#355846}
   position:relative;
   flex-shrink:0;
 }
+
+.drop-pct{display:block;margin-top:3px;font-size:9px;color:var(--muted);font-weight:500}
