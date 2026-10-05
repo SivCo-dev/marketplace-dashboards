@@ -113,6 +113,14 @@ successful loader without newer commercial events and alone is not an outage.
 Missing/stale/failed source refreshes or a missing complete snapshot need an
 alert. Alert delivery must not trigger ingestion.
 
+## Capacity and isolated validation
+
+Do not clone the full source/snapshot history into private schemas of the live
+project. Schemas and advisory locks do not isolate disk, WAL or I/O. The first
+attempt failed with WAL disk exhaustion and unavailable SQL connections; see
+`ORANGE_LIVE_SUPABASE_VALIDATION_INCIDENT.md`. Require an independent test
+instance and verified disk/WAL capacity before repeating the Supabase gate.
+
 ## Rollback
 
 Apply `supabase/rollback/20261005191734_orange_live_snapshot_optimization.rollback.sql`. The rollback restores the previous LIVE builder and trigger, then drops the fast-path helpers and indexes. Existing snapshot data and history are retained.
