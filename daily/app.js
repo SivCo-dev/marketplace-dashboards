@@ -49,9 +49,13 @@ const drawer=document.createElement('dialog');drawer.id='productDrawer';drawer.s
 const originalOpen=globalThis.openSku;globalThis.openSku=key=>{originalOpen(key);if(!drawer.open){lastFocus=document.activeElement;drawer.showModal();document.body.classList.add('drawer-open');$('drawerClose').focus()}};
 $('drawerClose').onclick=()=>drawer.close();drawer.addEventListener('click',e=>{if(e.target===drawer){const b=drawer.getBoundingClientRect();if(e.clientX<b.left||e.clientY<b.top||e.clientX>b.right||e.clientY>b.bottom)drawer.close()}});
 drawer.addEventListener('close',()=>{document.body.classList.remove('drawer-open');lastFocus?.focus()});
-$('focusTabs').onclick=e=>{const b=e.target.closest('[data-focus]');if(!b)return;focus=b.dataset.focus;limit=25;paint(view)};
+const defaultSkuSort=f=>f==='risk'?'problemImpact':f==='up'?'growthGmv':f==='down'?'lostGmv':'gmv';
+$('focusTabs').onclick=e=>{const b=e.target.closest('[data-focus]');if(!b)return;focus=b.dataset.focus;limit=25;skuSort={key:defaultSkuSort(focus),dir:'desc'};renderSkuTable(view)};
 $('breakdownSwitch').onclick=e=>{const b=e.target.closest('[data-breakdown]');if(!b)return;breakdown=b.dataset.breakdown;renderBreakdown(view)};
-$('showMore').onclick=()=>{limit+=25;paint(view)};
+$('showMore').onclick=()=>{limit+=25;renderSkuTable(view)};
+for(const [id,key] of [['skuMaster','masterCategory'],['skuMarket','marketplace'],['skuBrand','brand'],['skuStock','stock']])$(id).onchange=()=>{skuLocal[key]=$(id).value;limit=25;renderSkuTable(view)};
+$('skuSearch').oninput=()=>{skuLocal.q=$('skuSearch').value.trim().toLowerCase();limit=25;renderSkuTable(view)};
+$('allSkuHead').onclick=e=>{const b=e.target.closest('[data-sort]');if(!b)return;const key=b.dataset.sort;skuSort={key,dir:skuSort.key===key&&skuSort.dir==='desc'?'asc':'desc'};renderSkuTable(view)};
 shell.insertAdjacentHTML('beforeend','<footer class="page-footer"><span>Данные из текущих сохранённых отчётов V2</span>'+({ORANGE:'../',W:'../w.html',CPR:'../cpr.html'}[tenant]?'<a href="'+{ORANGE:'../',W:'../w.html',CPR:'../cpr.html'}[tenant]+'">Открыть прежний ежедневный дашборд ↗</a>':'')+'</footer>');
 await pending;
 document.title=config.display_name+' · Ежедневный отчёт';
@@ -74,6 +78,61 @@ function renderBreakdown(data){
   $('breakdownCards').innerHTML=items.map(([key,g])=>'<article class="breakdown-card"><div><span class="market-icon '+esc(key.toLowerCase())+'">'+esc(key.slice(0,2))+'</span><b>'+esc(marketNames[key]||key)+'</b><small>'+(c.gmv?(g.gmv/c.gmv*100).toFixed(1):'0')+'% оборота</small></div><strong>'+money(g.gmv)+'</strong><div class="progress"><i style="width:'+Math.max(0,Math.min(100,c.gmv?g.gmv/c.gmv*100:0))+'%"></i></div><p>'+fmt(g.units)+' шт <span>'+(g.units?money(g.gmv/g.units):'—')+' / шт</span></p></article>').join('')||'<p class="muted">Нет данных за выбранный период</p>';
  }
  for(const b of $('breakdownSwitch').querySelectorAll('button'))b.classList.toggle('active',b.dataset.breakdown===breakdownMode);
+}
+
+const marketLabel=v=>v==='OZON'?'Ozon':v==='WB'?'Wildberries':v==='YANDEX'?'Яндекс Маркет':v;
+function fillSkuLocalOptions(data){
+ const dims=(data?.payload?.dimensions||[]);
+ const values=key=>[...new Set(dims.map(d=>String(d[key]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+ const setOptions=(id,vals,all,labelFn=v=>v)=>{
+   const el=$(id),current=skuLocal[{skuMaster:'masterCategory',skuMarket:'marketplace',skuBrand:'brand'}[id]]||'ALL';
+   el.innerHTML='<option value="ALL">'+all+'</option>'+vals.map(v=>'<option value="'+esc(v)+'">'+esc(labelFn(v))+'</option>').join('');
+   el.value=vals.includes(current)?current:'ALL';
+   const key={skuMaster:'masterCategory',skuMarket:'marketplace',skuBrand:'brand'}[id];skuLocal[key]=el.value;
+ };
+ setOptions('skuMaster',values('master_category'),'Все мастер-категории');
+ setOptions('skuMarket',values('marketplace'),'Все маркетплейсы',marketLabel);
+ setOptions('skuBrand',values('brand'),'Все бренды');
+}
+const matchesSkuSearch=a=>!skuLocal.q||((a.article||'')+' '+(a.canonical_sku||'')+' '+(a.sku||'')+' '+(a.product_name||'')).toLowerCase().includes(skuLocal.q);
+const stockMatches=a=>skuLocal.stock==='ALL'
+ ||(skuLocal.stock==='zero'&&a.stockQty===0)
+ ||(skuLocal.stock==='positive'&&a.stockQty>0)
+ ||(skuLocal.stock==='lt14'&&a.stockQty>0&&a.stockDays!=null&&a.stockDays<=14)
+ ||(skuLocal.stock==='lt30'&&a.stockQty>0&&a.stockDays!=null&&a.stockDays<=30)
+ ||(skuLocal.stock==='gt30'&&a.stockQty>0&&a.stockDays!=null&&a.stockDays>30);
+function sortValue(a,key){
+ if(key==='delta')return a.risk?.gmvPct==null?-Infinity:num(a.risk.gmvPct);
+ if(key==='stockQty')return a.stockQty==null?-Infinity:num(a.stockQty);
+ return num(a[key]);
+}
+function renderSkuTable(data){
+ if(!data||typeof globalThis.getDailySkuWorkspace!=='function')return;
+ const ws=globalThis.getDailySkuWorkspace({masterCategory:skuLocal.masterCategory,marketplace:skuLocal.marketplace,brand:skuLocal.brand});
+ const qFilter=arr=>arr.filter(matchesSkuSearch);
+ const allBeforeStock=qFilter(ws.skus||[]);
+ const zeroCount=allBeforeStock.filter(a=>a.stockQty===0).length;
+ const under14=allBeforeStock.filter(a=>a.stockQty>0&&a.stockDays!=null&&a.stockDays<=14).length;
+ const under30=allBeforeStock.filter(a=>a.stockQty>0&&a.stockDays!=null&&a.stockDays<=30).length;
+ const over30=allBeforeStock.filter(a=>a.stockQty>0&&a.stockDays!=null&&a.stockDays>30).length;
+ const positive=allBeforeStock.filter(a=>a.stockQty>0).length;
+ const stockSel=$('skuStock');for(const [value,label] of [['ALL','Все остатки'],['zero','Нет остатка · '+zeroCount],['lt14','До 14 дней · '+under14],['lt30','До 30 дней · '+under30],['gt30','Более 30 дней · '+over30],['positive','Есть остаток · '+positive]]){const o=[...stockSel.options].find(x=>x.value===value);if(o)o.textContent=label}
+ const common=arr=>qFilter(arr||[]).filter(stockMatches);
+ const skus=common(ws.skus),problemSkus=common(ws.problemSkus),growthSkus=common(ws.growthSkus),declineSkus=common(ws.declineSkus);
+ const counts={all:skus.length,top:Math.min(25,skus.filter(s=>s.units>=2).length),risk:problemSkus.length,up:growthSkus.length,down:declineSkus.length};
+ $('focusTabs').innerHTML=[['all','Все'],['top','Топ по обороту'],['risk','Проблемные'],['up','Рост'],['down','Падение']].map(([id,label])=>'<button type="button" data-focus="'+id+'" aria-pressed="'+(focus===id)+'" class="'+(focus===id?'active':'')+'">'+label+' <span>'+counts[id]+'</span></button>').join('');
+ let list=focus==='down'?declineSkus:focus==='up'?growthSkus:focus==='risk'?problemSkus:skus.filter(a=>focus==='top'?a.units>=2:true);
+ const sortKey=skuSort.key||defaultSkuSort(focus),dir=skuSort.dir==='asc'?1:-1;
+ list=[...list].sort((a,b)=>{const av=sortValue(a,sortKey),bv=sortValue(b,sortKey);return av===bv?num(b.gmv)-num(a.gmv):(av-bv)*dir});
+ if(focus==='top')list=list.slice(0,25);
+ const arrow=key=>skuSort.key===key?(skuSort.dir==='asc'?' ↑':' ↓'):'';
+ const dynKey=focus==='down'?'lostGmv':focus==='up'?'growthGmv':focus==='risk'?'problemImpact':'delta';
+ const dynLabel=focus==='down'?'Потеря оборота':focus==='up'?'Прирост оборота':focus==='risk'?'Приоритет ₽':'К прошлому периоду';
+ $('allSkuHead').innerHTML='<th>Товар / SKU</th><th>Маркетплейсы</th><th class="r"><button class="th-sort" data-sort="gmv">Оборот'+arrow('gmv')+'</button></th><th class="r"><button class="th-sort" data-sort="units">Заказано'+arrow('units')+'</button></th><th class="r"><button class="th-sort" data-sort="price">Ср. цена'+arrow('price')+'</button></th><th class="r"><button class="th-sort" data-sort="stockQty">Остаток'+arrow('stockQty')+'</button></th><th class="r"><button class="th-sort" data-sort="'+dynKey+'">'+dynLabel+arrow(dynKey)+'</button></th><th>Статус</th>';
+ $('rows').innerHTML=list.slice(0,limit).map(a=>'<tr class="click" data-key="'+esc(a.key)+'" tabindex="0" aria-label="Открыть '+esc(a.product_name||a.article)+'"><td><div class="product-cell"><span class="monogram">'+esc((a.article||a.sku||'SKU').slice(0,2))+'</span><div><b>'+esc(a.article||a.canonical_sku||a.sku)+'</b><small>SKU '+esc(a.sku||'—')+' · '+esc(a.product_name||'Без названия')+'</small></div></div></td><td><span title="'+esc(a.channels)+'">'+esc(a.channels)+'</span></td><td class="r"><b>'+money(a.gmv)+'</b></td><td class="r">'+fmt(a.units)+' шт</td><td class="r">'+money(a.price)+'</td><td class="r">'+(a.stockQty==null?'—':fmt(a.stockQty)+' шт'+(a.stockDays==null?'':'<small class="stock-days-sub">'+a.stockDays.toFixed(1)+' дн</small>'))+'</td><td class="r">'+(focus==='down'?'<b class="negative">−'+money(a.lostGmv)+'</b><small class="drop-pct">'+(a.risk.gmvPct==null?'—':a.risk.gmvPct.toFixed(1)+'%')+'</small>':focus==='up'?'<b class="positive">+'+money(a.growthGmv)+'</b><small class="drop-pct">'+(a.risk.gmvPct==null?'—':'+'+a.risk.gmvPct.toFixed(1)+'%')+'</small>':focus==='risk'?'<b>'+money(a.problemImpact)+'</b>':delta(a.risk.gmvPct))+'</td><td><span class="risk-chip '+esc(a.risk.cls)+'" title="'+esc(a.risk.reasons.join(' · '))+'">'+esc(a.risk.label)+'</span></td></tr>').join('')||'<tr><td colspan="8" class="empty">Нет товаров по выбранным фильтрам</td></tr>';
+ const sliceGmv=skus.reduce((sum,a)=>sum+num(a.gmv),0),share=ws.orgGmv?sliceGmv/ws.orgGmv*100:0;
+ $('tableCount').innerHTML='Показано '+Math.min(limit,list.length)+' из '+list.length+' SKU <span class="sku-scope-summary">· В срезе '+skus.length+' SKU · '+money(sliceGmv)+' · '+share.toFixed(1)+'% общего оборота</span>';
+ $('showMore').hidden=limit>=list.length;
 }
 function paint(data){
  if(!data||!$('focusTabs'))return;view=data;
