@@ -1,6 +1,8 @@
 const API='https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-import-v2';
 const labels={article:'Артикул продавца',sku:'SKU Ozon',operation:'Тип операции',amount:'Сумма операции',quantity:'Количество операции',compensation_amount:'Компенсация, ₽',decompensation_amount:'Декомпенсация, ₽',compensated_units:'Компенсировано, шт',disposal_units:'Утилизировано, шт',written_off_units:'Списано, шт',returned_units:'Возвращено, шт',returns_without_compensation:'Возврат без компенсации, шт'};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rememberedPin=()=>{try{return sessionStorage.getItem('monthlyImportPin')||'';}catch{return '';}};
+const rememberPin=pin=>{try{sessionStorage.setItem('monthlyImportPin',pin);}catch{}};
 const fmt=v=>Number(v??0).toLocaleString('ru-RU',{maximumFractionDigits:2});
 const button=document.createElement('button');button.type='button';button.id='uploadOpen';button.className='upload-open';button.textContent='↑ Загрузить файлы';
 document.querySelector('.title-block').append(button);
@@ -34,7 +36,7 @@ async function run(action){if(busy)return;busy=true;refresh();try{await action()
 button.addEventListener('click',()=>run(async()=>{
  if(!catalog.length){status('Загружаю список кабинетов…');catalog=(await request('catalog')).accounts;}
  const tenants=[...new Set(catalog.map(a=>a.tenant_id))];$('uploadTenant').innerHTML=tenants.map(t=>`<option>${esc(t)}</option>`).join('');$('uploadTenant').value=document.querySelector('#tenantSelect').value;accounts();$('uploadMonth').value=document.querySelector('#monthSelect').value;
- $('uploadPin').value=sessionStorage.getItem('monthlyImportPin')||'';status('Выберите файл и введите PIN импорта.');dialog.showModal();
+ $('uploadPin').value=rememberedPin();status('Выберите файл и введите PIN импорта.');dialog.showModal();
 }));$('uploadClose').addEventListener('click',()=>dialog.close());
 $('uploadTenant').addEventListener('change',accounts);for(const id of ['uploadAccount','uploadMonth','uploadType'])$(id).addEventListener('change',invalidate);
 $('uploadFile').addEventListener('change',()=>{file=$('uploadFile').files[0]||null;base64='';tables=[];invalidate();$('uploadSetup').hidden=true;status(file?'Файл выбран. Нажмите «Прочитать файл».':'Выберите файл.');refresh();});
@@ -57,5 +59,5 @@ $('uploadCheck').addEventListener('click',()=>run(async()=>{
  $('uploadPreview').innerHTML=`<h3>Предпросмотр распределения</h3><div class="upload-totals">${totals}</div>${errors}<p class="driver-note">${preview.row_count} строк файла → ${preview.patches.length} SKU. При применении поля «${preview.fields.map(k=>esc(labels[k])).join(', ')}» заменят предыдущие значения этого кабинета за ${esc(scope().month)}. Остальные поля сохранятся.</p><div class="table-scroll"><table><thead><tr><th>SKU / артикул</th><th>Категория</th>${preview.fields.map(k=>`<th>${esc(labels[k])}</th>`).join('')}</tr></thead><tbody>${preview.patches.slice(0,300).map(p=>`<tr><td>${esc(p.article||p.sku)}</td><td>${esc(p.master_category||'—')}</td>${preview.fields.map(k=>`<td>${fmt(p.values[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${preview.patches.length>300?'<small>Показаны первые 300 SKU. Применятся все проверенные строки.</small>':''}`;
  status(preview.errors.length?'Исправьте ошибки и повторите проверку.':'Контроль сошёлся. Распределение готово к применению.',preview.errors.length>0);
 }));
-$('uploadApply').addEventListener('click',()=>run(async()=>{if(!preview||preview.errors.length)return;status('Применяю распределение…');const result=await request('apply',{batch_id:preview.batch_id});sessionStorage.setItem('monthlyImportPin',$('uploadPin').value);preview=null;status(result.duplicate?'Этот файл уже учтён. Дубли не добавлены.':'Распределение применено. Обновляю отчёт…');location.reload();}));
+$('uploadApply').addEventListener('click',()=>run(async()=>{if(!preview||preview.errors.length)return;status('Применяю распределение…');const result=await request('apply',{batch_id:preview.batch_id});rememberPin($('uploadPin').value);preview=null;status(result.duplicate?'Этот файл уже учтён. Дубли не добавлены.':'Распределение применено. Обновляю отчёт…');location.reload();}));
 $('uploadHistoryButton').addEventListener('click',()=>run(async()=>{const rows=await request('history',scope());$('uploadHistory').innerHTML=rows.length?`<div class="table-scroll"><table><thead><tr><th>Файл</th><th>Дата</th><th>Состояние</th><th>Действующие поля</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.filename)}</td><td>${esc(new Date(r.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}))}</td><td>${r.status==='APPLIED'?'Применён · версия '+r.layer_revision:'Предпросмотр'}</td><td>${r.active_fields.map(k=>esc(labels[k]||k)).join(', ')||'—'}</td></tr>`).join('')}</tbody></table></div>`:'Файлы пока не загружены.';}));

@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2.95.3";
 import * as XLSX from "npm:@e965/xlsx@0.20.3";
 import {findTables, normalizeRows, allocate, norm} from "./processor.mjs";
-const origins=new Set(['https://sivco-dev.github.io','http://127.0.0.1:4173','http://localhost:4173']);
+const origins=new Set(['https://sivco-dev.github.io','http://127.0.0.1:4173','http://localhost:4173','null']);
 const sha=async(s:string|Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof s==='string'?new TextEncoder().encode(s):s))).map(b=>b.toString(16).padStart(2,'0')).join('');
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get('origin')||'';
