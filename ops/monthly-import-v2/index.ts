@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2.95.3";
 import * as XLSX from "npm:@e965/xlsx@0.20.3";
-import {findTables, normalizeRows, allocate, norm} from "./processor.mjs";
+import {findTables, guessMapping, isWarehouseReturn, normalizeRows, allocate, norm} from "./processor.mjs";
 const origins=new Set(['https://sivco-dev.github.io','http://127.0.0.1:4173','http://localhost:4173','null']);
 const sha=async(s:string|Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof s==='string'?new TextEncoder().encode(s):s))).map(b=>b.toString(16).padStart(2,'0')).join('');
 Deno.serve(async(req:Request)=>{
@@ -38,8 +38,13 @@ Deno.serve(async(req:Request)=>{
   const sheets=wb.SheetNames.map(name=>({name,matrix:XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:'',raw:false})}));
   const tables=findTables(sheets);if(!tables.length)throw Error('Таблица с артикулами / SKU не найдена');
   if(tables.some((t:any)=>t.matrix.length>10060||t.headers.length>100))throw Error('Максимум 10 000 строк и 100 колонок');
-  const hint=norm(input.filename+' '+tables.map((t:any)=>JSON.stringify(t.matrix.slice(0,t.row))).join(' '));
+  const warehouseReturn=tables.some((t:any)=>isWarehouseReturn(t.headers));
+  // The date in returns_report_<date> is the export date, not the reporting month.
+  const hint=norm((warehouseReturn?'':input.filename)+' '+tables.map((t:any)=>JSON.stringify(t.matrix.slice(0,t.row))).join(' '));
   const matched=catalog.accounts.filter((a:any)=>{const token=norm(a.display_name).replace(/^market /,'');return new RegExp('(?:^|[^a-zа-я0-9])'+token+'(?:$|[^a-zа-я0-9])','i').test(hint);});
+  if(warehouseReturn&&hint.includes('capris official store')&&hint.includes('1928268')){
+   const cpr=catalog.accounts.find((a:any)=>a.account_id==='ozon_cpr');if(cpr&&!matched.includes(cpr))matched.push(cpr);
+  }
   const months=[...new Set([...hint.matchAll(/(20\d{2})[-_. /](0[1-9]|1[0-2])(?:[-_. /]\d{2})?/g)].map(m=>m[1]+'-'+m[2]))];
   if(action==='parse')return reply(200,{tables,hints:{account_ids:matched.map((a:any)=>a.account_id),months},filename:input.filename});
   if(!account||!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.month))throw Error('Выберите кабинет и месяц');
@@ -47,8 +52,9 @@ Deno.serve(async(req:Request)=>{
   if(months.length===1&&months[0]!==input.month)throw Error('Месяц в файле отличается от выбранного');
   const table=tables.find((t:any)=>t.name===input.sheet);if(!table)throw Error('Выберите лист файла');
   const headerRow=Number(input.header_row);if(!Number.isInteger(headerRow)||headerRow<0||headerRow>=table.matrix.length)throw Error('Некорректная строка заголовка');
-  const normalized=normalizeRows(table.matrix,headerRow,input.mapping,input.type||'auto');
-  if(!normalized.rows.length)throw Error('Нет строк данных для распределения');
+  const standardReturn=isWarehouseReturn(table.matrix[headerRow]||[]);
+  const normalized=normalizeRows(table.matrix,headerRow,standardReturn?guessMapping(table.matrix[headerRow]):input.mapping,standardReturn?'return':input.type||'auto');
+  if(!normalized.rows.length)throw Error(normalized.errors.length?'Не удалось прочитать строки: '+normalized.errors.slice(0,3).map((e:any)=>'строка '+e.row+' — '+e.error).join('; '):'Нет строк данных для распределения');
   const context=await rpc('monthly_upload_context_v2',{p_tenant:input.tenant,p_month:input.month+'-01',p_account:input.account_id});
   const preview=allocate(normalized,context,account);
   const duplicate=new Set();for(const r of context.payload.sku.filter((r:any)=>r.account_id===account.account_id&&r.marketplace==='OZON')){if(duplicate.has(r.sku))preview.errors.push({error:'В базе повторяется SKU '+r.sku});duplicate.add(r.sku);}

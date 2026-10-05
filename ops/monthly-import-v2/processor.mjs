@@ -6,7 +6,20 @@ export const fields = {
 export const metrics=Object.keys(fields).filter(k=>!['article','sku','operation','amount','quantity'].includes(k));
 export const norm=v=>String(v??'').trim().toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ');
 const rules={article:[/артикул.*продав/,/^артикул$/, /offer.?id/],sku:[/^sku$/, /sku.*ozon/,/ozon.*sku/],operation:[/тип.*операц/,/вид.*операц/,/^операция$/, /причина/],amount:[/^сумма(?:,.*)?$/, /^стоимость$/, /сумма.*операц/],quantity:[/^количество(?:,.*)?$/, /^кол-во/,/^шт\.?$/],compensation_amount:[/^(?!.*декомпенс)(?:.*сум.*компенс.*|.*компенс.*сум.*|.*размер.*компенс.*|компенсация(?:,.*)?)$/],decompensation_amount:[/декомпенс.*(сум|руб|₽)/,/^декомпенсация$/, /удержан.*компенс/],compensated_units:[/^(?!.*декомпенс).*компенс.*(шт|кол)/,/(шт|кол).*компенс/],disposal_units:[/(утил).*?(шт|кол)/,/(шт|кол).*утил/,/^утилизировано$/],written_off_units:[/(списан).*?(шт|кол)/,/(шт|кол).*списан/,/^списано$/],returned_units:[/^(?!.*без.*компенс).*возвра.*(шт|кол)/,/(шт|кол).*возвра/,/^возвращено$/],returns_without_compensation:[/возврат.*без.*компенс/]};
-export function guessMapping(headers){return Object.fromEntries(Object.keys(fields).map(k=>[k,headers.findIndex(h=>(rules[k]||[]).some(re=>re.test(norm(h))))]));}
+export function guessMapping(headers){
+ const mapped=Object.fromEntries(Object.keys(fields).map(k=>[k,headers.findIndex(h=>(rules[k]||[]).some(re=>re.test(norm(h))))]));
+ const returned=headers.findIndex(h=>norm(h)==='количество возвращаемых товаров');
+ if(returned>=0&&headers.some(h=>norm(h)==='статус возврата')){
+  // Ozon's warehouse-return report is a quantity report. Days in storage and
+  // the reason for return are not quantity / operation columns.
+  for(const key of Object.keys(mapped))mapped[key]=-1;
+  mapped.article=headers.findIndex(h=>norm(h)==='артикул товара');
+  mapped.sku=headers.findIndex(h=>norm(h)==='sku');
+  mapped.returned_units=returned;
+ }
+ return mapped;
+}
+export function isWarehouseReturn(headers){return headers.some(h=>norm(h)==='количество возвращаемых товаров')&&headers.some(h=>norm(h)==='статус возврата');}
 export function findTables(sheets){
  return sheets.map(({name,matrix})=>{let best={score:-1,row:0};for(let row=0;row<Math.min(60,matrix.length);row++){const headers=matrix[row].map(v=>String(v??'').trim());const mapping=guessMapping(headers);const score=Object.values(mapping).filter(v=>v>=0).length+((mapping.article>=0||mapping.sku>=0)?3:0);if(score>best.score)best={name,row,headers,mapping,score};}return {...best,matrix};}).filter(t=>t.score>=4);
 }
@@ -64,7 +77,10 @@ export function allocate(normalized,context,account){
  const errors=[...normalized.errors],patches=new Map(),pools=new Map(),source=[];
  const patchFor=r=>{const key=String(r.sku);if(!patches.has(key))patches.set(key,{sku:key,article:r.article||key,product_name:r.product_name||key,master_category:r.master_category||null,values:{}});return patches.get(key);};
  for(const input of normalized.rows){
-  const match=candidates.filter(r=>(input.sku&&[r.sku,r.marketplace_sku].some(v=>norm(v)===norm(input.sku)))||(input.article&&[r.article,r.offer_id,r.sku].some(v=>norm(v)===norm(input.article))));
+  const exactSku=input.sku?candidates.filter(r=>[r.sku,r.marketplace_sku].some(v=>norm(v)===norm(input.sku))):[];
+  // An explicit marketplace SKU identifies the item even when its seller
+  // article is shared by discounted variants.
+  const match=exactSku.length?exactSku:candidates.filter(r=>input.article&&[r.article,r.offer_id,r.sku].some(v=>norm(v)===norm(input.article)));
   const keys=[...new Set(match.map(r=>String(r.sku)))];
   if(keys.length!==1){errors.push({row:input.source_row,article:input.article||input.sku,error:keys.length?'Артикул неоднозначен':'Артикул не найден в кабинете'});continue;}
   const r=match.find(r=>String(r.sku)===keys[0]);source.push({...input,canonical_sku:r.sku,master_category:r.master_category});
