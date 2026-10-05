@@ -959,7 +959,15 @@ globalThis.openSku=function(key){
 body+=buildSkuDynamics(key,a);
  E("detail").innerHTML=body;setDetailTab(detailTab)
 }
-function render(){if(!CONFIG?.onRender){kpis();tables()}else if(selected){openSku(selected)}trend();if(CONFIG?.onRender){let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap();CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:aggregateSku(ds).map(a=>({...a,risk:riskFor(a,pm),stock:stockFor(a),channels:channelShareText(a)})),filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})}}function setup(){
+function render(){if(!CONFIG?.onRender){kpis();tables()}else if(selected){openSku(selected)}trend();if(CONFIG?.onRender){
+ let ds=periodDates(0),prev=prevPeriodDates(),pm=prevMap(),currentSku=aggregateSku(ds),currentMap=new Map(currentSku.map(a=>[a.key,a]));
+ let declineSkus=[...pm.values()].filter(p=>N(p.units)>=2).map(p=>{
+   let a=currentMap.get(p.key)||{...p,gmv:0,units:0,orders:0,latest_gmv:0,latest_units:0};
+   let risk=riskFor(a,pm),lostGmv=Math.max(0,N(p.gmv)-N(a.gmv));
+   return {...a,risk,stock:stockFor(a),channels:channelShareText(a),previousGmv:N(p.gmv),previousUnits:N(p.units),lostGmv}
+ }).filter(a=>a.lostGmv>0).sort((a,b)=>b.lostGmv-a.lostGmv);
+ CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:currentSku.map(a=>({...a,risk:riskFor(a,pm),stock:stockFor(a),channels:channelShareText(a)})),declineSkus,filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})
+}}function setup(){
  rebuildDimMap();rebuildStockMap();rebuildLinkMap();rebuildPositionMap();rebuildContentMap();rebuildYandexAnalytics();E("q").value="";E("q").setAttribute("autocomplete","off");populateMarketplaceFilter();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();E("skuQuickSearch").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();openQuickSku()}};
  E("cabinet").onchange=()=>{populateDimensionFilters();render()};
  E("marketplace").onchange=()=>{applyMarketplacePageTheme();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();render()};
