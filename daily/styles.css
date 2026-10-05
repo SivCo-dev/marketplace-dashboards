@@ -7,24 +7,24 @@ body{--a:#355846}
 
 /* Desktop first-screen fit: compact header, filters and KPI without chart scaling. */
 @media (min-width:1101px) {
-  .shell { padding-top:18px; }
-  .header { margin-bottom:12px; }
-  .header h1 { margin-top:4px; font-size:27px; }
-  .header p { margin-top:5px; }
+  .shell { padding-top:12px; }
+  .header { margin-bottom:8px; }
+  .header h1 { margin-top:2px; font-size:26px; }
+  .header p { margin-top:3px; }
   .view-switch a,.view-switch span { padding:9px 16px; }
   .live-badge { padding:6px 9px; }
-  .visual-filters { padding:10px 12px; gap:9px; margin-bottom:9px; }
+  .visual-filters { padding:8px 12px; gap:8px; margin-bottom:7px; }
   .visual-filters label { margin-bottom:3px; }
   .visual-filters select { height:34px; }
   .extra-filters summary { padding:9px 12px; }
   .extra-filters[open] .extra-grid { top:38px; }
   .grid5 { margin-bottom:6px; }
-  .visual-kpi { padding:12px 15px; min-height:105px; }
-  .visual-kpi strong { font-size:26px; margin:8px 0 3px; }
-  .visual-kpi small { margin-bottom:7px; }
+  .visual-kpi { padding:9px 15px; min-height:96px; }
+  .visual-kpi strong { font-size:26px; margin:6px 0 2px; }
+  .visual-kpi small { margin-bottom:5px; }
   .kpi-label i { width:24px; height:24px; }
-  .state-strip { margin:8px 2px 10px; }
+  .state-strip { margin:5px 2px 7px; }
   #liveContext { padding:5px 11px; }
-  .trend-card.pad { padding:12px 16px; }
+  .trend-card.pad { padding:10px 16px; }
   .trend-card .section-head p { margin:3px 0 6px; }
 }
