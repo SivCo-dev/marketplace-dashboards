@@ -68,7 +68,7 @@ body{--a:#355846}
   .sales-overview #breakdownSwitch {display:flex;width:100%;margin-bottom:10px}
   .sales-overview #breakdownSwitch button {flex:1;white-space:nowrap}
   .sales-overview #breakdownCards {grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
-  .sales-overview .breakdown-panel[data-mode="market"] #breakdownCards {grid-template-columns:1fr}
+  .sales-overview .breakdown-panel[data-breakdown-view="market"] #breakdownCards {grid-template-columns:1fr}
   .sales-overview .breakdown-card {padding:9px 10px;min-width:0}
   .sales-overview .breakdown-card > div:first-child {grid-template-columns:24px minmax(0,1fr);gap:3px 7px}
   .sales-overview .breakdown-card .market-icon {width:23px;height:23px;font-size:8px}
@@ -86,7 +86,7 @@ body{--a:#355846}
 }
 
 /* Revenue categories as compact ledger rows rather than cards. */
-.sales-overview .breakdown-panel[data-mode="category"] #breakdownCards{
+.sales-overview .breakdown-panel[data-breakdown-view="category"] #breakdownCards{
  display:block;
 }
 .category-lines{width:100%;min-width:0}
@@ -104,8 +104,8 @@ body{--a:#355846}
 
 /* Keep category totals visible and long lists scrollable in Orange. */
 @media (min-width:901px) {
-  .sales-overview .breakdown-panel[data-mode="category"] {display:flex;flex-direction:column;min-height:0;overflow:hidden}
-  .sales-overview .breakdown-panel[data-mode="category"] #breakdownCards {display:flex;flex-direction:column;flex:1 1 0;min-height:0}
+  .sales-overview .breakdown-panel[data-breakdown-view="category"] {display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  .sales-overview .breakdown-panel[data-breakdown-view="category"] #breakdownCards {display:flex;flex-direction:column;flex:1 1 0;min-height:0}
   .sales-overview .category-lines {display:flex;flex-direction:column;flex:1 1 0;min-height:0}
   .sales-overview .category-lines-scroll {overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1 1 0;padding-right:4px}
   .sales-overview .category-total {flex-shrink:0}
@@ -114,12 +114,12 @@ body{--a:#355846}
 .category-lines-scroll:focus-visible{outline:2px solid #658568;outline-offset:2px}
 
 /* Bounded Orange category list, independent of SKU rerendering. */
-.sales-overview .breakdown-panel[data-mode="category"] .category-lines-scroll{
+.sales-overview .breakdown-panel[data-breakdown-view="category"] .category-lines-scroll{
   max-height:340px;
   overflow-y:auto;
   overflow-x:hidden;
 }
-.sales-overview .breakdown-panel[data-mode="category"] .category-total{
+.sales-overview .breakdown-panel[data-breakdown-view="category"] .category-total{
   position:relative;
   flex-shrink:0;
 }
