@@ -261,10 +261,11 @@ begin
   where s.tenant_id=v_tenant and s.snapshot_kind='daily-full' and s.is_complete
     and (s.payload-'meta')=(p_payload-'meta');
   if found then
+    -- Heartbeat metadata is not a new commercial publication.
     update dev21.dashboard_snapshots
-    set payload=p_payload,generated_at=now(),source_as_of=p_source_as_of,
-        data_as_of=p_source_as_of,published_at=now()
-    where tenant_id=v_tenant and snapshot_kind='daily-full';
+    set payload=p_payload
+    where tenant_id=v_tenant and snapshot_kind='daily-full'
+      and payload is distinct from p_payload;
     return v_version;
   end if;
 
@@ -310,10 +311,17 @@ language plpgsql
 set search_path to ''
 as $function$
 begin
-  if new.tenant_id='ORANGE' and new.snapshot_kind='daily-full'
-     and coalesce(new.payload#>>'{meta,canonicalization_version}','')<>'orange-v2' then
-    new.payload := dev21.canonicalize_orange_dashboard_payload(new.payload);
-    new.payload := jsonb_set(new.payload,'{meta,canonicalization_version}',to_jsonb('orange-v2'::text),true);
+  if new.tenant_id='ORANGE' and new.snapshot_kind='daily-full' then
+    -- Full/closed-day publishers may inherit metadata. A version marker
+    -- alone is insufficient when commercial SKU/dimension arrays change.
+    if coalesce(new.payload#>>'{meta,canonicalization_version}','')<>'orange-v2'
+       or coalesce(new.payload#>>'{meta,canonical_content_hash}','') is distinct from
+          md5(jsonb_build_array(new.payload->'sku_daily',new.payload->'dimensions')::text) then
+      new.payload := dev21.canonicalize_orange_dashboard_payload(new.payload);
+      new.payload := jsonb_set(new.payload,'{meta,canonicalization_version}',to_jsonb('orange-v2'::text),true);
+      new.payload := jsonb_set(new.payload,'{meta,canonical_content_hash}',
+        to_jsonb(md5(jsonb_build_array(new.payload->'sku_daily',new.payload->'dimensions')::text)),true);
+    end if;
   end if;
   return new;
 end;
@@ -322,7 +330,10 @@ $function$;
 -- Existing current snapshots were already canonicalized by the old trigger.
 -- Marking them allows the new trigger to avoid repeating that full-payload work.
 update dev21.dashboard_snapshots
-set payload=jsonb_set(payload,'{meta,canonicalization_version}',to_jsonb('orange-v2'::text),true)
+set payload=jsonb_set(
+  jsonb_set(payload,'{meta,canonicalization_version}',to_jsonb('orange-v2'::text),true),
+  '{meta,canonical_content_hash}',
+  to_jsonb(md5(jsonb_build_array(payload->'sku_daily',payload->'dimensions')::text)),true)
 where tenant_id='ORANGE' and snapshot_kind='daily-full' and is_complete;
 
 create or replace function dev21.refresh_live_snapshot_v2(
@@ -381,24 +392,23 @@ begin
   v_old_fingerprints := coalesce(v_payload#>'{meta,live_source_fingerprints}','{}'::jsonb);
 
   with accounts as materialized (
-    select a.account_id,a.marketplace,r.cabinet,
-      greatest(s.last_success_at,ls.last_success) last_success_at
+    select a.account_id,a.marketplace,r.cabinet
     from config.marketplace_accounts a
     join config.account_runtime_v2 r using(tenant_id,account_id)
-    left join raw.order_source_success_v2 s using(account_id)
-    left join public.orange_marketplace_load_status_1x ls
-      on a.tenant_id='ORANGE' and ls.marketplace=a.marketplace and ls.cabinet=r.cabinet
     where a.tenant_id=v_tenant and a.active and r.daily_active
   ), live as materialized (
     select * from dev21.live_order_rows_v2(v_tenant,p_report_date)
   ), source_hashes as (
     select account_id,md5(coalesce(string_agg(
-      concat_ws('|',marketplace,cabinet,order_key,sku,article,units::text,gmv::text,
-        coalesce(order_state,''),coalesce(source_updated_at::text,'')),E'\n'
-      order by marketplace,cabinet,order_key,sku,article),'')) row_hash
+      jsonb_build_array(marketplace,cabinet,report_date,order_key,sku,article,
+        product_name,trim_scale(units),trim_scale(gmv),order_state,
+        (coalesce(order_state,'')<>'cancelled' or source_updated_at::date>report_date))::text,E'\n'
+      order by marketplace,cabinet,order_key,sku,article,product_name,units,gmv,order_state,
+        (coalesce(order_state,'')<>'cancelled' or source_updated_at::date>report_date)),'')) row_hash
     from live group by account_id
   ), fingerprints as (
-    select a.account_id,md5(coalesce(h.row_hash,'')||'|'||coalesce(a.last_success_at::text,'')) fingerprint
+    select a.account_id,md5(jsonb_build_array(p_report_date,a.marketplace,a.cabinet,
+      coalesce(h.row_hash,''))::text) fingerprint
     from accounts a left join source_hashes h using(account_id)
   )
   select coalesce(jsonb_object_agg(account_id,fingerprint),'{}'::jsonb),
@@ -410,6 +420,10 @@ begin
 
   if cardinality(v_changed_accounts)=0
      and v_payload#>>'{meta,orders_refreshed_date}'=p_report_date::text then
+    -- Refresh health and changed stocks without rebuilding order arrays.
+    -- Metadata-only publication preserves the version and publication time.
+    v_payload := dev21.enrich_live_snapshot_fast_v2(v_tenant,p_report_date,v_payload);
+    v_version := dev21.publish_live_snapshot_v2(v_tenant,v_payload,now());
     raise notice 'LIVE snapshot unchanged tenant=% date=% version=%',v_tenant,p_report_date,v_version;
     return v_version;
   end if;
@@ -513,6 +527,10 @@ begin
       'live_source_fingerprints',v_fingerprints,
       'canonicalization_version','orange-v2'
     ));
+  if v_tenant='ORANGE' then
+    v_payload := jsonb_set(v_payload,'{meta,canonical_content_hash}',
+      to_jsonb(md5(jsonb_build_array(v_payload->'sku_daily',v_payload->'dimensions')::text)),true);
+  end if;
   v_payload := dev21.enrich_live_snapshot_fast_v2(v_tenant,p_report_date,v_payload);
   v_after_enrich := clock_timestamp();
   v_payload := jsonb_set(v_payload,'{meta,build_timings_ms}',jsonb_build_object(
