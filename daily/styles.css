@@ -50,10 +50,10 @@ body{--a:#355846}
 }
 
 /* Desktop sales overview: readable 30-day chart beside marketplace/category distribution. */
-@media (min-width:1101px) {
+@media (min-width:901px) {
   .sales-overview {
     display:grid;
-    grid-template-columns:minmax(0,1.75fr) minmax(335px,1fr);
+    grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr);
     gap:10px;
     align-items:stretch;
     margin-bottom:10px;
@@ -77,7 +77,7 @@ body{--a:#355846}
   .sales-overview .breakdown-card > strong {font-size:16px;margin:7px 0 7px;white-space:nowrap}
   .sales-overview .breakdown-card p {margin-top:6px;font-size:9px;gap:5px}
 }
-@media (max-width:1100px) {
+@media (max-width:900px) {
   .sales-overview {display:block}
   .sales-overview #breakdownCards {grid-template-columns:repeat(3,minmax(0,1fr))}
 }
