@@ -39,6 +39,17 @@ function normArticle(v){return String(v||"").toLowerCase().replace(/[^a-zа-я0-
 function canonicalKey(x){return String((x&&x.canonical_sku)||(x&&x.external_sku)||(x&&x.article)||(x&&x.sku)||"")}
 function refMap(){let m=new Map();for(const r of D.refs||[]){if(r.article)m.set(String(r.article).toLowerCase(),r);if(r.sku)m.set(String(r.sku),r)}return m}
 let DIM=new Map(),STOCK=[],POSITION=[],CONTENT=[],VISIBILITY=[],ADS=[],LINKS=[];
+// Perf caches. Each entry remembers the exact source object it was built from (the snapshot object D,
+// the STOCK array, the CONTENT array) and is rebuilt when that object changes; setup() also clears all
+// entries for every new snapshot. Index buckets keep the original row order, so every sum, sort and
+// "first match" below sees rows in the same order as the previous full scans.
+let PERF={};
+function perfCache(name,src,build){let c=PERF[name];if(!c||c.src!==src){c=PERF[name]={src,val:build()}}return c.val}
+function groupRows(rows,keyFn){let m=new Map();for(const x of rows){let k=keyFn(x),b=m.get(k);if(!b)m.set(k,b=[]);b.push(x)}return m}
+function skuRowsByKey(key){return perfCache("skuByKey",D,()=>groupRows(D.sku_daily||[],canonicalKey)).get(key)||[]}
+function skuRowsByArticle(art){return perfCache("skuByArticle",D,()=>groupRows(D.sku_daily||[],x=>normArticle(x.article))).get(art)||[]}
+function stockIndex(){return perfCache("stockIndex",STOCK,()=>({byArticle:groupRows(STOCK,s=>normArticle(s.offer_id)),bySku:groupRows(STOCK,s=>String(s.sku||""))}))}
+function contentIndex(){return perfCache("contentIndex",CONTENT,()=>{let byArticle=new Map(),bySku=new Map();CONTENT.forEach((c,i)=>{let a=normArticle(c.offer_id),s=String(c.sku||"");if(!byArticle.has(a))byArticle.set(a,[]);byArticle.get(a).push(i);if(!bySku.has(s))bySku.set(s,[]);bySku.get(s).push(i)});return{byArticle,bySku}})}
 function dimKey(cab,sku){return String(cab||"")+"|"+String(sku||"")}
 function rebuildDimMap(){DIM=new Map();for(const d of D.dimensions||[])DIM.set(dimKey(d.cabinet,d.sku),d)}
 function rebuildStockMap(){STOCK=Array.isArray(D.stocks)?D.stocks:[]}
@@ -84,7 +95,8 @@ function productLinkFor(marketplace,a){
 }
 function stockFor(a){
  let art=normArticle(a.article),sku=String(a.sku||"");
- let arr=STOCK.filter(s=>((art&&normArticle(s.offer_id)===art)||(!art&&sku&&String(s.sku||"")===sku)));
+ // Same rows as STOCK.filter((art&&normArticle(offer_id)===art)||(!art&&sku&&String(sku)===sku)), in STOCK order.
+ let idx=stockIndex(),arr=art?(idx.byArticle.get(art)||[]).slice():sku?(idx.bySku.get(sku)||[]).slice():[];
  if(!arr.length)return null;
 
  // 1. Ozon всегда приоритетнее других маркетплейсов, если SKU там существует.
@@ -215,9 +227,10 @@ function populateDimensionFilters(){
  E("category").value=cats.includes(oldCat)?oldCat:"ALL";E("brand").value=brands.includes(oldBrand)?oldBrand:"ALL"
 }
 function isLiveRow(x){return x&&(x.is_live===true||String(x.is_live).toLowerCase()==="true")}
-function liveDateSet(){return new Set([].concat(D.daily||[],D.sku_daily||[],D.lines||[]).filter(isLiveRow).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))}
-function allDates(){return [...new Set([].concat(D.daily||[],D.sku_daily||[]).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))].sort()}
-function dates(){let live=liveDateSet();return allDates().filter(d=>!live.has(d))}
+// Date lists depend only on the snapshot D: computed once per snapshot; callers receive fresh copies.
+function liveDateSet(){return new Set(perfCache("liveDates",D,()=>new Set([].concat(D.daily||[],D.sku_daily||[],D.lines||[]).filter(isLiveRow).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))))}
+function allDates(){return perfCache("allDates",D,()=>[...new Set([].concat(D.daily||[],D.sku_daily||[]).map(x=>String(x.report_date||"").slice(0,10)).filter(Boolean))].sort()).slice()}
+function dates(){return perfCache("closedDates",D,()=>{let live=liveDateSet();return allDates().filter(d=>!live.has(d))}).slice()}
 function chartLiveDates(){return selectUnclosedChartDates(allDates(),liveDateSet(),periodDates(0),E("days").value)}
 function periodDates(offset=0){
  let ds=dates(),v=E("days").value;
@@ -368,7 +381,7 @@ function allMarketAvgDailySales14d(a){
  let maxDate=dates().at(-1)||"";if(!maxDate)return 0;
  let end=new Date(maxDate+"T00:00:00Z"),start=new Date(end);start.setUTCDate(start.getUTCDate()-13);
  let startS=start.toISOString().slice(0,10),units=0;
- for(const x of rows){
+ for(const x of (rows.length?skuRowsByArticle(art):[])){
    let d=String(x.report_date||"");
    if(d<startS||d>maxDate||isLiveRow(x))continue;
    if(normArticle(x.article)!==art)continue;
@@ -378,10 +391,12 @@ function allMarketAvgDailySales14d(a){
 }
 function avgContentScore(a,f=currentFilters()){
  let art=normArticle(a.article),sku=String(a.sku||"");
- let arr=CONTENT.filter(c=>{
+ // Candidates = rows matching (art&&normArticle(offer_id)===art)||(sku&&String(sku)===sku), in CONTENT order.
+ let idx=contentIndex(),ids=[...new Set([...(art?idx.byArticle.get(art)||[]:[]),...(sku?idx.bySku.get(sku)||[]:[])])].sort((x,y)=>x-y);
+ let arr=ids.map(i=>CONTENT[i]).filter(c=>{
    if(f.marketplace!=="ALL"&&String(c.marketplace||"").toUpperCase()!==f.marketplace)return false;
    if(f.cab!=="ALL"&&c.cabinet!==f.cab)return false;
-   return (art&&normArticle(c.offer_id)===art)||(sku&&String(c.sku||"")===sku)
+   return true
  });
  if(!arr.length)return null;
  return arr.reduce((s,c)=>s+N(c.content_score),0)/arr.length
@@ -457,7 +472,7 @@ function mergeOzonEconomics(base,oz){
 }
 function channelShareText(a,f=currentFilters()){
  const allowed=new Set(periodDates(0)),tot={OZON:0,YANDEX:0,WB:0};let sum=0;
- for(const x of (D.sku_daily||[])){
+ for(const x of skuRowsByKey(a.key)){
    let k=canonicalKey(x);
    if(k!==a.key||!allowed.has(x.report_date))continue;
    if(f.cab!=="ALL"&&x.cabinet!==f.cab)continue;
@@ -476,10 +491,17 @@ function channelShareText(a,f=currentFilters()){
  if(tot.WB)parts.push("WB "+Math.round(tot.WB/sum*100)+"%");
  return parts.join(" · ")
 }
+// Result depends only on the snapshot (sku_daily, closed dates, dimensions), not on filters or the period,
+// so it is computed once per SKU and marketplace per snapshot. Callers get a shallow copy, as before.
 function operationalEconomicsFor(key,mk){
  mk=String(mk||"").toUpperCase();if(mk!=="WB"&&mk!=="YANDEX")return null;
+ let memo=perfCache("operationalEconomics",D,()=>new Map()),ck=String(key)+"\u0000"+mk;
+ if(!memo.has(ck))memo.set(ck,computeOperationalEconomics(key,mk));
+ let r=memo.get(ck);return r?{...r}:r
+}
+function computeOperationalEconomics(key,mk){
  let all=(D.sku_daily||[]),ds=dates(),d14=new Set(ds.slice(-14)),d30=new Set(ds.slice(-30));
- let own=all.filter(x=>canonicalKey(x)===key&&rowMarketplace(x)===mk);
+ let own=skuRowsByKey(key).filter(x=>rowMarketplace(x)===mk);
  if(!own.length)return null;
  own.sort((a,b)=>String(b.report_date||"").localeCompare(String(a.report_date||"")));
  let latestPrice=own.find(x=>x.current_price!==null&&x.current_price!==undefined),currentPrice=latestPrice?N(latestPrice.current_price):null;
@@ -494,14 +516,16 @@ function operationalEconomicsFor(key,mk){
  }
  function categoryRows(){
    if(!targetCat)return[];
-   return all.filter(x=>rowMarketplace(x)===mk&&(dimFor(x.cabinet,x.sku).category||"Без категории")===targetCat)
+   let memo=perfCache("categoryRows",D,()=>new Map()),ck=mk+"\u0000"+targetCat;
+   if(!memo.has(ck))memo.set(ck,all.filter(x=>rowMarketplace(x)===mk&&(dimFor(x.cabinet,x.sku).category||"Без категории")===targetCat));
+   return memo.get(ck)
  }
  function pickMetric(kind){
    let candidates=[
      {rows:own,set:d14,label:"SKU • факт 14д"},
      {rows:own,set:d30,label:"SKU • факт 30д"},
      {rows:categoryRows(),set:d14,label:"категория • факт 14д"},
-     {rows:all.filter(x=>rowMarketplace(x)===mk),set:d14,label:"маркет • факт 14д"}
+     {rows:perfCache("marketRows",D,()=>new Map()).get(mk)||perfCache("marketRows",D,()=>new Map()).set(mk,all.filter(x=>rowMarketplace(x)===mk)).get(mk),set:d14,label:"маркет • факт 14д"}
    ];
    for(const c of candidates){let s=sumRows(c.rows,c.set);if(kind==="commission"&&s.cg>0&&s.ca>=0)return{value:s.ca/s.cg*100,source:c.label};if(kind==="logistics"&&s.cu>0&&s.la>=0)return{value:s.la/s.cu,source:c.label}}
    return{value:null,source:"нет данных"}
@@ -1008,7 +1032,7 @@ function render(){if(!CONFIG?.onRender){kpis();tables()}else if(selected){openSk
  let problemSkus=[...problemMap.values()].filter(a=>a.risk.level>0).sort((a,b)=>b.problemImpact-a.problemImpact||b.risk.level-a.risk.level||b.gmv-a.gmv);
  CONFIG.onRender({payload:D,currentDates:ds,previousDates:prev,current:aggregateDaily(dailyFor(ds)),previous:aggregateDaily(dailyFor(prev)),skuRows:skuFor(ds),previousSkuRows:skuFor(prev),live:dailyFor(chartLiveDates()),skus:enrichedCurrent,declineSkus,growthSkus,problemSkus,filters:currentFilters(),marketTotals:availableMarketplaces().map(marketplace=>({marketplace,...aggregateDaily(dailyFor(ds,marketplace))}))})
 }}function setup(){
- rebuildDimMap();rebuildStockMap();rebuildLinkMap();rebuildPositionMap();rebuildContentMap();rebuildYandexAnalytics();E("q").value="";E("q").setAttribute("autocomplete","off");populateMarketplaceFilter();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();E("skuQuickSearch").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();openQuickSku()}};
+ PERF={};rebuildDimMap();rebuildStockMap();rebuildLinkMap();rebuildPositionMap();rebuildContentMap();rebuildYandexAnalytics();E("q").value="";E("q").setAttribute("autocomplete","off");populateMarketplaceFilter();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();E("skuQuickSearch").onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();openQuickSku()}};
  E("cabinet").onchange=()=>{populateDimensionFilters();render()};
  E("marketplace").onchange=()=>{applyMarketplacePageTheme();populateCabinetFilter();populateDimensionFilters();refreshQuickSkuList();render()};
  E("masterCategory").onchange=()=>{populateDimensionFilters();render()};["category","brand","riskLimit","topLimit","moverLimit","allSkuLimit","trendMode"].forEach(id=>E(id).onchange=render);E("days").onchange=function(){refreshQuickSkuList();render()};
