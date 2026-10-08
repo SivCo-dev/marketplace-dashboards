@@ -120,5 +120,26 @@ H.compare = (a, b) => {
   }
   return out;
 };
+// Same app on live network (no data substitution), for repeat-open timing and full-page comparison.
+H.instanceNet = (srcName, tenant) => new Promise((resolve, reject) => {
+  const fr = document.createElement('iframe'); fr.style.cssText = 'width:1400px;height:900px;position:absolute;left:-5000px;top:0';
+  fr.src = BASE + 'dev23/index.html?tenant=' + tenant + '&period=30&_=' + Math.random();
+  fr.onload = async () => {
+    try {
+      const w = fr.contentWindow, d = fr.contentDocument;
+      const core = H.src[srcName].replace(/from\s+['"]\.\.\/\.\.\/core\/runtime-registry\.js[^'"]*['"]/, `from '${BASE}core/runtime-registry.js?v=20261004finish'`).replace(/from\s+['"]\.\/canonical-sku\.js['"]/, `from '${BASE}daily/core/canonical-sku.js'`);
+      const coreUrl = URL.createObjectURL(new Blob([core], { type: 'text/javascript' }));
+      const app = H.src.app.replace(/from\s+['"]\.\/core\/dashboard-core\.js[^'"]*['"]/, `from '${coreUrl}'`).replace(/from\s+['"]\.\.\/config\/(\w+)\.js['"]/g, (m, f) => `from '${BASE}config/${f}.js'`).replace(/from\s+['"]\.\.\/core\/runtime-registry\.js[^'"]*['"]/, `from '${BASE}core/runtime-registry.js?v=20261004finish'`);
+      d.head.innerHTML = '<meta charset="utf-8"><link rel="stylesheet" href="' + BASE + 'daily/core/dashboard.css"><link rel="stylesheet" href="' + BASE + 'daily/styles.css">';
+      d.body.removeAttribute('style'); d.body.innerHTML = '<main id="app"></main>';
+      const t0 = w.performance.now();
+      await w.eval('import(' + JSON.stringify(URL.createObjectURL(new Blob([app], { type: 'text/javascript' }))) + ')');
+      const st = Date.now(); while (Date.now() - st < 180000) { const l = d.getElementById('load'); if (l && l.classList.contains('hide')) break; await new Promise(r => setTimeout(r, 20)); }
+      const ent = w.performance.getEntriesByType('resource').find(e => /tenant=/.test(e.name) && /dashboard-data-dev23/.test(e.name));
+      resolve({ fr, w, d, readyMs: w.performance.now() - t0, dataEnd: ent ? ent.responseEnd - t0 : null });
+    } catch (e) { reject(e); }
+  };
+  document.body.appendChild(fr);
+});
 return 'harness ready';
 })();

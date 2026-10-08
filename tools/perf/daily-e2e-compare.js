@@ -26,9 +26,12 @@ E2E.actions = inst => {
   for (const id of ['skuMarket', 'skuStock', 'skuMaster', 'skuBrand']) { const v = opts(id).filter(x => x !== 'ALL')[0]; if (v) { A.push({ t: 'select', id, v }); A.push({ t: 'select', id, v: 'ALL' }); } }
   A.push({ t: 'input', id: 'skuSearch', v: 'b' }); A.push({ t: 'input', id: 'skuSearch', v: '' });
   for (const mode of [...d.querySelectorAll('#moverMode [data-mode]')].map(b => b.dataset.mode)) A.push({ t: 'clickSel', sel: '#moverMode [data-mode="' + mode + '"]' });
-  for (const k of [0, 1, 2]) { A.push({ t: 'openRow', k }); for (const tab of ['overview', 'dynamics', 'economics']) A.push({ t: 'clickSel', sel: '#productDrawer [data-tab="' + tab + '"]', optional: true }); A.push({ t: 'clickSel', sel: '#drawerClose' }); }
+  for (const k of [0, 1, 2]) A.push({ t: 'openRow', k }, { t: 'clickSel', sel: '#drawerClose' });
   A.push({ t: 'select', id: 'days', v: '7' }); A.push({ t: 'openRow', k: 0 }); A.push({ t: 'clickSel', sel: '#drawerClose' }); A.push({ t: 'select', id: 'days', v: '30' });
-  return A;
+  // SKU card with its tabs and switches, exercised first (right after load).
+  const card = [];
+  for (const k of [0, 1, 2]) { card.push({ t: 'openRow', k }); for (const s of ['[data-tab="dynamics"]', '[data-dyn-metric="PRICE"]', '[data-dyn-metric="POSITION"]', '[data-dyn-market]', '[data-tab="overview"]', '[data-overview-market="ALL"]', '[data-overview-market="OZON"]']) card.push({ t: 'clickSel', sel: s, optional: true }); card.push({ t: 'clickSel', sel: '#drawerClose' }); }
+  return [...card, ...A];
 };
 E2E.apply = (inst, a) => {
   const d = inst.d, $ = id => d.getElementById(id);
