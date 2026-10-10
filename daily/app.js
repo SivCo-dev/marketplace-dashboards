@@ -6,7 +6,7 @@ import {loadReportRegistry,dailyConfigsFromRegistry} from '../core/runtime-regis
 import {ensureSession,getAccessToken,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js';
 const session=await ensureSession();
 const accessToken=await getAccessToken();
-const authedFetch=makeAuthedFetch({onAccessDenied:()=>{E('load').classList.add('hide');E('err').classList.remove('hide');E('err').textContent='Нет доступа к этому кабинету для вашей учётной записи.';}});
+const authedFetch=makeAuthedFetch({onAccessDenied:()=>{document.getElementById('load')?.classList.add('hide');const errEl=document.getElementById('err');if(errEl){errEl.classList.remove('hide');errEl.textContent='Нет доступа к этому кабинету для вашей учётной записи.';}}});
 const initialQuery=new URLSearchParams(location.search);
 const requestedTenant=/^[A-Z0-9_-]{1,32}$/.test(initialQuery.get('tenant')||'')?initialQuery.get('tenant'):'W';
 const initialResponse=authedFetch('https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/dashboard-data-auth-dev?tenant='+requestedTenant+'&format=columnar',{cache:'no-cache'});
