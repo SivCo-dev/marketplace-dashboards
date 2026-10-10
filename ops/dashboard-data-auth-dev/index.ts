@@ -138,6 +138,7 @@ Deno.serve(async (request:Request)=>{
       raw_max_date:(payload.meta as Record<string,unknown>|undefined)?.raw_max_date,
       wb_finance_through:(payload.meta as Record<string,unknown>|undefined)?.wb_finance_through,
       wb_ads_through:(payload.meta as Record<string,unknown>|undefined)?.wb_ads_through,
+      ozon_enrichment:(()=>{const m=(ozonPayload.meta||{}) as Record<string,unknown>;return pick(m,["generated_at","as_of_date","logistics_max_date","price_max_date","positions_max_date","reference_month","reference_month_status"]);})(),
       generated_at:base.generated_at,
       source_as_of:base.source_as_of,
       version:"2.3",
