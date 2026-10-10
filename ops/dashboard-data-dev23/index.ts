@@ -25,6 +25,8 @@ const fields: Record<string,string[]> = {
   ads:["ad_orders","ad_revenue","cabinet","clicks","drr","marketplace","offer_id","period_from","period_to","shows","source_type","spend"],
   product_links:["cabinet","external_id","marketplace","offer_id","product_url"],
   refs:["article","sku","commission_pct","logistics_per_unit","current_price"],
+  ozon_current:["cabinet","sku","offer_id","price","price_date","old_price","commission_pct","commission_date","logistics_per_unit","logistics_status","logistics_units","logistics_from","logistics_to","received_per_unit","month","month_status","month_units","month_received_per_unit","month_commission_pct","month_logistics_per_unit"],
+  ozon_ads_campaigns:["date","campaign_id","title","views","clicks","orders","spend","orders_money"],
   marketplace_products:["tenant_id","marketplace","account_id","cabinet","canonical_sku","external_sku","marketplace_product_id","offer_id","product_url","product_name","is_active","last_seen_at","link_checked_at","source_updated_at","current_price","master_category","commission_pct","commission_source"]
 };
 
@@ -32,7 +34,7 @@ const pick=(row:Record<string,unknown>,keys:string[])=>Object.fromEntries(keys.f
 const safePayload=(payload:Record<string,unknown>)=>{
   const out:Record<string,unknown>={};
   for(const [key,keys] of Object.entries(fields)){
-    if(key==="marketplace_products") continue;
+    if(key==="marketplace_products"||key==="ozon_current"||key==="ozon_ads_campaigns") continue;
     out[key]=Array.isArray(payload[key]) ? (payload[key] as Record<string,unknown>[]).map(r=>pick(r,keys)) : [];
   }
   return out;
@@ -101,7 +103,11 @@ Deno.serve(async (request:Request)=>{
       ...safePayload(ozonPayload),
       sku_daily:(Array.isArray(ozonPayload.sku_daily)?ozonPayload.sku_daily as Record<string,unknown>[]:[])
         .filter(row=>baseOzonKeys.has([row.report_date,row.cabinet,String(row.sku||"")].join("|")))
-        .map(row=>pick(row,["report_date","cabinet","sku","ref_month","current_price","commission_pct","commission_status","logistics_per_unit","actual_logistics_units","forecast_logistics_units","logistics_status"]))
+        .map(row=>pick(row,["report_date","cabinet","sku","ref_month","current_price","commission_pct","commission_status","logistics_per_unit","actual_logistics_units","forecast_logistics_units","logistics_status"])),
+      ozon_current:(Array.isArray(ozonPayload.ozon_current)?ozonPayload.ozon_current as Record<string,unknown>[]:[])
+        .map(row=>pick(row,fields.ozon_current)),
+      ozon_ads_campaigns:(Array.isArray(ozonPayload.ozon_ads_campaigns)?ozonPayload.ozon_ads_campaigns as Record<string,unknown>[]:[])
+        .map(row=>pick(row,fields.ozon_ads_campaigns))
     },
     meta:{
       tenant_id:tenant,
@@ -119,6 +125,7 @@ Deno.serve(async (request:Request)=>{
       raw_max_date:(payload.meta as Record<string,unknown>|undefined)?.raw_max_date,
       wb_finance_through:(payload.meta as Record<string,unknown>|undefined)?.wb_finance_through,
       wb_ads_through:(payload.meta as Record<string,unknown>|undefined)?.wb_ads_through,
+      ozon_enrichment:(()=>{const m=(ozonPayload.meta||{}) as Record<string,unknown>;return pick(m,["generated_at","as_of_date","logistics_max_date","price_max_date","positions_max_date","reference_month","reference_month_status"]);})(),
       generated_at:base.generated_at,
       source_as_of:base.source_as_of,
       version:"2.3",

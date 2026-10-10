@@ -140,3 +140,16 @@ body{--a:#355846}
 @media(max-width:650px){.sku-local-toolbar{grid-template-columns:1fr 1fr}.sku-local-search{grid-column:1/-1}}
 
 .sku-local-title{margin-top:10px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+/* 2026-10-10 visual release 5–9 */
+#kpis.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.data-as-of{color:#83938a;white-space:nowrap}
+body.market-OZON .market-accent-card>.section-head,body.market-YANDEX .market-accent-card>.section-head,body.market-WB .market-accent-card>.section-head{background:transparent;border-top-color:transparent}
+.product-cell small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
+#rows small.price-delta,#rows small.ad-spend{display:block;font-size:9px;color:var(--muted);margin-top:3px;font-weight:500}
+#rows .drr-high{color:#b5603f;font-weight:650}
+.ov-group{margin-top:16px}.ov-group-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:2px}.ov-group-title{font-size:12px;font-weight:800;color:#24342b}.ov-group-note{font-size:10px;color:var(--muted);text-align:right}
+.ov-group .ov-grid{margin-top:6px}
+.pass-sub.warn{color:#b54708}
+.pass .pass-sub{line-height:1.35}
+@media(max-width:650px){#kpis.grid4{grid-template-columns:1fr 1fr}.ov-group .ov-grid{grid-template-columns:1fr 1fr!important}.ov-group-head{flex-direction:column;align-items:flex-start}.ov-group-note{text-align:left}}
+.ov-group .pass{min-height:0}.ov-group .pass-sub{font-size:11px}

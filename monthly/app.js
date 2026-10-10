@@ -21,7 +21,7 @@ const previousPayload=()=>selectPayload(state.bundle,tenant(),previousMonth(mont
 const comparisonReady=()=>Boolean(state.payload&&previousPayload()&&state.payload.metadata.marketplace_close_status==="CLOSED"&&previousPayload().metadata.marketplace_close_status==="CLOSED");
 const metricRate=(p,key)=>rate(p?.financial_economics?.[key],p?.financial_economics?.sales);
 
-function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);history.replaceState(null,"",url);}
+function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);history.replaceState(null,"",url);const daily=new URL("../daily/",location.href);daily.searchParams.set("tenant",tenant());const link=document.getElementById("dailyLink");if(link)link.href=daily.toString();}
 
 function availableMarkets(){
  const consolidated=selectPayload(state.bundle,tenant(),month(),"ALL");
@@ -198,6 +198,8 @@ $("#tenantSelect").innerHTML=Object.entries(TENANTS).map(([id,config])=>'<option
 $("#monthSelect").innerHTML=MONTHS.map(value=>'<option value="'+value+'">'+e(monthLabel(value))+'</option>').join("");
 $("#marketSelect").innerHTML=MARKETPLACES.map(item=>'<option value="'+item.id+'">'+e(item.label)+'</option>').join("");
 $("#tenantSelect").value=TENANTS[query.get("tenant")]?query.get("tenant"):"W";
+// Organization picker only when the user can see more than one organization.
+$("#tenantControl").hidden=Object.keys(TENANTS).length<2;
 $("#monthSelect").value=MONTHS.includes(query.get("month"))?query.get("month"):(MONTHS[1]||MONTHS[0]);
 state.market=MARKETPLACES.some(item=>item.id===query.get("marketplace"))?query.get("marketplace"):"ALL";
 $("#marketSelect").value=state.market;
