@@ -808,9 +808,13 @@ function skuMarketAds(a,mk,ds){
  let daily=arr.filter(x=>String(x.period_from||"")===String(x.period_to||"")&&set.has(String(x.period_to||"")));
  let periods=arr.filter(x=>String(x.period_from||"")!==String(x.period_to||"")&&String(x.period_from||"")>=first&&String(x.period_to||"")<=last);
  let use=daily.concat(periods);if(!use.length)return null;
- let z={spend:0,orders:0,revenue:0,shows:0,clicks:0,from:"",to:""};
- for(const x of use){z.spend+=N(x.spend);z.orders+=N(x.ad_orders);z.revenue+=N(x.ad_revenue);z.shows+=N(x.shows);z.clicks+=N(x.clicks);if(!z.from||String(x.period_from)<z.from)z.from=String(x.period_from);if(String(x.period_to)>z.to)z.to=String(x.period_to)}
- z.ctr=z.shows?z.clicks/z.shows*100:null;z.drr_ads=z.revenue?z.spend/z.revenue*100:null;return z
+ let z={spend:0,orders:0,revenue:0,shows:0,clicks:0,from:"",to:"",ppo:0,ppo_estimate:false,spend_with_revenue:0};
+ for(const x of use){let st=String(x.source_type||"");z.spend+=N(x.spend);z.orders+=N(x.ad_orders);z.revenue+=N(x.ad_revenue);z.shows+=N(x.shows);z.clicks+=N(x.clicks);
+   if(st.startsWith("ppo")){z.ppo+=N(x.spend);if(st==="ppo_estimate"||st.includes("DERIVED"))z.ppo_estimate=true;
+     z.ppo_dates=z.ppo_dates||new Set();for(let t=new Date(String(x.period_from)+"T00:00:00Z");t<=new Date(String(x.period_to)+"T00:00:00Z");t.setUTCDate(t.getUTCDate()+1))z.ppo_dates.add(t.toISOString().slice(0,10))}
+   if(N(x.ad_revenue)>0)z.spend_with_revenue+=N(x.spend);
+   if(!z.from||String(x.period_from)<z.from)z.from=String(x.period_from);if(String(x.period_to)>z.to)z.to=String(x.period_to)}
+ z.ctr=z.shows?z.clicks/z.shows*100:null;z.drr_ads=z.revenue?z.spend_with_revenue/z.revenue*100:null;return z
 }
 function skuOzonPositionStats(a){
  let art=normArticle(a.article),sku=String(marketSkuFor("OZON",a)||a.sku||""),cab=E("cabinet").value;
@@ -900,6 +904,10 @@ function buildSkuOverview(key,a){
  let adWin=ad&&mk==="YANDEX"&&ad.period_from?" · окно "+dm(ad.period_from)+"–"+dm(ad.period_to):"";
  promo.push(card("Реклама",ad?R(ad.spend):"—",ad?"ДРР общий "+Pd(drrAll)+" · рекламный "+Pd(ad.drr_ads)+(ad.ctr!=null?" · CTR "+P(ad.ctr):"")+adWin:(mk==="OZON"?"Нет данных по SKU":"Нет данных"),"neu"));
  promo.push(card("Рекламные заказы",ad?I(ad.orders):"—",ad?(adShare==null?"":P(adShare)+" от всех заказов SKU"):"Нет данных","neu"));
+ if(mk==="OZON"&&ad&&ad.ppo>0){
+   let pdts=ad.ppo_dates||new Set(),pg=0;for(const r of D.sku_daily||[])if(rowMarketplace(r)==="OZON"&&pdts.has(String(r.report_date))&&canonicalKey(r)===key)pg+=N(r.gmv);
+   let ppoPct=pg?ad.ppo/pg*100:null,partial=pdts.size&&pdts.size<ds.length?" за "+pdts.size+" дн. с данными":"";
+   promo.push(card("Оплата за заказ",(ad.ppo_estimate?"≈ ":"")+R(ad.ppo),Pd(ppoPct)+" оборота"+partial+" · "+(ad.ppo_estimate?"оценка: расход кампании по доле оборота SKU":"факт по SKU")+" · входит в «Рекламу»","neu"))}
  // Marketplace card
  let cDate=skuContentDate(ct);
  let content=[card("Контент",ct?I(ct.content_score)+" / 100":"—",ct?((mk==="YANDEX"?"Content Rating Яндекс":mk==="WB"?"Content Score WB · наш расчёт":"Content Score Ozon")+(cDate?" · на "+dm(cDate):"")):"Нет данных","neu")];
