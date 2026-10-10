@@ -189,7 +189,7 @@ function renderLoadStatus(){
  else if(selectedError)$text("#reviewNote",selectedError.message);
  else $text("#reviewNote","Актуальные данные Monthly · "+dateText(selected.refreshed_at)+(failed.length?" · Недоступно: "+failed.join(", "):""));
  $("#accessNote").hidden=!selectedError;
- if(selectedError)$text("#accessNote","Выбранный срез "+(TENANTS[tenant()]?.label??tenant())+" временно недоступен. Остальные организации и площадки работают независимо.");
+ if(selectedError)$text("#accessNote",selectedError.accessDenied?"Нет доступа к этому кабинету для вашей учётной записи.":"Выбранный срез "+(TENANTS[tenant()]?.label??tenant())+" временно недоступен. Остальные организации и площадки работают независимо.");
 }
 function render(){
  state.payload=selectPayload(state.bundle,tenant(),month(),state.market);renderLoadStatus();updateUrl();renderHeader();renderSummary();renderAllocation();renderComparison();renderExpenses();renderBridge();setCategories();renderProducts();

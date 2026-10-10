@@ -176,13 +176,19 @@ export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000
    try{
     const params=new URLSearchParams({tenant,month,marketplace:market});
     const response=await fetcher(`${BASE}?${params}`,{cache:"no-store",signal:controller.signal});
+    if(response.status===403){
+     let body={};try{body=await response.clone().json();}catch{/* non-JSON error body */}
+     const denied=new Error(body?.error==="TENANT_ACCESS_DENIED"?"Нет доступа к этому кабинету для вашей учётной записи.":`Ошибка загрузки ${tenant}/${market}: ${response.status}`);
+     denied.accessDenied=body?.error==="TENANT_ACCESS_DENIED";
+     throw denied;
+    }
     if(!response.ok)throw new Error(`Ошибка загрузки ${tenant}/${market}: ${response.status}`);
     const scope=await response.json();
     const payload=adaptScope(scope);payload.metadata.loaded_at_ms=Date.now();put(payload);
     bundle.scope_status[key]={status:"ready",refreshed_at:payload.metadata.refreshed_at};publish();return payload;
    }catch(error){
     const message=controller.signal.aborted?`Превышено время загрузки ${tenant}/${market}`:String(error?.message??error);
-    bundle.scope_status[key]={status:"error",message};publish();throw error;
+    bundle.scope_status[key]={status:"error",message,accessDenied:Boolean(error?.accessDenied)};publish();throw error;
    }finally{clearTimeout(timer);inflight.delete(key);}
   })();
   inflight.set(key,promise);return promise;
@@ -199,7 +205,9 @@ export function createScopeLoader({onUpdate=()=>{},fetcher=fetch,timeoutMs=45000
   const ready=results.filter(result=>result.status==="fulfilled").map(result=>result.value);
   const totalReady=months.filter(month=>bundle.payloads.some(item=>scopeKey(item.metadata.tenant_id,item.metadata.month,item.metadata.marketplace)===scopeKey(tenant,month,"ALL"))).length;
   if(!totalReady){
-   bundle.tenant_status[tenant]={status:"error",message:`Данные ${tenant} временно недоступны`};
+   const rejected=results.filter(result=>result.status==="rejected");
+   const allDenied=rejected.length>0&&rejected.every(result=>result.reason?.accessDenied);
+   bundle.tenant_status[tenant]=allDenied?{status:"error",message:"Нет доступа к этому кабинету для вашей учётной записи.",accessDenied:true}:{status:"error",message:`Данные ${tenant} временно недоступны`};
   }else{
    bundle.tenant_status[tenant]={status:"ready",refreshed_at:latestTimestamp(ready.map(payload=>({updated_at:payload.metadata.refreshed_at})),bundle.exported_at),partial:totalReady!==months.length};
   }
