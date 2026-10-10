@@ -1,1 +1,9 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../core/dashboard.css?v=2.3.1"></head><body><main id="app"></main><script type="module">import config from "../config/w.js?v=2.3.1";import{startDashboard}from"../core/dashboard-core.js?v=2.3.1";startDashboard(config);</script></body></html>
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="../core/dashboard.css?v=2.3.1"></head><body><main id="app"></main><script type="module">
+import config from "../config/w.js?v=2.3.1";
+import{startDashboard}from"../core/dashboard-core.js?v=2.3.1";
+import{ensureSession,getAccessToken,mountAuthBadge}from"../../shared/auth-dev.js";
+const session=await ensureSession();
+config.data_headers={Authorization:"Bearer "+(await getAccessToken())};
+await startDashboard(config);
+mountAuthBadge();
+</script></body></html>

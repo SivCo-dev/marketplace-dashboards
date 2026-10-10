@@ -3,6 +3,10 @@ import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePaylo
 import {createScopeLoader} from "./live-v2.js?v=20261006incomeunits";
 
 import {loadReportRegistry} from '../core/runtime-registry.js?v=20261004finish';
+import {ensureSession,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js';
+const session=await ensureSession();
+const authedFetch=makeAuthedFetch();
+mountAuthBadge();
 let TENANTS={...DEFAULT_TENANTS};
 try{const rows=await loadReportRegistry();const runtime=Object.fromEntries(rows.filter(t=>t.monthly_available).map(t=>[t.tenant_id,{label:t.display_name}]));if(Object.keys(runtime).length)TENANTS=runtime}catch(error){console.warn('Report registry unavailable',error.message)}
 const $=s=>document.querySelector(s);
@@ -234,7 +238,7 @@ document.addEventListener("click",async event=>{
  const sku=event.target.closest("[data-sku]");if(sku){openProduct(sku.dataset.sku);}
 });
 render();
-loader=createScopeLoader({tenantIds:Object.keys(TENANTS),onUpdate:bundle=>{
+loader=createScopeLoader({tenantIds:Object.keys(TENANTS),fetcher:authedFetch,onUpdate:bundle=>{
  state.bundle=bundle;
  render();
 }});

@@ -1,6 +1,10 @@
 import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002orange";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
 import {createScopeLoader} from "./live-v2.js?v=20261006incomeunits";
+import {ensureSession,makeAuthedFetch,mountAuthBadge} from "../shared/auth-dev.js";
+const session=await ensureSession();
+const authedFetch=makeAuthedFetch();
+mountAuthBadge();
 
 const $=s=>document.querySelector(s);
 const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all"};
@@ -229,7 +233,7 @@ document.addEventListener("click",async event=>{
  const sku=event.target.closest("[data-sku]");if(sku){openProduct(sku.dataset.sku);}
 });
 render();
-loader=createScopeLoader({onUpdate:bundle=>{
+loader=createScopeLoader({fetcher:authedFetch,onUpdate:bundle=>{
  state.bundle=bundle;
  render();
 }});

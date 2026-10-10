@@ -3,14 +3,18 @@ import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
 import {loadReportRegistry,dailyConfigsFromRegistry} from '../core/runtime-registry.js?v=20261004finish';
+import {ensureSession,getAccessToken,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js';
+const session=await ensureSession();
+const accessToken=await getAccessToken();
+const authedFetch=makeAuthedFetch({onAccessDenied:()=>{E('load').classList.add('hide');E('err').classList.remove('hide');E('err').textContent='Нет доступа к этому кабинету для вашей учётной записи.';}});
 const initialQuery=new URLSearchParams(location.search);
 const requestedTenant=/^[A-Z0-9_-]{1,32}$/.test(initialQuery.get('tenant')||'')?initialQuery.get('tenant'):'W';
-const initialResponse=fetch('https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/dashboard-data-dev23?tenant='+requestedTenant+'&format=columnar',{cache:'no-cache'});
+const initialResponse=authedFetch('https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/dashboard-data-auth-dev?tenant='+requestedTenant+'&format=columnar',{cache:'no-cache'});
 initialResponse.catch(()=>{});
 let configs={W:w,CPR:cpr,ORANGE:orange};
 try{const runtime=dailyConfigsFromRegistry(await loadReportRegistry(),configs);if(Object.keys(runtime).length)configs=runtime}catch(error){console.warn('Report registry unavailable',error.message)}
 const query=new URLSearchParams(location.search),tenant=configs[query.get('tenant')]?query.get('tenant'):configs.W?'W':Object.keys(configs)[0];
-const config={...configs[tenant],data_url:configs[tenant].data_url+"&format=columnar",theme:{accent:'#355846'},onRender:paint,data_response:tenant===requestedTenant?initialResponse:null};
+const config={...configs[tenant],data_url:configs[tenant].data_url+"&format=columnar",data_headers:{Authorization:'Bearer '+accessToken},theme:{accent:'#355846'},onRender:paint,data_response:tenant===requestedTenant?initialResponse:null};
 const $=id=>document.getElementById(id),num=v=>Number(v||0),fmt=v=>v==null?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(num(v)),money=v=>fmt(v)+' ₽';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const pct=(a,b)=>a==null||b==null?null:num(b)?(num(a)/num(b)-1)*100:null;
@@ -18,6 +22,7 @@ const delta=v=>v==null?'<span class="muted">Нет сопоставимой ис
 const date=v=>String(v||'').slice(8,10)+'.'+String(v||'').slice(5,7);
 let view,focus='all',breakdown=null,limit=25,lastFocus;const skuLocal={masterCategory:'ALL',marketplace:'ALL',brand:'ALL',stock:'ALL',q:''};let skuSort={key:'gmv',dir:'desc'};
 const pending=startDashboard(config); // Shared calculations, canonical SKU mapping and SKU card economics.
+mountAuthBadge();
 const shell=document.querySelector('.shell'),header=document.querySelector('.header');
 header.innerHTML='<div><div class="eyebrow">АНАЛИТИКА ПРОДАЖ</div><h1>'+esc(config.display_name)+' · Ежедневный отчёт <span class="live-badge">● LIVE</span></h1><p class="muted">Оперативная динамика по маркетплейсам и товарам <span id="dataAsOf" class="data-as-of"></span></p></div><nav class="view-switch" aria-label="Вид отчёта"><span aria-current="page">По дням</span><a id="monthlyLink" href="../monthly/?tenant='+tenant+'">По месяцам</a></nav>';
 const coreStatus=document.createElement('span');coreStatus.id='status';coreStatus.hidden=true;header.append(coreStatus);

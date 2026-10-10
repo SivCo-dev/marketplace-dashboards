@@ -1,6 +1,6 @@
 import {validatePayload} from "./core.js?v=20261003scope1";
 
-const BASE="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-v2";
+const BASE="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-data-auth-dev";
 const TENANTS=["W","CPR","ORANGE"];
 import {MONTHS} from "./config.js?v=20261004periods";
 const MARKETS=["ALL","OZON","WB","YANDEX"];
