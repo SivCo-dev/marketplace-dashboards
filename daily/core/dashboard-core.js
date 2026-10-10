@@ -523,26 +523,44 @@ function computeOperationalEconomics(key,mk){
    if(!memo.has(ck))memo.set(ck,all.filter(x=>rowMarketplace(x)===mk&&(dimFor(x.cabinet,x.sku).category||"Без категории")===targetCat));
    return memo.get(ck)
  }
+ function marketRows(){
+   let memo=perfCache("marketRows",D,()=>new Map());
+   if(!memo.has(mk))memo.set(mk,all.filter(x=>rowMarketplace(x)===mk));
+   return memo.get(mk)
+ }
+ function minusDays(dstr,n){let d=new Date(String(dstr)+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-n);return d.toISOString().slice(0,10)}
+ // Fact-based fallback, widest to narrowest within the current reporting window (14d then 30d, SKU → category → market),
+ // then — only if none of those found any covered data at all — the SKU's own most recent covered fact, however old.
+ // Reaching that last step always means nothing fresher existed above, so it is always labeled "устар." (stale).
  function pickMetric(kind){
    let candidates=[
      {rows:own,set:d14,label:"SKU • факт 14д"},
      {rows:own,set:d30,label:"SKU • факт 30д"},
      {rows:categoryRows(),set:d14,label:"категория • факт 14д"},
-     {rows:perfCache("marketRows",D,()=>new Map()).get(mk)||perfCache("marketRows",D,()=>new Map()).set(mk,all.filter(x=>rowMarketplace(x)===mk)).get(mk),set:d14,label:"маркет • факт 14д"}
+     {rows:categoryRows(),set:d30,label:"категория • факт 30д"},
+     {rows:marketRows(),set:d14,label:"маркет • факт 14д"},
+     {rows:marketRows(),set:d30,label:"маркет • факт 30д"}
    ];
-   for(const c of candidates){let s=sumRows(c.rows,c.set);if(kind==="commission"&&s.cg>0&&s.ca>=0)return{value:s.ca/s.cg*100,source:c.label};if(kind==="logistics"&&s.cu>0&&s.la>=0)return{value:s.la/s.cu,source:c.label}}
-   return{value:null,source:"нет данных"}
+   for(const c of candidates){let s=sumRows(c.rows,c.set);if(kind==="commission"&&s.cg>0&&s.ca>=0)return{value:s.ca/s.cg*100,source:c.label,stale:false};if(kind==="logistics"&&s.cu>0&&s.la>=0)return{value:s.la/s.cu,source:c.label,stale:false}}
+   let fact=own.filter(x=>kind==="commission"?N(x.cost_covered_gmv)>0:N(x.cost_covered_units)>0).sort((a,b)=>String(b.report_date||"").localeCompare(String(a.report_date||"")));
+   if(fact.length){
+     let lastDate=String(fact[0].report_date||""),cutoff=minusDays(lastDate,60),block=fact.filter(x=>String(x.report_date||"")>=cutoff),bset=new Set(block.map(x=>String(x.report_date||"")));
+     let s=sumRows(block,bset);
+     if(kind==="commission"&&s.cg>0&&s.ca>=0)return{value:s.ca/s.cg*100,source:"SKU • устар. факт по "+dm(lastDate),stale:true};
+     if(kind==="logistics"&&s.cu>0&&s.la>=0)return{value:s.la/s.cu,source:"SKU • устар. факт по "+dm(lastDate),stale:true}
+   }
+   return{value:null,source:"нет данных",stale:false}
  }
- let commission,commissionSource;
+ let commission,commissionSource,commissionStale=false;
  if(mk==="WB"){
    let t=own.find(x=>x.commission_pct!==null&&x.commission_pct!==undefined);
    commission=t?N(t.commission_pct):null;commissionSource=t?"тариф сегодня":"нет данных"
  }else{
-   let c=pickMetric("commission");commission=c.value;commissionSource=c.source
+   let c=pickMetric("commission");commission=c.value;commissionSource=c.source;commissionStale=!!c.stale
  }
  let l=pickMetric("logistics"),logistics=l.value;
  let received=(calculationPrice!=null&&commission!=null&&logistics!=null)?calculationPrice*(1-commission/100)-logistics:null;
- return{current_price:currentPrice,calculation_price:calculationPrice,price_source:priceSource,commission_pct:commission,commission_source:commissionSource,logistics_per_unit:logistics,logistics_source:l.source,received_per_unit:received,has_ref:commission!=null&&logistics!=null}
+ return{current_price:currentPrice,calculation_price:calculationPrice,price_source:priceSource,commission_pct:commission,commission_source:commissionSource,commission_stale:commissionStale,logistics_per_unit:logistics,logistics_source:l.source,logistics_stale:!!l.stale,received_per_unit:received,has_ref:commission!=null&&logistics!=null}
 }
 function marketBreakdownFor(key){
  const allowed=new Set(periodDates(0)),f=currentFilters(),m=new Map();
@@ -954,8 +972,8 @@ function buildSkuOverview(key,a){
  }else{
    let op=operationalEconomicsFor(key,mk)||{},price=op.current_price!=null?N(op.current_price):(x.current_price!=null?N(x.current_price):null),pd=start&&price!=null?deltaPct(price,start.price):null;
    econ.push(card("Текущая цена",price!=null?R(price):"—",price==null?"Нет данных":X(op.price_source||"последняя известная")+(pd==null?"":" · "+(Math.abs(pd)<0.05?"без изменений":S(pd)+pd.toFixed(1)+"%")+" к "+dm(start.date)),"neu"));
-   econ.push(card("Комиссия",op.commission_pct!=null?P(op.commission_pct):"—",op.commission_pct!=null?X(op.commission_source||""):"Нет данных","neu"));
-   econ.push(card("Логистика / шт",op.logistics_per_unit!=null?R(op.logistics_per_unit):"—",op.logistics_per_unit!=null?X(op.logistics_source||""):"Нет данных","neu"));
+   econ.push(card("Комиссия",op.commission_pct!=null?P(op.commission_pct):"—",op.commission_pct!=null?X(op.commission_source||""):"Нет данных",op.commission_stale?"warn":"neu"));
+   econ.push(card("Логистика / шт",op.logistics_per_unit!=null?R(op.logistics_per_unit):"—",op.logistics_per_unit!=null?X(op.logistics_source||""):"Нет данных",op.logistics_stale?"warn":"neu"));
    econ.push(card("≈ К получению / шт",op.received_per_unit!=null?R(op.received_per_unit):"—","после привязанных к SKU расходов МП; без рекламы","neu"));
  }
  // Promotion for the selected period

@@ -1,4 +1,4 @@
-import {startDashboard} from './core/dashboard-core.js?v=20261010ppo3';
+import {startDashboard} from './core/dashboard-core.js?v=20261010logfb1';
 import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
