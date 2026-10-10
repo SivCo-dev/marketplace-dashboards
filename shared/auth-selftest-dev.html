@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Самопроверка авторизации (dev)</title>
+<style>
+  body{font:14px/1.5 system-ui,sans-serif;max-width:900px;margin:24px auto;padding:0 16px;color:#222}
+  h1{font-size:18px}
+  ol.steps{padding-left:20px}
+  ol.steps>li{margin-bottom:14px}
+  button{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid #999;background:#f4f4f4;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button+button{margin-left:8px}
+  #status{padding:8px 12px;border-radius:6px;background:#eef;margin:12px 0;font-size:13px}
+  iframe{width:100%;height:560px;border:1px solid #ccc;border-radius:6px;display:block;margin:10px 0}
+  table{border-collapse:collapse;width:100%;margin-top:16px;font-size:13px}
+  td,th{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
+  th{background:#f0f0f0}
+  .pass{color:#176b17;font-weight:600}
+  .fail{color:#b00020;font-weight:600}
+  .note{color:#555;font-size:12px}
+  #report{width:100%;height:160px;margin-top:10px;font:12px/1.4 monospace}
+</style>
+</head>
+<body>
+<h1>Самопроверка авторизации — logout / «Назад» / смена пользователя</h1>
+<p class="note">
+  Этот инструмент работает только в вашем браузере. Он не отправляет и не показывает
+  access_token / refresh_token где-либо вне этой страницы и не пишет их в консоль.
+  Прод не затрагивается — все запросы идут на auth-dev эндпоинты.
+</p>
+
+<div id="status">Проверка сессии…</div>
+
+<ol class="steps">
+  <li>
+    <b>Шаг 1.</b> Войдите тестовым пользователем (viewer) в окне ниже. После входа оно само
+    откроет «Ежедневный отчёт» и загрузит данные.
+    <br><button id="btnCheckLoaded">Проверить, что данные загрузились</button>
+  </li>
+  <li>
+    <b>Шаг 2.</b> Проверка выхода (logout): приватные данные пропадают из интерфейса, и
+    клиентские хранилища (localStorage/sessionStorage) очищаются.
+    <br><button id="btnLogout" disabled>Выполнить выход и проверить очистку</button>
+  </li>
+  <li>
+    <b>Шаг 3.</b> Проверка, что защищённые API без токена отвечают 401 (после выхода).
+    <br><button id="btnNoToken" disabled>Проверить запрос без токена</button>
+  </li>
+  <li>
+    <b>Шаг 4.</b> Проверка кнопки «Назад»: после выхода она не должна возвращать доступ к
+    ранее загруженным данным.
+    <br><button id="btnBack" disabled>Нажать «Назад» и проверить</button>
+  </li>
+  <li>
+    <b>Шаг 5.</b> Войдите в окне ниже <u>другим</u> пользователем (другая роль/tenant), затем
+    нажмите кнопку. Проверяется, что данные и права предыдущего пользователя не сохранились.
+    <br><button id="btnSwitch" disabled>Проверить смену пользователя</button>
+  </li>
+</ol>
+
+<iframe id="dash" src="/shared/login-dev.html?return=%2Fdaily%2F"></iframe>
+
+<table id="results"><thead><tr><th>Проверка</th><th>Результат</th><th>Детали</th></tr></thead><tbody></tbody></table>
+
+<p>
+  <button id="btnReport">Собрать отчёт (без токенов) для копирования</button>
+</p>
+<textarea id="report" readonly placeholder="Отчёт появится здесь после нажатия кнопки выше…"></textarea>
+
+<script type="module">
+import { getSupabase } from "./supabase-client-dev.js";
+import { getAccessToken, getUserEmail } from "./auth-dev.js";
+
+const BASE = "https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1";
+const STORAGE_PREFIXES = ["sivco-", "monthlyImport", "dashboard-"];
+
+const iframe = document.getElementById("dash");
+const statusEl = document.getElementById("status");
+const results = [];
+let previousUserSub = null; // kept only in memory, never rendered or logged
+
+function countPrivateStorageKeys() {
+  let n = 0;
+  for (const store of [window.localStorage, window.sessionStorage]) {
+    for (const key of Object.keys(store)) {
+      if (STORAGE_PREFIXES.some((p) => key.startsWith(p))) n++;
+    }
+  }
+  return n;
+}
+
+function decodeSub(token) {
+  if (!token) return null;
+  try {
+    return JSON.parse(atob(token.split(".")[1]))?.sub || null;
+  } catch {
+    return null;
+  }
+}
+
+function record(name, pass, details) {
+  results.push({ name, pass, details });
+  const tbody = document.querySelector("#results tbody");
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${name}</td><td class="${pass ? "pass" : "fail"}">${pass ? "PASS" : "FAIL"}</td><td>${details}</td>`;
+  tbody.appendChild(tr);
+}
+
+function kpiCountIn(doc) {
+  try {
+    return doc.querySelectorAll("#kpis .visual-kpi").length;
+  } catch {
+    return 0;
+  }
+}
+
+async function refreshStatus() {
+  const email = await getUserEmail();
+  statusEl.textContent = email ? `Текущая сессия: ${email}` : "Сессия отсутствует — войдите в окне ниже.";
+}
+refreshStatus();
+setInterval(refreshStatus, 2000);
+
+document.getElementById("btnCheckLoaded").addEventListener("click", async () => {
+  const doc = iframe.contentDocument;
+  const kpis = kpiCountIn(doc);
+  const token = await getAccessToken();
+  previousUserSub = decodeSub(token);
+  const ok = kpis > 0 && !!token;
+  record("Шаг 1: данные загружены после входа", ok, `kpis=${kpis}, сессия=${token ? "есть" : "нет"}`);
+  document.getElementById("btnLogout").disabled = !ok;
+});
+
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  const before = { kpis: kpiCountIn(iframe.contentDocument), keys: countPrivateStorageKeys() };
+  const badgeBtn = iframe.contentDocument?.querySelector("[data-auth-badge-dev] button");
+  if (!badgeBtn) {
+    record("Шаг 2: кнопка выхода найдена", false, "Бейдж авторизации не найден на странице — logout не выполнен");
+    return;
+  }
+  badgeBtn.click();
+
+  // Poll briefly for the iframe to navigate to the login page and for storage to clear.
+  let navigatedToLogin = false;
+  for (let i = 0; i < 40 && !navigatedToLogin; i++) {
+    await new Promise((r) => setTimeout(r, 150));
+    try {
+      navigatedToLogin = iframe.contentWindow.location.href.includes("login-dev");
+    } catch {
+      /* cross-origin momentarily during navigation */
+    }
+  }
+  const after = { kpis: navigatedToLogin ? 0 : kpiCountIn(iframe.contentDocument), keys: countPrivateStorageKeys() };
+
+  record(
+    "Шаг 2a: после выхода интерфейс больше не показывает данные",
+    navigatedToLogin,
+    navigatedToLogin ? "Окно перешло на страницу входа" : "Окно НЕ перешло на страницу входа — данные могли остаться видимыми"
+  );
+  record(
+    "Шаг 2b: приватные ключи удалены из localStorage/sessionStorage",
+    after.keys === 0,
+    `до выхода: ${before.keys} ключ(ей), после: ${after.keys} ключ(ей)`
+  );
+
+  document.getElementById("btnNoToken").disabled = false;
+  document.getElementById("btnBack").disabled = !navigatedToLogin;
+});
+
+document.getElementById("btnNoToken").addEventListener("click", async () => {
+  try {
+    const r = await fetch(`${BASE}/dashboard-data-auth-dev?tenant=W`, { cache: "no-store" });
+    let code = null;
+    try {
+      code = (await r.json())?.error || null;
+    } catch {}
+    record("Шаг 3: API без токена отвечает 401", r.status === 401, `status=${r.status}, error=${code || "—"}`);
+  } catch (e) {
+    record("Шаг 3: API без токена отвечает 401", false, `Запрос не выполнен: ${e}`);
+  }
+});
+
+document.getElementById("btnBack").addEventListener("click", async () => {
+  try {
+    iframe.contentWindow.history.back();
+  } catch (e) {
+    record("Шаг 4: кнопка «Назад» не восстанавливает данные", false, `history.back() не выполнен: ${e}`);
+    return;
+  }
+  let staleDataSeen = false;
+  let sawLoginAgain = false;
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    let href = "";
+    try {
+      href = iframe.contentWindow.location.href;
+    } catch {
+      continue;
+    }
+    if (href.includes("login-dev")) {
+      sawLoginAgain = true;
+      continue;
+    }
+    if (kpiCountIn(iframe.contentDocument) > 0) {
+      staleDataSeen = true;
+    }
+  }
+  record(
+    "Шаг 4: кнопка «Назад» не восстанавливает данные",
+    !staleDataSeen,
+    staleDataSeen
+      ? "После «Назад» в DOM на короткое время появились ранее загруженные данные (возможно восстановление из bfcache) — требует внимания до прод-релиза"
+      : sawLoginAgain
+      ? "Окно осталось на/вернулось на страницу входа, данные не показаны"
+      : "Данные не появились"
+  );
+  document.getElementById("btnSwitch").disabled = false;
+  // Leave the iframe pointed at the login page for Step 5, regardless of where "back" left it.
+  iframe.src = "/shared/login-dev.html?return=%2Fdaily%2F";
+});
+
+document.getElementById("btnSwitch").addEventListener("click", async () => {
+  const token = await getAccessToken();
+  const newSub = decodeSub(token);
+  const kpis = kpiCountIn(iframe.contentDocument);
+  const identityChanged = !!newSub && newSub !== previousUserSub;
+
+  let leakFound = false;
+  if (previousUserSub) {
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      for (const key of Object.keys(store)) {
+        const val = store.getItem(key) || "";
+        if (val.includes(previousUserSub)) leakFound = true;
+      }
+    }
+  }
+
+  record(
+    "Шаг 5a: вход выполнен другим пользователем",
+    identityChanged,
+    identityChanged ? "Идентификатор сессии изменился" : "Не удалось подтвердить смену пользователя — убедитесь, что вошли другим аккаунтом"
+  );
+  record(
+    "Шаг 5b: данные нового пользователя загрузились",
+    kpis > 0,
+    `kpis=${kpis}`
+  );
+  record(
+    "Шаг 5c: следов предыдущего пользователя в хранилищах нет",
+    !leakFound,
+    leakFound ? "Найдено значение, содержащее идентификатор прежней сессии" : "Не найдено"
+  );
+  record(
+    "Шаг 5d (визуально, вручную)",
+    true,
+    "Пожалуйста, визуально убедитесь, что показанные организация/цифры соответствуют новому пользователю, а не прежнему"
+  );
+});
+
+document.getElementById("btnReport").addEventListener("click", () => {
+  const lines = results.map((r) => `${r.pass ? "PASS" : "FAIL"}  ${r.name}  — ${r.details}`);
+  document.getElementById("report").value = lines.join("\n");
+});
+</script>
+</body>
+</html>
