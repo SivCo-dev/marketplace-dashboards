@@ -780,6 +780,7 @@ function overviewMetric(stats,prev,a,mk,name){
    return positionMain(cur)+(imp==null?"":("<span class='metric-delta'>"+(imp>0?"↑ ":"↓ ")+I(Math.abs(imp))+"</span>"))
  }
  function adWindowLabel(z){if(!z||!z.period_from||!z.period_to)return"выбранный период";let a=new Date(z.period_from+"T00:00:00"),b=new Date(z.period_to+"T00:00:00"),n=Math.round((b-a)/86400000)+1;return n+"д • "+String(z.period_from).slice(5)+"–"+String(z.period_to).slice(5)}
+ if((name==="ads"||name==="drr")&&mk==="OZON"){let oa=skuMarketAds(a,"OZON",periodDates(0));if(!oa)return"—<span class='metric-note'>нет данных по SKU</span>";return name==="ads"?R(oa.spend)+"<span class='metric-note'>выбранный период</span>":(oa.drr_ads!=null?P(oa.drr_ads)+"<span class='metric-note'>выбранный период</span>":"—<span class='metric-note'>нет выручки рекламы</span>")}
  if(name==="ads")return (mk==="YANDEX"||mk==="WB")?(ya?R(ya.spend)+"<span class='metric-note'>"+X(mk==="WB"?"выбранный период":adWindowLabel(ya))+"</span>":"—<span class='metric-note'>нет данных</span>"):"—<span class='metric-note'>не подключено</span>";
  if(name==="drr")return (mk==="YANDEX"||mk==="WB")?(ya&&ya.drr!=null?P(ya.drr)+"<span class='metric-note'>"+X(mk==="WB"?"выбранный период":adWindowLabel(ya))+"</span>":"—<span class='metric-note'>нет данных</span>"):"—<span class='metric-note'>не подключено</span>";
  if(name==="content")return (mk==="OZON"||mk==="YANDEX"||mk==="WB")?(ct?(I(ct.content_score)+" / 100"+(mk==="WB"?"<span class='metric-note'>наш расчёт</span>":"")):"—<span class='metric-note'>нет данных</span>"):"—<span class='metric-note'>не подключено</span>";
@@ -896,7 +897,8 @@ function buildSkuOverview(key,a){
  let ad=mk==="YANDEX"?skuYandexAds(a):mk==="WB"?skuWBAds(a):skuMarketAds(a,"OZON",ds);
  if(ad&&mk!=="OZON"){ad={...ad,drr_ads:ad.drr,ctr:ad.shows?ad.clicks/ad.shows*100:null}}
  let drrAll=ad&&x.gmv?ad.spend/N(x.gmv)*100:null,adShare=ad&&x.units?Math.min(100,N(ad.orders)/N(x.units)*100):null;
- promo.push(card("Реклама",ad?R(ad.spend):"—",ad?"ДРР общий "+Pd(drrAll)+" · рекламный "+Pd(ad.drr_ads)+(ad.ctr!=null?" · CTR "+P(ad.ctr):""):(mk==="OZON"?"Нет данных по SKU":"Нет данных"),"neu"));
+ let adWin=ad&&mk==="YANDEX"&&ad.period_from?" · окно "+dm(ad.period_from)+"–"+dm(ad.period_to):"";
+ promo.push(card("Реклама",ad?R(ad.spend):"—",ad?"ДРР общий "+Pd(drrAll)+" · рекламный "+Pd(ad.drr_ads)+(ad.ctr!=null?" · CTR "+P(ad.ctr):"")+adWin:(mk==="OZON"?"Нет данных по SKU":"Нет данных"),"neu"));
  promo.push(card("Рекламные заказы",ad?I(ad.orders):"—",ad?(adShare==null?"":P(adShare)+" от всех заказов SKU"):"Нет данных","neu"));
  // Marketplace card
  let cDate=skuContentDate(ct);
