@@ -101,6 +101,35 @@ function decodeSub(token) {
   }
 }
 
+// Reads the session straight out of localStorage (shared across all pages on
+// this origin, including the iframe) instead of going through this page's own
+// cached Supabase client instance, which may lag behind a sign-in/out that
+// happened inside the iframe's own, separate client instance.
+function rawSessionSub() {
+  try {
+    const raw = localStorage.getItem("sivco-dashboards-auth-dev");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const token = parsed?.access_token || parsed?.currentSession?.access_token;
+    return decodeSub(token);
+  } catch {
+    return null;
+  }
+}
+
+function iframeState() {
+  let href = "(недоступен)";
+  try {
+    href = iframe.contentWindow.location.href;
+  } catch {}
+  const doc = iframe.contentDocument;
+  const onLogin = href.includes("login-dev");
+  const hasLoginForm = !!doc?.getElementById("loginForm");
+  const errVisible = !!doc?.getElementById("err") && !doc.getElementById("err").classList.contains("hide");
+  const kpis = kpiCountIn(doc);
+  return { href, onLogin, hasLoginForm, errVisible, kpis };
+}
+
 function record(name, pass, details) {
   results.push({ name, pass, details });
   const tbody = document.querySelector("#results tbody");
@@ -127,10 +156,9 @@ setInterval(refreshStatus, 2000);
 document.getElementById("btnCheckLoaded").addEventListener("click", async () => {
   const doc = iframe.contentDocument;
   const kpis = kpiCountIn(doc);
-  const token = await getAccessToken();
-  previousUserSub = decodeSub(token);
-  const ok = kpis > 0 && !!token;
-  record("Шаг 1: данные загружены после входа", ok, `kpis=${kpis}, сессия=${token ? "есть" : "нет"}`);
+  previousUserSub = rawSessionSub();
+  const ok = kpis > 0 && !!previousUserSub;
+  record("Шаг 1: данные загружены после входа", ok, `kpis=${kpis}, сессия=${previousUserSub ? "есть" : "нет"}`);
   document.getElementById("btnLogout").disabled = !ok;
 });
 
@@ -223,9 +251,9 @@ document.getElementById("btnBack").addEventListener("click", async () => {
 });
 
 document.getElementById("btnSwitch").addEventListener("click", async () => {
-  const token = await getAccessToken();
-  const newSub = decodeSub(token);
-  const kpis = kpiCountIn(iframe.contentDocument);
+  const newSub = rawSessionSub(); // read storage directly, not via this page's possibly-stale client
+  const state = iframeState();
+  const kpis = state.kpis;
   const identityChanged = !!newSub && newSub !== previousUserSub;
 
   let leakFound = false;
@@ -241,12 +269,16 @@ document.getElementById("btnSwitch").addEventListener("click", async () => {
   record(
     "Шаг 5a: вход выполнен другим пользователем",
     identityChanged,
-    identityChanged ? "Идентификатор сессии изменился" : "Не удалось подтвердить смену пользователя — убедитесь, что вошли другим аккаунтом"
+    identityChanged
+      ? "Идентификатор сессии изменился"
+      : `Не удалось подтвердить смену пользователя (newSub=${newSub ? "есть" : "нет"}). Состояние окна: url=${state.href}, на_странице_входа=${state.onLogin}, форма_входа_видна=${state.hasLoginForm}, ошибка_доступа_видна=${state.errVisible}`
   );
   record(
     "Шаг 5b: данные нового пользователя загрузились",
     kpis > 0,
-    `kpis=${kpis}`
+    kpis > 0
+      ? `kpis=${kpis}`
+      : `kpis=0. ${state.onLogin ? "Окно всё ещё на странице входа — вход не был завершён до нажатия кнопки." : state.errVisible ? "Показана ошибка «нет доступа к кабинету» — у этого пользователя нет прав на дефолтный tenant (W); это не баг, попробуйте учётку с доступом к W, либо откройте .../daily/?tenant=XXX в iframe после входа." : "Причина не определена — url=" + state.href}`
   );
   record(
     "Шаг 5c: следов предыдущего пользователя в хранилищах нет",
