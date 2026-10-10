@@ -1,4 +1,4 @@
-import {startDashboard} from './core/dashboard-core.js?v=20261005sku-local3';
+import {startDashboard} from './core/dashboard-core.js?v=20261010visual59';
 import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
@@ -19,11 +19,13 @@ const date=v=>String(v||'').slice(8,10)+'.'+String(v||'').slice(5,7);
 let view,focus='all',breakdown=null,limit=25,lastFocus;const skuLocal={masterCategory:'ALL',marketplace:'ALL',brand:'ALL',stock:'ALL',q:''};let skuSort={key:'gmv',dir:'desc'};
 const pending=startDashboard(config); // Shared calculations, canonical SKU mapping and SKU card economics.
 const shell=document.querySelector('.shell'),header=document.querySelector('.header');
-header.innerHTML='<div><div class="eyebrow">АНАЛИТИКА ПРОДАЖ</div><h1>'+esc(config.display_name)+' · Ежедневный отчёт <span class="live-badge">● LIVE</span></h1><p class="muted">Оперативная динамика по маркетплейсам и товарам</p></div><nav class="view-switch" aria-label="Вид отчёта"><span aria-current="page">По дням</span><a id="monthlyLink" href="../monthly/?tenant='+tenant+'">По месяцам</a></nav>';
+header.innerHTML='<div><div class="eyebrow">АНАЛИТИКА ПРОДАЖ</div><h1>'+esc(config.display_name)+' · Ежедневный отчёт <span class="live-badge">● LIVE</span></h1><p class="muted">Оперативная динамика по маркетплейсам и товарам <span id="dataAsOf" class="data-as-of"></span></p></div><nav class="view-switch" aria-label="Вид отчёта"><span aria-current="page">По дням</span><a id="monthlyLink" href="../monthly/?tenant='+tenant+'">По месяцам</a></nav>';
 const coreStatus=document.createElement('span');coreStatus.id='status';coreStatus.hidden=true;header.append(coreStatus);
 const toolbar=document.querySelector('.toolbar'),organization=document.createElement('div');
 organization.innerHTML='<label for="organization">Организация</label><select id="organization">'+Object.entries(configs).map(([id,c])=>'<option value="'+id+'" '+(id===tenant?'selected':'')+'>'+esc(c.display_name)+'</option>').join('')+'</select>';
 toolbar.prepend(organization);
+// Organization picker only when the viewer has access to more than one organization (admin); access itself is enforced server-side.
+organization.hidden=Object.keys(configs).length<2;
 // The cabinet select stays in the main toolbar and is hidden by core when only one exists.
 const coreSearch=$('q').parentElement;coreSearch.hidden=true;$('q').value='';
 const periodControl=$('days').parentElement;toolbar.append(periodControl); // Move period after category.
@@ -104,6 +106,7 @@ function stockMatches(a){return skuLocal.stock==='ALL'
 function sortValue(a,key){
  if(key==='delta')return a.risk?.gmvPct==null?-Infinity:num(a.risk.gmvPct);
  if(key==='stockQty')return a.stockQty==null?-Infinity:num(a.stockQty);
+ if(key==='drr')return a.drr==null?(a.adSpend?0:-Infinity):num(a.drr);
  return num(a[key]);
 }
 function renderSkuTable(data){
@@ -128,8 +131,8 @@ function renderSkuTable(data){
  const arrow=key=>skuSort.key===key?(skuSort.dir==='asc'?' ↑':' ↓'):'';
  const dynKey=focus==='down'?'lostGmv':focus==='up'?'growthGmv':focus==='risk'?'problemImpact':'delta';
  const dynLabel=focus==='down'?'Потеря оборота':focus==='up'?'Прирост оборота':focus==='risk'?'Приоритет ₽':'К прошлому периоду';
- $('allSkuHead').innerHTML='<th>Товар / SKU</th><th>Маркетплейсы</th><th class="r"><button class="th-sort" data-sort="gmv">Оборот'+arrow('gmv')+'</button></th><th class="r"><button class="th-sort" data-sort="units">Заказано'+arrow('units')+'</button></th><th class="r"><button class="th-sort" data-sort="price">Ср. цена'+arrow('price')+'</button></th><th class="r"><button class="th-sort" data-sort="stockQty">Остаток'+arrow('stockQty')+'</button></th><th class="r"><button class="th-sort" data-sort="'+dynKey+'">'+dynLabel+arrow(dynKey)+'</button></th><th>Статус</th>';
- $('rows').innerHTML=list.slice(0,limit).map(a=>'<tr class="click" data-key="'+esc(a.key)+'" tabindex="0" aria-label="Открыть '+esc(a.product_name||a.article)+'"><td><div class="product-cell"><span class="monogram">'+esc((a.article||a.sku||'SKU').slice(0,2))+'</span><div><b>'+esc(a.article||a.canonical_sku||a.sku)+'</b><small>SKU '+esc(a.sku||'—')+' · '+esc(a.product_name||'Без названия')+'</small></div></div></td><td><span title="'+esc(a.channels)+'">'+esc(a.channels)+'</span></td><td class="r"><b>'+money(a.gmv)+'</b></td><td class="r">'+fmt(a.units)+' шт</td><td class="r">'+money(a.price)+'</td><td class="r">'+(a.stockQty==null?'—':fmt(a.stockQty)+' шт'+(a.stockDays==null?'':'<small class="stock-days-sub">'+a.stockDays.toFixed(1)+' дн</small>'))+'</td><td class="r">'+(focus==='down'?'<b class="negative">−'+money(a.lostGmv)+'</b><small class="drop-pct">'+(a.risk.gmvPct==null?'—':a.risk.gmvPct.toFixed(1)+'%')+'</small>':focus==='up'?'<b class="positive">+'+money(a.growthGmv)+'</b><small class="drop-pct">'+(a.risk.gmvPct==null?'—':'+'+a.risk.gmvPct.toFixed(1)+'%')+'</small>':focus==='risk'?'<b>'+money(a.problemImpact)+'</b>':delta(a.risk.gmvPct))+'</td><td><span class="risk-chip '+esc(a.risk.cls)+'" title="'+esc(a.risk.reasons.join(' · '))+'">'+esc(a.risk.label)+'</span></td></tr>').join('')||'<tr><td colspan="8" class="empty">Нет товаров по выбранным фильтрам</td></tr>';
+ $('allSkuHead').innerHTML='<th>Товар / SKU</th><th>Маркетплейсы</th><th class="r"><button class="th-sort" data-sort="gmv">Оборот'+arrow('gmv')+'</button></th><th class="r"><button class="th-sort" data-sort="units">Заказано'+arrow('units')+'</button></th><th class="r"><button class="th-sort" data-sort="price">Ср. цена · Δ'+arrow('price')+'</button></th><th class="r"><button class="th-sort" data-sort="drr">Реклама'+arrow('drr')+'</button></th><th class="r"><button class="th-sort" data-sort="stockQty">Остаток'+arrow('stockQty')+'</button></th><th class="r"><button class="th-sort" data-sort="'+dynKey+'">'+dynLabel+arrow(dynKey)+'</button></th><th>Статус</th>';
+ $('rows').innerHTML=list.slice(0,limit).map(a=>'<tr class="click" data-key="'+esc(a.key)+'" tabindex="0" aria-label="Открыть '+esc(a.product_name||a.article)+'"><td><div class="product-cell"><span class="monogram">'+esc((a.article||a.sku||'SKU').slice(0,2))+'</span><div><b>'+esc(a.article||a.canonical_sku||a.sku)+'</b><small>SKU '+esc(a.sku||'—')+' · '+esc(a.product_name||'Без названия')+'</small></div></div></td><td><span title="'+esc(a.channels)+'">'+esc(a.channels)+'</span></td><td class="r"><b>'+money(a.gmv)+'</b></td><td class="r">'+fmt(a.units)+' шт</td><td class="r">'+money(a.price)+(a.pricePct!=null&&Math.abs(a.pricePct)>=1?'<small class="price-delta">'+(a.pricePct>0?'↑ ':'↓ ')+Math.abs(a.pricePct).toFixed(1)+'%</small>':'')+'</td><td class="r">'+(a.adSpend?'<span class="'+(a.drr!=null&&a.drr>15?'drr-high':'')+'">ДРР '+(a.drr==null?'—':a.drr>0&&a.drr<0.1?'<0,1%':a.drr.toFixed(1)+'%')+'</span><small class="ad-spend">'+money(a.adSpend)+'</small>':'<span class="muted">—</span>')+'</td><td class="r">'+(a.stockQty==null?'—':fmt(a.stockQty)+' шт'+(a.stockDays==null?'':'<small class="stock-days-sub">'+a.stockDays.toFixed(1)+' дн</small>'))+'</td><td class="r">'+(focus==='down'?'<b class="negative">−'+money(a.lostGmv)+'</b><small class="drop-pct">'+(a.risk.gmvPct==null?'—':a.risk.gmvPct.toFixed(1)+'%')+'</small>':focus==='up'?'<b class="positive">+'+money(a.growthGmv)+'</b><small class="drop-pct">'+(a.risk.gmvPct==null?'—':'+'+a.risk.gmvPct.toFixed(1)+'%')+'</small>':focus==='risk'?'<b>'+money(a.problemImpact)+'</b>':delta(a.risk.gmvPct))+'</td><td><span class="risk-chip '+esc(a.risk.cls)+'" title="'+esc(a.risk.reasons.join(' · '))+'">'+esc(a.risk.label)+'</span></td></tr>').join('')||'<tr><td colspan="9" class="empty">Нет товаров по выбранным фильтрам</td></tr>';
  const sliceGmv=skus.reduce((sum,a)=>sum+num(a.gmv),0),share=ws.orgGmv?sliceGmv/ws.orgGmv*100:0;
  $('tableCount').innerHTML='Показано '+Math.min(limit,list.length)+' из '+list.length+' SKU <span class="sku-scope-summary">· В срезе '+skus.length+' SKU · '+money(sliceGmv)+' · '+share.toFixed(1)+'% общего оборота</span>';
  $('showMore').hidden=limit>=list.length;
@@ -138,9 +141,19 @@ function paint(data){
  if(!data||!$('focusTabs'))return;view=data;
  const {current:c,previous:p,skus,currentDates:days,live,payload}=data;
  const problemSkus=data.problemSkus||skus.filter(a=>a.risk.level>0),risks=problemSkus,critical=problemSkus.filter(a=>a.risk.level===3).length;
- const kpis=[['₽','Оборот заказов',money(c.gmv),days.length+' закрытых дней',delta(pct(c.gmv,p.gmv))],['▥','Заказано',fmt(c.units)+' шт',days.length?fmt(c.units/days.length)+' шт. в среднем за день':'Нет закрытых дней',delta(pct(c.units,p.units))],['○','Заказы',fmt(c.orders),c.orders==null?'Нет полной детализации заказов':'Средний чек '+(c.orders?money(c.gmv/c.orders):'—'),delta(pct(c.orders,p.orders))],['◇','Активные SKU',fmt(skus.length),'Товары с заказами за период','<span class="muted">Без LIVE-дней</span>'],['!','Точки внимания',fmt(risks.length)+' SKU',critical+' критичных · '+(risks.length-critical)+' требуют внимания','<span class="negative">По действующим правилам рисков</span>']];
- $('kpis').innerHTML=kpis.map(([icon,label,value,note,change])=>'<article class="card visual-kpi"><div class="kpi-label"><i>'+icon+'</i>'+label+'</div><strong>'+value+'</strong><small>'+note+'</small><div>'+change+'</div></article>').join('');
+ const ads=typeof globalThis.getPeriodAdTotals==='function'?globalThis.getPeriodAdTotals():{spend:0,sources:[]};
+ const soldArts=new Set(skus.map(a=>String(a.article||'').toLowerCase()));
+ const stockedIdle=new Set((payload.stocks||[]).filter(s=>num(s.total_stock)>0&&!soldArts.has(String(s.offer_id||'').toLowerCase())).map(s=>String(s.offer_id||'').toLowerCase())).size;
+ const perDay=days.length?c.gmv/days.length:null;
+ const kpis=[
+  ['₽','Оборот заказов',money(c.gmv),(perDay==null?'Нет закрытых дней':money(perDay)+' в день')+' · '+days.length+' закрытых дней',delta(pct(c.gmv,p.gmv))],
+  ['▥','Заказано',fmt(c.units)+' шт',(c.orders==null?'Нет детализации заказов':fmt(c.orders)+' заказов'+(c.orders?' · '+(c.units/c.orders).toFixed(2).replace('.',',')+' шт в заказе':''))+(days.length?' · '+fmt(c.units/days.length)+' шт/день':''),delta(pct(c.units,p.units))+(c.orders!=null&&p.orders!=null?' <span class="muted">· заказы </span>'+delta(pct(c.orders,p.orders)):'')],
+  ['◇','SKU с заказами',fmt(skus.length),stockedIdle?fmt(stockedIdle)+' SKU в наличии без заказов':'Все SKU в наличии продаются','<span class="muted">Без LIVE-дней</span>'],
+  ['%','Реклама · ДРР',ads.spend&&c.gmv?(ads.spend/c.gmv*100).toFixed(1).replace('.',',')+'%':'—',ads.spend?'Расход '+money(ads.spend)+' · '+ads.sources.join(' + '):'Нет данных о расходах за период','<span class="muted">Расход к обороту заказов</span>']
+ ];
+ $('kpis').className='grid4';$('kpis').innerHTML=kpis.map(([icon,label,value,note,change])=>'<article class="card visual-kpi"><div class="kpi-label"><i>'+icon+'</i>'+label+'</div><strong>'+value+'</strong><small>'+note+'</small><div>'+change+'</div></article>').join('');
  const latest=live.at(-1),ts=payload.meta?.generated_at;
+ $('dataAsOf').textContent=ts?'· данные на '+new Date(ts).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',',')+' МСК':'';
  $('dailyContext').textContent='● Обновлено '+(ts?new Date(ts).toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' МСК':'—')+' · '+(days.length?date(days[0])+'–'+date(days.at(-1)):'Нет закрытых дней')+' · LIVE не входит в итог';
  $('liveContext').textContent=latest?'LIVE · '+date(latest.report_date)+' · '+money(latest.gmv):'LIVE-данных нет';
  const url=new URL(location.href);url.searchParams.set('tenant',tenant);url.searchParams.set('period',$('days').value);history.replaceState(null,'',url);

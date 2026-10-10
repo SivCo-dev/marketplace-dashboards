@@ -2,17 +2,18 @@
 <html lang="ru"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://tcefrvybgulcwwsdarcw.supabase.co; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'">
-<title>Monthly — пульт руководителя</title><link rel="stylesheet" href="./styles.css?v=20261005import"></head><body>
+<title>Monthly — пульт руководителя</title><link rel="stylesheet" href="./styles.css?v=20261010viewswitch"></head><body>
 <a class="skip" href="#overview">К отчёту</a>
 <main class="shell" id="main">
 <header class="dashboard-head">
  <div class="title-block"><div class="title-line"><h1 id="pageTitle">W · Сентябрь 2026</h1><span id="monthStatus" class="status-pill">—</span></div><p>Пульт руководителя — сводная аналитика по маркетплейсам</p></div>
+ <div class="head-right"><nav class="view-switch" aria-label="Вид отчёта"><a id="dailyLink" href="../daily/">По дням</a><span aria-current="page">По месяцам</span></nav>
  <div class="controls">
-  <label>Организация<select id="tenantSelect" aria-label="Организация"></select></label>
+  <label id="tenantControl">Организация<select id="tenantSelect" aria-label="Организация"></select></label>
   <label>Период<select id="monthSelect" aria-label="Период"></select></label>
   <label>Сравнение<select id="comparisonSelect" aria-label="Сравнение" disabled><option>Нет сопоставимой истории</option></select></label>
   <label>Маркетплейс<select id="marketSelect" aria-label="Маркетплейс"></select></label>
- </div>
+ </div></div>
 </header>
 <div id="reviewNote" class="review-note" role="status">Открываем срез для ревью…</div>
 <div id="accessNote" class="access-note" hidden>Не удалось загрузить данные.</div>
@@ -35,4 +36,4 @@
 <footer><span>Monthly v2</span><details><summary>Состояние данных</summary><pre id="technicalState">Нет данных</pre></details><span id="footerCoverage">Актуальные данные</span></footer>
 </main>
 <dialog id="productDrawer" aria-labelledby="drawerTitle"><div class="drawer-head"><div><span class="eyebrow">КАРТОЧКА ТОВАРА</span><span id="drawerSku" class="muted"></span></div><button id="drawerClose" class="icon-button" aria-label="Закрыть карточку">✕</button></div><div class="drawer-scroll"><h2 id="drawerTitle"></h2><div id="drawerTabs" class="drawer-tabs" role="group" aria-label="Площадка товара"></div><div id="drawerBody"></div></div></dialog>
-<script type="module" src="./app.js?v=20261006incomeunits"></script><script type="module" src="./import.js?v=20261005import2"></script></body></html>
+<script type="module" src="./app.js?v=20261010viewswitch"></script><script type="module" src="./import.js?v=20261005import2"></script></body></html>

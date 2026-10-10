@@ -466,7 +466,10 @@ function mergeOzonEconomics(base,oz){
    x.expected_received=(x.commission_amount==null||logAmount==null)?null:gmv-x.commission_amount-logAmount;
  }
  base.stocks=[...(Array.isArray(base.stocks)?base.stocks:[]),...(Array.isArray(oz.stocks)?oz.stocks:[])];
- base.positions=Array.isArray(oz.positions)?oz.positions:[];
+ base.positions=Array.isArray(oz.positions)&&oz.positions.length?oz.positions:(Array.isArray(base.positions)?base.positions:[]);
+ base.ads=[...(Array.isArray(base.ads)?base.ads:[]),...(Array.isArray(oz.ads)?oz.ads:[])];
+ base.ozon_current=Array.isArray(oz.ozon_current)?oz.ozon_current:[];
+ base.ozon_ads_campaigns=Array.isArray(oz.ozon_ads_campaigns)?oz.ozon_ads_campaigns:[];
  base.content=[...(Array.isArray(base.content)?base.content:[]),...(Array.isArray(oz.content)?oz.content:[])];
  return base
 }
@@ -777,12 +780,50 @@ function overviewMetric(stats,prev,a,mk,name){
    return positionMain(cur)+(imp==null?"":("<span class='metric-delta'>"+(imp>0?"↑ ":"↓ ")+I(Math.abs(imp))+"</span>"))
  }
  function adWindowLabel(z){if(!z||!z.period_from||!z.period_to)return"выбранный период";let a=new Date(z.period_from+"T00:00:00"),b=new Date(z.period_to+"T00:00:00"),n=Math.round((b-a)/86400000)+1;return n+"д • "+String(z.period_from).slice(5)+"–"+String(z.period_to).slice(5)}
+ if((name==="ads"||name==="drr")&&mk==="OZON"){let oa=skuMarketAds(a,"OZON",periodDates(0));if(!oa)return"—<span class='metric-note'>нет данных по SKU</span>";return name==="ads"?R(oa.spend)+"<span class='metric-note'>выбранный период</span>":(oa.drr_ads!=null?P(oa.drr_ads)+"<span class='metric-note'>выбранный период</span>":"—<span class='metric-note'>нет выручки рекламы</span>")}
  if(name==="ads")return (mk==="YANDEX"||mk==="WB")?(ya?R(ya.spend)+"<span class='metric-note'>"+X(mk==="WB"?"выбранный период":adWindowLabel(ya))+"</span>":"—<span class='metric-note'>нет данных</span>"):"—<span class='metric-note'>не подключено</span>";
  if(name==="drr")return (mk==="YANDEX"||mk==="WB")?(ya&&ya.drr!=null?P(ya.drr)+"<span class='metric-note'>"+X(mk==="WB"?"выбранный период":adWindowLabel(ya))+"</span>":"—<span class='metric-note'>нет данных</span>"):"—<span class='metric-note'>не подключено</span>";
  if(name==="content")return (mk==="OZON"||mk==="YANDEX"||mk==="WB")?(ct?(I(ct.content_score)+" / 100"+(mk==="WB"?"<span class='metric-note'>наш расчёт</span>":"")):"—<span class='metric-note'>нет данных</span>"):"—<span class='metric-note'>не подключено</span>";
  if(name==="stock")return st?(I(st.total)+" шт"+stockStatusHtml(st,a)):"—<span class='metric-note'>"+("нет данных")+"</span>";
  return"—"
 }
+function ozonCurrentFor(a,cab){
+ let sku=String(marketSkuFor("OZON",a)||a.sku||""),art=normArticle(a.article),pageCab=E("cabinet")?E("cabinet").value:"ALL";
+ let arr=(D.ozon_current||[]).filter(r=>(sku&&String(r.sku||"")===sku)||(art&&normArticle(r.offer_id)===art));
+ for(const c of [cab,pageCab!=="ALL"?pageCab:null]){if(!c)continue;let f=arr.filter(r=>r.cabinet===c);if(f.length){arr=f;break}}
+ arr=[...arr].sort((x,y)=>N(y.logistics_units)-N(x.logistics_units)||String(y.price_date||"").localeCompare(String(x.price_date||"")));
+ return arr[0]||null
+}
+function priceAtPeriodStart(key,mk){
+ let ds=periodDates(0),set=new Set(ds);
+ let rows=skuRowsByKey(key).filter(x=>rowMarketplace(x)===mk&&set.has(String(x.report_date||""))&&x.current_price!=null&&N(x.current_price)>0).sort((x,y)=>String(x.report_date).localeCompare(String(y.report_date)));
+ return rows.length?{price:N(rows[0].current_price),date:String(rows[0].report_date)}:null
+}
+function dm(v){v=String(v||"");return v.length>=10?v.slice(8,10)+"."+v.slice(5,7):v}
+function monthShort(ym){let m=Number(String(ym||"").slice(5,7));return["","янв.","февр.","март","апр.","май","июнь","июль","авг.","сент.","окт.","нояб.","дек."][m]||String(ym||"")}
+function Pd(v){return v==null||!isFinite(Number(v))?"—":(Number(v)>0&&Number(v)<0.1?"<0,1%":Number(v).toFixed(1)+"%")}
+function skuMarketAds(a,mk,ds){
+ ds=ds||periodDates(0);let set=new Set(ds),first=ds[0]||"",last=ds.at(-1)||"",art=normArticle(a.article),sku=String(marketSkuFor(mk,a)||a.sku||"");
+ let arr=ADS.filter(x=>rowMarketplace(x)===mk&&((art&&normArticle(x.offer_id)===art)||(sku&&String(x.offer_id||"")===sku)));
+ let daily=arr.filter(x=>String(x.period_from||"")===String(x.period_to||"")&&set.has(String(x.period_to||"")));
+ let periods=arr.filter(x=>String(x.period_from||"")!==String(x.period_to||"")&&String(x.period_from||"")>=first&&String(x.period_to||"")<=last);
+ let use=daily.concat(periods);if(!use.length)return null;
+ let z={spend:0,orders:0,revenue:0,shows:0,clicks:0,from:"",to:""};
+ for(const x of use){z.spend+=N(x.spend);z.orders+=N(x.ad_orders);z.revenue+=N(x.ad_revenue);z.shows+=N(x.shows);z.clicks+=N(x.clicks);if(!z.from||String(x.period_from)<z.from)z.from=String(x.period_from);if(String(x.period_to)>z.to)z.to=String(x.period_to)}
+ z.ctr=z.shows?z.clicks/z.shows*100:null;z.drr_ads=z.revenue?z.spend/z.revenue*100:null;return z
+}
+function skuOzonPositionStats(a){
+ let art=normArticle(a.article),sku=String(marketSkuFor("OZON",a)||a.sku||""),cab=E("cabinet").value;
+ let arr=POSITION.filter(p=>((sku&&String(p.sku||"")===sku)||(art&&normArticle(p.offer_id)===art))&&(cab==="ALL"||p.cabinet===cab));
+ if(!arr.length)return null;
+ let oneDay=arr.filter(p=>!p.period_from||String(p.period_from)===String(p.period_to));if(oneDay.length)arr=oneDay;
+ let byDate=new Map();for(const p of arr){let d=String(p.snapshot_date||p.period_to||"");let b=byDate.get(d)||{pos:[],search:0,view:0};if(N(p.position)>0)b.pos.push(N(p.position));b.search+=N(p.unique_search_users);b.view+=N(p.unique_view_users);byDate.set(d,b)}
+ let ds=[...byDate.keys()].sort(),last=ds.slice(-7),prev=ds.slice(-14,-7);
+ const avg=list=>{let v=list.flatMap(d=>byDate.get(d).pos);return v.length?v.reduce((s,x)=>s+x,0)/v.length:null};
+ let search=0,view=0;for(const d of last){search+=byDate.get(d).search;view+=byDate.get(d).view}
+ return{position:avg(last),previous:avg(prev),from:last[0],to:last.at(-1),days:last.length,search,view,conversion:search?view/search*100:null}
+}
+function skuContentDate(ct){return ct?(ct.snapshot_date||String(ct.captured_at||"").slice(0,10)):""}
 globalThis.setSkuOverviewMarket=function(mk){skuOverviewMarket=mk;detailTab="overview";if(selected)openSku(selected)}
 function buildSkuOverview(key,a){
  let stats=skuMarketStats(key),prev=skuPrevMarketStats(key),markets=["OZON","YANDEX","WB"],allUnits=0,allGmv=0,prevUnits=0,prevGmv=0;
@@ -794,8 +835,8 @@ function buildSkuOverview(key,a){
  let buttons=["ALL"].concat(markets).map(mk=>{let cls=mk==="OZON"?"ozon":mk==="YANDEX"?"yandex":mk==="WB"?"wb":"";return"<button type='button' data-overview-market='"+mk+"' class='market-tab "+cls+" "+(skuOverviewMarket===mk?"active":"")+"'>"+X(mk==="ALL"?"Все":marketLabel(mk))+"</button>"}).join("");
  let stockStatus=st?(days==null?"нет продаж 14д":days<7?"Критичный":days<14?"Низкий":"Норма"):"нет данных",stockCls=!st?"neu":days==null?"neu":days<7?"neg":days<14?"neu":"pos";
  let top="<div class='kpi4' style='grid-template-columns:repeat(5,1fr)'><div class='kpi-mini'><div class='mn'>Продано</div><div class='mv'>"+I(allUnits)+" шт</div><div class='kpi-sub "+C(du)+"'>"+(du===0?"—":S(du)+I(du)+" шт")+"</div></div>"+
-   "<div class='kpi-mini'><div class='mn'>GMV</div><div class='mv'>"+R(allGmv)+"</div><div class='kpi-sub "+C(dgp)+"'>"+(dgp==null?"—":S(dgp)+dgp.toFixed(1)+"%")+"</div></div>"+
-   "<div class='kpi-mini'><div class='mn'>Средняя цена</div><div class='mv'>"+R(avg)+"</div><div class='kpi-sub "+C(dap)+"'>"+(dap==null?"—":S(dap)+dap.toFixed(1)+"%")+"</div></div>"+
+   "<div class='kpi-mini'><div class='mn'>Оборот</div><div class='mv'>"+R(allGmv)+"</div><div class='kpi-sub "+C(dgp)+"'>"+(dgp==null?"—":S(dgp)+dgp.toFixed(1)+"%")+"</div></div>"+
+   "<div class='kpi-mini'><div class='mn'>Средняя цена продажи</div><div class='mv'>"+R(avg)+"</div><div class='kpi-sub neu'>"+(dap==null?"—":S(dap)+dap.toFixed(1)+"%")+"</div></div>"+
    "<div class='kpi-mini'><div class='mn'>Остаток</div><div class='mv'>"+(st?I(st.total_stock)+" шт":"—")+"</div><div class='kpi-sub neu'>"+(st&&st.source_cabinet?X("источник: "+(st.source_marketplace==="YANDEX"?"Яндекс ":"")+st.source_cabinet):"нет данных")+"</div></div>"+
    "<div class='kpi-mini'><div class='mn'>Запас</div><div class='mv'>"+(days==null?"—":days.toFixed(1)+" дн.")+"</div><div class='kpi-sub "+stockCls+"'>"+X(stockStatus)+"</div></div></div>";
  let badge=skuOverviewMarket==="OZON"?"<span class='market-badge ozon'>Ozon</span>":skuOverviewMarket==="YANDEX"?"<span class='market-badge yandex'>Яндекс</span>":skuOverviewMarket==="WB"?"<span class='market-badge wb'>WB</span>":"";
@@ -810,39 +851,63 @@ function buildSkuOverview(key,a){
    let body=rows.map(r=>"<tr><th>"+r[0]+"</th>"+markets.map(m=>"<td>"+overviewMetric(stats,prev,a,m,r[1])+"</td>").join("")+"</tr>").join("");
    return"<div class='tab-pane' data-tab='overview'>"+top+toolbar+"<table class='ov-matrix'>"+head+"<tbody>"+body+"</tbody></table><div class='ov-source'>Δ — изменение к предыдущему сопоставимому периоду. «Нет данных» означает, что источник подключён, но значения нет; «не подключено» — интеграция ещё отсутствует. Расходы WB показаны только по заказам, связанным с финансовым отчётом; хранение и общие удержания без артикула не распределяются.</div></div>"
  }
- let mk=skuOverviewMarket,x=stats.get(mk),p=prev.get(mk),pos=mk==="OZON"?skuOzonPosition(a):null,ct=(mk==="OZON"||mk==="YANDEX"||mk==="WB")?skuMarketContent(mk,a):null,stmk=skuMarketStock(a,mk),yv=mk==="YANDEX"?skuYandexVisibility(a,0):null,yp=mk==="YANDEX"?skuYandexVisibility(a,1):null,ya=mk==="YANDEX"?skuYandexAds(a):mk==="WB"?skuWBAds(a):null;
- let posText="Источник не подключён",posVal="—";
- if(mk==="OZON"){if(pos){let imp=N(pos.previous_position)&&N(pos.position)?N(pos.previous_position)-N(pos.position):null;posVal="№ "+I(pos.position);posText=imp==null?"Нет базы сравнения":((imp>0?"↑ ":"↓ ")+I(Math.abs(imp))+" к прошлому")}else posText="Нет данных"}
- if(mk==="YANDEX"){if(yv!=null){posVal=Number(yv).toFixed(1)+"%";posText=yp==null?"Индекс видимости Яндекс":("Индекс видимости • Δ "+S(yv-yp)+(yv-yp).toFixed(1)+" п.п.")}else posText="Нет данных"}
- let cards=[
-   ["Продано",x.units?I(x.units)+" шт":"—",(x.units||p.units)?((x.units-p.units)===0?"Без изменений":("Δ "+S(x.units-p.units)+I(x.units-p.units)+" шт")):"Нет базы сравнения"],
-   ["GMV",x.gmv?R(x.gmv):"—",deltaPct(x.gmv,p.gmv)==null?"Нет базы сравнения":"Δ "+S(deltaPct(x.gmv,p.gmv))+deltaPct(x.gmv,p.gmv).toFixed(1)+"%"],
-   ["Средняя цена",x.avg_price?R(x.avg_price):"—",deltaPct(x.avg_price,p.avg_price)==null?"Нет базы сравнения":"Δ "+S(deltaPct(x.avg_price,p.avg_price))+deltaPct(x.avg_price,p.avg_price).toFixed(1)+"%"],
-   ["Текущая цена",x.current_price?R(x.current_price):"—",x.current_price?(p.current_price&&deltaPct(x.current_price,p.current_price)!=null?"Δ "+S(deltaPct(x.current_price,p.current_price))+deltaPct(x.current_price,p.current_price).toFixed(1)+"%":"Нет базы сравнения"):"Нет данных"],
-   ["Комиссия",x.commission_pct!=null?("<span class='neu'>"+P(x.commission_pct)+"</span>"):"—",x.commission_pct!=null?(p.cost_units&&p.commission_pct!=null?(Math.abs(x.commission_pct-p.commission_pct)<0.0001?"Без изменений":"Δ "+S(x.commission_pct-p.commission_pct)+(x.commission_pct-p.commission_pct).toFixed(1)+" п.п."):"Нет базы сравнения"):("Нет данных")],
-   ["Логистика / шт",x.logistics_per_unit!=null?R(x.logistics_per_unit):"—",x.logistics_per_unit!=null?(deltaPct(x.logistics_per_unit,p.logistics_per_unit)==null?"Нет базы сравнения":"Δ "+S(deltaPct(x.logistics_per_unit,p.logistics_per_unit))+deltaPct(x.logistics_per_unit,p.logistics_per_unit).toFixed(1)+"%"):("Нет данных")],
-   ["Получено / шт",x.received_per_unit!=null?R(x.received_per_unit):"—",x.received_per_unit!=null?(deltaPct(x.received_per_unit,p.received_per_unit)==null?"Нет базы сравнения":"Δ "+S(deltaPct(x.received_per_unit,p.received_per_unit))+deltaPct(x.received_per_unit,p.received_per_unit).toFixed(1)+"%"):("Нет данных")],
-   ["Позиция / видимость",posVal,posText],
-   ["Реклама",(mk==="YANDEX"||mk==="WB")&&ya?R(ya.spend):"—",(mk==="YANDEX"||mk==="WB")?(ya?(mk==="WB"?"Расход по SKU за выбранный период":"Расход за последние 7 дней"):"Нет данных"):"Источник не подключён"],
-   ["ДРР",(mk==="YANDEX"||mk==="WB")&&ya&&ya.drr!=null?P(ya.drr):"—",(mk==="YANDEX"||mk==="WB")?(ya?(mk==="WB"?"Расход / выручка рекламы • выбранный период":"Расход / выручка рекламы • последние 7 дней"):"Нет данных"):"Источник не подключён"],
-   ["Рекламные заказы","—","Источник не подключён"],
-   ["Акция / промо","—","Источник не подключён"],
-   ["Контент",ct?I(ct.content_score)+" / 100":"—",(mk==="OZON"||mk==="YANDEX"||mk==="WB")?(ct?(mk==="YANDEX"?"Content Rating Яндекс":mk==="WB"?"Content Score WB • наш расчёт":"Content Score Ozon"):"Нет данных"):"Источник не подключён"],
-   ["Рейтинг","—","Источник не подключён"],
-   ["Отзывы","—","Источник не подключён"]];
- function passSubClass(title,text){
-  let t=String(text||"");
-  if(!t||/нет данных|нет базы|источник|—|не подключ/i.test(t))return"neu";
-  let dir=0;
-  if(t.includes("↑"))dir=1;else if(t.includes("↓"))dir=-1;
-  else {let m=t.match(/(?:Δ\s*)?([+-])\s*\d/);if(m)dir=m[1]==="+"?1:-1}
-  if(!dir)return"neu";
-  if(title==="Комиссия"||title==="Логистика / шт"||title==="ДРР")dir=-dir;
-  return dir>0?"pos":"neg";
-}
- let marketCardClass=mk==="OZON"?"market-ozon":mk==="YANDEX"?"market-yandex":mk==="WB"?"market-wb":"";
- let grid=cards.map(c=>"<div class='pass "+marketCardClass+"'><div class='pass-title'>"+X(c[0])+"</div><div class='pass-value "+(c[1]==="—"?"pass-empty":"")+"'>"+c[1]+"</div><div class='pass-sub "+passSubClass(c[0],c[2])+"'>"+X(c[2])+"</div></div>").join("");
- return"<div class='tab-pane' data-tab='overview'>"+top+toolbar+"<div class='ov-grid'>"+grid+"</div>"+(mk==="WB"?"<div class='ov-source'>Подтверждённые расходы: "+I(x.cost_units)+"/"+I(x.units)+" шт. Комиссия — фактические услуги WB и эквайринг в % от GMV заказов. «Получено / шт» — расчёт GMV минус привязанные расходы, не сумма выплаты WB. Хранение и удержания без артикула не распределены. Рекламные расходы и ДРР показаны отдельно и не входят в расчёт «Получено / шт».</div>":"")+"</div>"
+ let mk=skuOverviewMarket,x=stats.get(mk),p=prev.get(mk),ct=skuMarketContent(mk,a),yv=mk==="YANDEX"?skuYandexVisibility(a,0):null,yp=mk==="YANDEX"?skuYandexVisibility(a,1):null,ds=periodDates(0);
+ const card=(title,value,sub,cls)=>"<div class='pass'><div class='pass-title'>"+X(title)+"</div><div class='pass-value "+(value==="—"?"pass-empty":"")+"'>"+value+"</div><div class='pass-sub "+(cls||"neu")+"'>"+sub+"</div></div>";
+ const group=(title,note,cards,cols)=>"<section class='ov-group'><div class='ov-group-head'><div class='ov-group-title'>"+X(title)+"</div><div class='ov-group-note'>"+X(note)+"</div></div><div class='ov-grid' style='grid-template-columns:repeat("+(cols||cards.length)+",minmax(0,1fr))'>"+cards.join("")+"</div></section>";
+ const dPct=(c,pv)=>{let d=deltaPct(c,pv);return d==null?null:d};
+ const signCls=(d,invert)=>d==null||Math.abs(d)<0.0001?"neu":((invert?-d:d)>0?"pos":"neg");
+ // Sales for the selected period
+ let dUnits=N(x.units)-N(p.units),dg=dPct(x.gmv,p.gmv),da=dPct(x.avg_price,p.avg_price);
+ let sales=[
+   card("Продано",x.units?I(x.units)+" шт":"—",(x.units||p.units)?(dUnits===0?"Без изменений":S(dUnits)+I(dUnits)+" шт"):"Нет базы сравнения",signCls(dUnits)),
+   card("Оборот",x.gmv?R(x.gmv):"—",dg==null?"Нет базы сравнения":S(dg)+dg.toFixed(1)+"%",signCls(dg)),
+   card("Средняя цена продажи",x.avg_price?R(x.avg_price):"—",da==null?"Нет базы сравнения":S(da)+da.toFixed(1)+"%","neu")
+ ];
+ let mst=skuMarketStock(a,mk),mavg=allMarketAvgDailySales14d(a),mdays=mst&&mavg>0?N(mst.total)/mavg:null;
+ sales.push(card("Остаток",mst?I(mst.total)+" шт":"—",mst?(mst.cabinet?"склад "+X(mst.cabinet):""):"Нет данных","neu"));
+ sales.push(card("Запас",mdays==null?"—":mdays.toFixed(1)+" дн.",mdays==null?(mst?"нет продаж 14д":"Нет данных"):mdays<7?"Критичный":mdays<14?"Низкий":"Норма",mdays==null?"neu":mdays<7?"neg":mdays<14?"warn":"pos"));
+ // Price and economics as of today (independent of the period)
+ let econ=[],oc=mk==="OZON"?ozonCurrentFor(a,x.cabinet):null,start=priceAtPeriodStart(key,mk);
+ if(mk==="OZON"){
+   let price=oc&&oc.price!=null?N(oc.price):(x.current_price!=null?N(x.current_price):null),pd=start&&price!=null?deltaPct(price,start.price):null;
+   econ.push(card("Текущая цена",price!=null?R(price):"—",price==null?"Нет данных":(oc&&oc.price_date?"на "+dm(oc.price_date):"")+(pd==null?"":" · "+(Math.abs(pd)<0.05?"без изменений":S(pd)+pd.toFixed(1)+"%")+" к "+dm(start.date)),"neu"));
+   let mcom=oc&&oc.month_commission_pct!=null?" · факт "+monthShort(oc.month)+" "+P(oc.month_commission_pct):"";
+   econ.push(card("Комиссия Ozon",oc&&oc.commission_pct!=null?P(oc.commission_pct):"—",oc&&oc.commission_pct!=null?"тариф на "+dm(oc.commission_date)+mcom:"Нет данных","neu"));
+   let ls=oc?oc.logistics_status:null,lsub=!oc||oc.logistics_per_unit==null?"Нет данных":ls==="avg7"||ls==="avg14"?"факт "+dm(oc.logistics_from)+"–"+dm(oc.logistics_to)+" · "+I(oc.logistics_units)+" шт":ls==="stale"?"устар. факт "+dm(oc.logistics_from)+"–"+dm(oc.logistics_to):ls==="month"?"факт "+monthShort(oc.month):ls==="estimate"?"оценка по категории":"";
+   econ.push(card("Логистика / шт",oc&&oc.logistics_per_unit!=null?R(oc.logistics_per_unit):"—",X(lsub),ls==="stale"||ls==="estimate"?"warn":"neu"));
+   let mr=oc&&oc.month_received_per_unit!=null?"факт "+monthShort(oc.month)+" "+R(oc.month_received_per_unit):"факт прошлого месяца: нет данных";
+   econ.push(card("≈ К получению / шт",oc&&oc.received_per_unit!=null?R(oc.received_per_unit):"—","после прямых расходов МП · "+mr,"neu"));
+ }else{
+   let op=operationalEconomicsFor(key,mk)||{},price=op.current_price!=null?N(op.current_price):(x.current_price!=null?N(x.current_price):null),pd=start&&price!=null?deltaPct(price,start.price):null;
+   econ.push(card("Текущая цена",price!=null?R(price):"—",price==null?"Нет данных":X(op.price_source||"последняя известная")+(pd==null?"":" · "+(Math.abs(pd)<0.05?"без изменений":S(pd)+pd.toFixed(1)+"%")+" к "+dm(start.date)),"neu"));
+   econ.push(card("Комиссия",op.commission_pct!=null?P(op.commission_pct):"—",op.commission_pct!=null?X(op.commission_source||""):"Нет данных","neu"));
+   econ.push(card("Логистика / шт",op.logistics_per_unit!=null?R(op.logistics_per_unit):"—",op.logistics_per_unit!=null?X(op.logistics_source||""):"Нет данных","neu"));
+   econ.push(card("≈ К получению / шт",op.received_per_unit!=null?R(op.received_per_unit):"—","после прямых расходов МП","neu"));
+ }
+ // Promotion for the selected period
+ let promo=[];
+ if(mk==="OZON"){
+   let ps=skuOzonPositionStats(a);
+   let pdlt=ps&&ps.position!=null&&ps.previous!=null?ps.previous-ps.position:null;
+   promo.push(card("Позиция в поиске",ps&&ps.position!=null?"№ "+I(ps.position):"—",ps&&ps.position!=null?"средняя за "+ps.days+" дн · "+(pdlt==null?"нет базы сравнения":(Math.abs(pdlt)<0.5?"без изменений":(pdlt>0?"↑ ":"↓ ")+I(Math.abs(pdlt))+" к прошлой неделе")):"Нет данных",signCls(pdlt)));
+   promo.push(card("Видели в поиске → открыли",ps&&ps.search?I(ps.search)+" → "+I(ps.view):"—",ps&&ps.search?"конверсия в просмотр "+P(ps.conversion):"Нет данных","neu"));
+ }else if(mk==="YANDEX"){
+   promo.push(card("Видимость",yv!=null?Number(yv).toFixed(1)+"%":"—",yv==null?"Нет данных":(yp==null?"индекс видимости Яндекс":"Δ "+S(yv-yp)+(yv-yp).toFixed(1)+" п.п."),signCls(yv!=null&&yp!=null?yv-yp:null)));
+ }
+ let ad=mk==="YANDEX"?skuYandexAds(a):mk==="WB"?skuWBAds(a):skuMarketAds(a,"OZON",ds);
+ if(ad&&mk!=="OZON"){ad={...ad,drr_ads:ad.drr,ctr:ad.shows?ad.clicks/ad.shows*100:null}}
+ let drrAll=ad&&x.gmv?ad.spend/N(x.gmv)*100:null,adShare=ad&&x.units?Math.min(100,N(ad.orders)/N(x.units)*100):null;
+ let adWin=ad&&mk==="YANDEX"&&ad.period_from?" · окно "+dm(ad.period_from)+"–"+dm(ad.period_to):"";
+ promo.push(card("Реклама",ad?R(ad.spend):"—",ad?"ДРР общий "+Pd(drrAll)+" · рекламный "+Pd(ad.drr_ads)+(ad.ctr!=null?" · CTR "+P(ad.ctr):"")+adWin:(mk==="OZON"?"Нет данных по SKU":"Нет данных"),"neu"));
+ promo.push(card("Рекламные заказы",ad?I(ad.orders):"—",ad?(adShare==null?"":P(adShare)+" от всех заказов SKU"):"Нет данных","neu"));
+ // Marketplace card
+ let cDate=skuContentDate(ct);
+ let content=[card("Контент",ct?I(ct.content_score)+" / 100":"—",ct?((mk==="YANDEX"?"Content Rating Яндекс":mk==="WB"?"Content Score WB · наш расчёт":"Content Score Ozon")+(cDate?" · на "+dm(cDate):"")):"Нет данных","neu")];
+ let html=group("Продажи · за выбранный период","Δ к предыдущему такому же периоду",sales,5)
+   +group("Цена и экономика · на сегодня","Не зависит от периода · под каждой цифрой дата и источник",econ,4)
+   +group("Продвижение · за выбранный период",mk==="OZON"?"Позиции и охват — Ozon Seller API, реклама — Ozon Performance":"",promo,promo.length)
+   +group("Карточка на маркетплейсе","",content,3);
+ return"<div class='tab-pane' data-tab='overview'>"+toolbar+html+(mk==="WB"?"<div class='ov-source'>Подтверждённые расходы: "+I(x.cost_units)+"/"+I(x.units)+" шт. Комиссия — фактические услуги WB и эквайринг в % от оборота заказов. «≈ К получению / шт» — оборот минус привязанные расходы МП, не сумма выплаты. Реклама не входит в «К получению».</div>":"")+"</div>"
 }
 
 let skuDynKey=null,skuDynMarket=null,skuDynMetric="PRICE";
@@ -985,6 +1050,32 @@ body+=buildSkuDynamics(key,a);
  E("detail").innerHTML=body;setDetailTab(detailTab)
 }
 
+// Ad spend per canonical SKU for the selected period (Ozon daily SKU stats + pay-per-order periods inside the period, WB daily).
+function adsByKeyForPeriod(){
+ let ds=periodDates(0),first=ds[0]||"",last=ds.at(-1)||"";
+ return perfCache("adsByKey:"+first+":"+last,ADS,()=>{
+   let set=new Set(ds),out=new Map();
+   let keyMap=perfCache("adsKeyMap",D,()=>{let m=new Map();for(const x of D.sku_daily||[]){let k=canonicalKey(x),mk=rowMarketplace(x),art=normArticle(x.article);if(art&&!m.has(mk+"|art|"+art))m.set(mk+"|art|"+art,k);let s=mk+"|"+String(x.cabinet||"")+"|"+String(x.sku||"");if(!m.has(s))m.set(s,k)}return m});
+   for(const r of ADS){
+     let mk=rowMarketplace(r);if(mk==="YANDEX")continue;
+     let from=String(r.period_from||""),to=String(r.period_to||""),daily=from===to;
+     if(daily?!set.has(to):!(from>=first&&to<=last))continue;
+     let k=mk==="WB"?keyMap.get("WB|"+String(r.cabinet||"")+"|"+String(r.offer_id||"")):(keyMap.get(mk+"|art|"+normArticle(r.offer_id))||keyMap.get(mk+"|"+String(r.cabinet||"")+"|"+String(r.offer_id||"")));
+     if(!k)continue;
+     let z=out.get(k)||{spend:0,revenue:0,orders:0,shows:0,clicks:0};z.spend+=N(r.spend);z.revenue+=N(r.ad_revenue);z.orders+=N(r.ad_orders);z.shows+=N(r.shows);z.clicks+=N(r.clicks);out.set(k,z)
+   }
+   return out
+ })
+}
+globalThis.getSkuAdsByKey=adsByKeyForPeriod;
+// Tenant-level advertising for the period: Ozon campaign totals (all campaign types) + WB SKU rows.
+function periodAdTotals(){
+ let ds=periodDates(0),set=new Set(ds),spend=0,sources=new Set();
+ for(const c of D.ozon_ads_campaigns||[]){if(set.has(String(c.date||"")))spend+=N(c.spend),sources.add("Ozon")}
+ for(const r of ADS){if(rowMarketplace(r)==="WB"&&String(r.period_from||"")===String(r.period_to||"")&&set.has(String(r.period_to||"")))spend+=N(r.spend),sources.add("WB")}
+ return{spend,sources:[...sources]}
+}
+globalThis.getPeriodAdTotals=periodAdTotals;
 function dailySkuWorkspace(local={}){
  const f={
    cab:"ALL",
@@ -999,7 +1090,8 @@ function dailySkuWorkspace(local={}){
  const enrich=a=>{
    let p=pm.get(a.key)||{},previousGmv=N(p.gmv),previousUnits=N(p.units),lostGmv=Math.max(0,previousGmv-N(a.gmv)),growthGmv=Math.max(0,N(a.gmv)-previousGmv);
    let stock=stockFor(a),stockQty=stock?N(stock.total_stock):null,avg14=allMarketAvgDailySales14d(a),stockDays=stock&&avg14>0?stockQty/avg14:null;
-   return {...a,risk:riskFor(a,pm,f),stock,stockQty,stockDays,channels:channelShareText(a,f),previousGmv,previousUnits,lostGmv,growthGmv,problemImpact:Math.max(N(a.gmv),lostGmv)}
+   let ad=adsByKeyForPeriod().get(a.key)||null,adSpend=ad?ad.spend:null,drr=ad&&N(a.gmv)?ad.spend/N(a.gmv)*100:null,previousPrice=N(p.price)||null,pricePct=previousPrice&&N(a.price)?(N(a.price)/previousPrice-1)*100:null;
+   return {...a,risk:riskFor(a,pm,f),stock,stockQty,stockDays,channels:channelShareText(a,f),previousGmv,previousUnits,lostGmv,growthGmv,problemImpact:Math.max(N(a.gmv),lostGmv),adSpend,drr,previousPrice,pricePct}
  };
  const skus=currentSku.map(enrich);
  const declineSkus=[...pm.values()].filter(p=>N(p.units)>=2).map(p=>{
