@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2.95.3";
 import * as XLSX from "npm:@e965/xlsx@0.20.3";
 import {findTables, guessMapping, isWarehouseReturn, isWarehouseWriteoff, financialReportType, normalizeRows, allocate, norm} from "./processor.mjs";
-const origins=new Set(['https://sivco-dev.github.io','http://127.0.0.1:4173','http://localhost:4173','http://127.0.0.1:3000','http://localhost:3000','http://127.0.0.1:5173','http://localhost:5173']);
+const origins=new Set(['https://sivco-dev.github.io','https://feature-platform-auth-dev.marketplace-dashboards.pages.dev','http://127.0.0.1:4173','http://localhost:4173','http://127.0.0.1:3000','http://localhost:3000','http://127.0.0.1:5173','http://localhost:5173']);
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get('origin')||'';
  const headers={'Access-Control-Allow-Origin':origins.has(origin)?origin:'https://sivco-dev.github.io','Access-Control-Allow-Headers':'content-type,authorization,apikey','Access-Control-Allow-Methods':'POST,OPTIONS','Vary':'Origin','Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'};
