@@ -585,7 +585,7 @@ function allSkuHeader(){
 function econCell(a,type){
  if(!a.has_ref)return"—";
  let v=type==="commission"?P(a.commission_pct):type==="logistics"?R(a.logistics_per_unit):R(a.received_per_unit);
- let note=a.econ_source?(type==="commission"?a.econ_source.commission_source:type==="logistics"?a.econ_source.logistics_source:(a.econ_source.price_source+" − комиссия − логистика")):a.cost_partial?"Факт по "+a.cost_coverage_pct.toFixed(0)+"% проданных шт.":"Факт по выбранному периоду";
+ let note=a.econ_source?(type==="commission"?a.econ_source.commission_source:type==="logistics"?a.econ_source.logistics_source:(a.econ_source.price_source+" − комиссия − логистика · без рекламы")):a.cost_partial?"Факт по "+a.cost_coverage_pct.toFixed(0)+"% проданных шт.":"Факт по выбранному периоду";
  return"<span title='"+X(note)+"'>"+v+(a.cost_partial?" *":"")+"</span>"
 }
 function tables(){
@@ -767,7 +767,7 @@ function overviewMetric(stats,prev,a,mk,name,key){
  if(name==="logistics")return x.logistics_per_unit!=null?(metricMain(R(x.logistics_per_unit),x.logistics_per_unit,null,"pct",true)+"<span class='metric-note'>"+X(x.econ_source?.logistics_source||"факт")+"</span>"):"—<span class='metric-note'>нет данных</span>";
  if(name==="storage")return mk==="WB"?(x.cost_units&&x.storage_amount?R(x.storage_amount):"—<span class='metric-note'>без привязки к SKU</span>"):"—";
  if(name==="other")return mk==="WB"?(x.cost_units?R(x.other_amount):"—<span class='metric-note'>нет данных</span>"):"—";
- if(name==="received")return x.received_per_unit!=null?(metricMain(R(x.received_per_unit),x.received_per_unit,null,"pct")+"<span class='metric-note'>"+X(x.econ_source?.price_source||"цена")+" − комиссия − логистика</span>"):"—<span class='metric-note'>нет данных</span>";
+ if(name==="received")return x.received_per_unit!=null?(metricMain(R(x.received_per_unit),x.received_per_unit,null,"pct")+"<span class='metric-note'>"+X(x.econ_source?.price_source||"цена")+" − комиссия − логистика · без рекламы</span>"):"—<span class='metric-note'>нет данных</span>";
  if(name==="position"){
    if(mk==="YANDEX"){
      if(yv==null)return"—<span class='metric-note'>нет данных</span>";
@@ -781,9 +781,10 @@ function overviewMetric(stats,prev,a,mk,name,key){
  }
  if(name==="ads"||name==="drr"){
    if(mk!=="OZON"&&mk!=="YANDEX"&&mk!=="WB")return"—<span class='metric-note'>не подключено</span>";
-   let g=skuGeneralAds(key,a,mk,periodDates(0));if(!g)return"—<span class='metric-note'>"+(mk==="OZON"?"нет полных данных по SKU":"нет данных")+"</span>";
-   let note=X([g.note||"выбранный период",g.estimate?"вкл. оценку ОЗЗ":""].filter(Boolean).join(" · "));
-   return name==="ads"?(g.estimate?"≈ ":"")+R(g.spend)+"<span class='metric-note'>"+note+"</span>":(g.drr!=null?(g.estimate?"≈ ":"")+P(g.drr)+"<span class='metric-note'>общий · "+note+"</span>":"—<span class='metric-note'>нет оборота</span>")
+   let g=skuGeneralAds(key,a,mk,periodDates(0));if(!g)return"—<span class='metric-note'>нет данных</span>";
+   let cov=g.days?(g.note?"ДРР "+g.note:"выбранный период"):"нет полного покрытия для ДРР",est=g.estimate?" · вкл. оценку ОЗЗ":"";
+   if(name==="ads")return (g.estimate?"≈ ":"")+R(g.spend)+"<span class='metric-note'>"+X(cov+est)+"</span>";
+   return g.drr!=null?(g.estimate?"≈ ":"")+P(g.drr)+"<span class='metric-note'>"+X("общий · "+(g.note||"выбранный период")+est)+"</span>":"—<span class='metric-note'>"+X(g.days?"нет оборота":"нет полного покрытия")+"</span>"
  }
  if(name==="content")return (mk==="OZON"||mk==="YANDEX"||mk==="WB")?(ct?(I(ct.content_score)+" / 100"+(mk==="WB"?"<span class='metric-note'>наш расчёт</span>":"")):"—<span class='metric-note'>нет данных</span>"):"—<span class='metric-note'>не подключено</span>";
  if(name==="stock")return st?(I(st.total)+" шт"+stockStatusHtml(st,a)):"—<span class='metric-note'>"+("нет данных")+"</span>";
@@ -829,34 +830,60 @@ function wbAdCoverage(ds){
 }
 function adCoverage(mk,ds){return mk==="OZON"?ozonAdCoverage(ds):mk==="WB"?wbAdCoverage(ds):new Set()}
 function covNote(n,m){return n<m?"за "+n+" из "+m+" дн.":""}
+// PPO period report rows carry their campaign ids in source_type: "ppo_period:<source>:<ids>".
+function ppoReportCampaigns(r){let p=String(r.source_type||"").split(":");return p[0]==="ppo_period"&&p[2]?p[2].split(","):[]}
+// Ozon SKU ad rows for the window, split into
+//  known   — every known SKU-level spend in the window: daily rows on window dates + period reports lying fully inside the window
+//            (partial period reports are never split by day); a per-SKU PPO estimate on a date already covered by a PPO report is dropped;
+//  covered — rows on dates with complete, verified spend (used for ДРР only).
+function ozonAdRows(ds){
+ return perfCache("ozrows:"+ds[0]+":"+ds.at(-1)+":"+ds.length,ADS,()=>{
+   let set=new Set(ds),cov=ozonAdCoverage(ds),known=[],covered=[];
+   let rows=ADS.filter(r=>rowMarketplace(r)==="OZON"&&r.period_from&&r.period_to);
+   let ppoRanges=rows.filter(r=>String(r.source_type||"").startsWith("ppo_period")).map(r=>[String(r.period_from),String(r.period_to)]);
+   for(const r of rows){
+     let f=String(r.period_from),t=String(r.period_to),st=String(r.source_type||"");
+     if(f===t){
+       if(!set.has(t))continue;
+       if(st==="ppo_estimate"&&ppoRanges.some(([x,y])=>t>=x&&t<=y))continue;
+       known.push(r);if(cov.has(t))covered.push(r)
+     }else{
+       let dd=dateRangeList(f,t);if(!dd.every(d=>set.has(d)))continue;
+       known.push(r);if(dd.every(d=>cov.has(d)))covered.push(r)
+     }
+   }
+   return{known,covered,cov}
+ })
+}
+function adRowEstimate(r){let st=String(r.source_type||"");return st==="ppo_estimate"||st.includes("DERIVED")}
 function skuMarketAds(a,mk,ds){
- ds=ds||periodDates(0);let cov=adCoverage(mk,ds),art=normArticle(a.article),sku=String(marketSkuFor(mk,a)||a.sku||"");
- if(!cov.size)return null;
- let arr=ADS.filter(x=>rowMarketplace(x)===mk&&((art&&normArticle(x.offer_id)===art)||(sku&&String(x.offer_id||"")===sku)));
- let daily=arr.filter(x=>String(x.period_from||"")===String(x.period_to||"")&&cov.has(String(x.period_to||"")));
- let periods=arr.filter(x=>String(x.period_from||"")!==String(x.period_to||"")&&dateRangeList(x.period_from,x.period_to).every(d=>cov.has(d)));
- let use=daily.concat(periods);
- // Covered dates without rows for this SKU are a confirmed zero spend, not missing data.
- let z={spend:0,orders:0,revenue:0,shows:0,clicks:0,from:"",to:"",ppo:0,ppo_estimate:false,spend_with_revenue:0,cov_dates:ds.filter(d=>cov.has(d)),days_total:ds.length};
- for(const x of use){let st=String(x.source_type||"");z.spend+=N(x.spend);z.orders+=N(x.ad_orders);z.revenue+=N(x.ad_revenue);z.shows+=N(x.shows);z.clicks+=N(x.clicks);
-   if(st.startsWith("ppo")){z.ppo+=N(x.spend);if(st==="ppo_estimate"||st.includes("DERIVED"))z.ppo_estimate=true}
+ ds=ds||periodDates(0);let o=ozonAdRows(ds),art=normArticle(a.article),sku=String(marketSkuFor(mk,a)||a.sku||"");
+ let mine=x=>(art&&normArticle(x.offer_id)===art)||(sku&&String(x.offer_id||"")===sku);
+ let known=o.known.filter(mine),covered=o.covered.filter(mine);
+ if(!known.length&&!o.cov.size)return null;
+ // Spend shown = all known spend; ДРР spend = spend on covered dates only. Covered dates without rows are a confirmed zero.
+ let z={spend:0,orders:0,revenue:0,shows:0,clicks:0,from:"",to:"",ppo:0,ppo_estimate:false,spend_with_revenue:0,cov_spend:0,cov_ppo:0,cov_dates:ds.filter(d=>o.cov.has(d)),days_total:ds.length};
+ for(const x of known){let st=String(x.source_type||"");z.spend+=N(x.spend);z.orders+=N(x.ad_orders);z.revenue+=N(x.ad_revenue);z.shows+=N(x.shows);z.clicks+=N(x.clicks);
+   if(st.startsWith("ppo")){z.ppo+=N(x.spend);if(adRowEstimate(x))z.ppo_estimate=true}
    if(N(x.ad_revenue)>0)z.spend_with_revenue+=N(x.spend);
    if(!z.from||String(x.period_from)<z.from)z.from=String(x.period_from);if(String(x.period_to)>z.to)z.to=String(x.period_to)}
+ for(const x of covered){z.cov_spend+=N(x.spend);if(String(x.source_type||"").startsWith("ppo"))z.cov_ppo+=N(x.spend)}
  z.ctr=z.shows?z.clicks/z.shows*100:null;z.drr_ads=z.revenue?z.spend_with_revenue/z.revenue*100:null;return z
 }
 // General ДРР = all ad spend / turnover over the same covered dates. Attributed ДРР (spend with ad revenue / ad revenue) stays separate.
 function skuGeneralAds(key,a,mk,ds){
  ds=ds||periodDates(0);
  if(mk==="YANDEX"){let y=skuYandexAds(a);if(!y)return null;let wd=dateRangeList(y.period_from,y.period_to),g=skuMarketStatsForDates(key,wd).get("YANDEX")?.gmv||0;
-   return{spend:y.spend,gmv:g,drr:g?y.spend/g*100:null,drr_attr:y.drr,ctr:y.shows?y.clicks/y.shows*100:null,orders:y.orders,estimate:false,ppo:0,note:"окно "+dm(y.period_from)+"–"+dm(y.period_to),days:wd.length,total:wd.length,dates:wd}}
+   return{spend:y.spend,cov_spend:y.spend,gmv:g,drr:g?y.spend/g*100:null,drr_attr:y.drr,ctr:y.shows?y.clicks/y.shows*100:null,orders:y.orders,estimate:false,ppo:0,note:"окно "+dm(y.period_from)+"–"+dm(y.period_to),days:wd.length,total:wd.length,dates:wd}}
  if(mk==="WB"){let cov=wbAdCoverage(ds),cd=ds.filter(d=>cov.has(d));if(!cd.length)return null;let cs=new Set(cd),art=normArticle(a.article),cab=E("cabinet").value;
    let ids=new Set((D.sku_daily||[]).filter(x=>rowMarketplace(x)==="WB"&&art&&normArticle(x.article)===art&&(cab==="ALL"||x.cabinet===cab)).map(x=>String(x.cabinet)+"|"+String(x.sku)));
    let w={spend:0,orders:0,revenue:0,shows:0,clicks:0};for(const x of ADS)if(String(x.marketplace||"")==="WB"&&ids.has(String(x.cabinet)+"|"+String(x.offer_id))&&cs.has(String(x.period_to||""))){w.spend+=N(x.spend);w.orders+=N(x.ad_orders);w.revenue+=N(x.ad_revenue);w.shows+=N(x.shows);w.clicks+=N(x.clicks)}
    let g=skuMarketStatsForDates(key,cd).get("WB")?.gmv||0;
-   return{spend:w.spend,gmv:g,drr:g?w.spend/g*100:null,drr_attr:w.revenue?w.spend/w.revenue*100:null,ctr:w.shows?w.clicks/w.shows*100:null,orders:w.orders,estimate:false,ppo:0,note:covNote(cd.length,ds.length),days:cd.length,total:ds.length,dates:cd}}
+   return{spend:w.spend,cov_spend:w.spend,gmv:g,drr:g?w.spend/g*100:null,drr_attr:w.revenue?w.spend/w.revenue*100:null,ctr:w.shows?w.clicks/w.shows*100:null,orders:w.orders,estimate:false,ppo:0,note:covNote(cd.length,ds.length),days:cd.length,total:ds.length,dates:cd}}
+ if(mk!=="OZON")return null;
  let z=skuMarketAds(a,mk,ds);if(!z)return null;
  let g=z.cov_dates.length?skuMarketStatsForDates(key,z.cov_dates).get(mk)?.gmv||0:0;
- return{spend:z.spend,gmv:g,drr:g?z.spend/g*100:null,drr_attr:z.drr_ads,ctr:z.ctr,orders:z.orders,estimate:z.ppo_estimate,ppo:z.ppo,note:covNote(z.cov_dates.length,z.days_total),days:z.cov_dates.length,total:z.days_total,dates:z.cov_dates}
+ return{spend:z.spend,cov_spend:z.cov_spend,gmv:g,drr:g&&z.cov_dates.length?z.cov_spend/g*100:null,drr_attr:z.drr_ads,ctr:z.ctr,orders:z.orders,estimate:z.ppo_estimate,ppo:z.ppo,ppo_cov:z.cov_ppo,note:covNote(z.cov_dates.length,z.days_total),days:z.cov_dates.length,total:z.days_total,dates:z.cov_dates}
 }
 function skuOzonPositionStats(a){
  let art=normArticle(a.article),sku=String(marketSkuFor("OZON",a)||a.sku||""),cab=E("cabinet").value;
@@ -921,14 +948,15 @@ function buildSkuOverview(key,a){
    econ.push(card("Комиссия Ozon",oc&&oc.commission_pct!=null?P(oc.commission_pct):"—",oc&&oc.commission_pct!=null?"тариф на "+dm(oc.commission_date)+mcom:"Нет данных","neu"));
    let ls=oc?oc.logistics_status:null,lsub=!oc||oc.logistics_per_unit==null?"Нет данных":ls==="avg7"||ls==="avg14"?"факт "+dm(oc.logistics_from)+"–"+dm(oc.logistics_to)+" · "+I(oc.logistics_units)+" шт":ls==="stale"?"устар. факт "+dm(oc.logistics_from)+"–"+dm(oc.logistics_to):ls==="month"?"факт "+monthShort(oc.month):ls==="estimate"?"оценка по категории":"";
    econ.push(card("Логистика / шт",oc&&oc.logistics_per_unit!=null?R(oc.logistics_per_unit):"—",X(lsub),ls==="stale"||ls==="estimate"?"warn":"neu"));
-   let mr=oc&&oc.month_received_per_unit!=null?"факт "+monthShort(oc.month)+" "+R(oc.month_received_per_unit):"факт прошлого месяца: нет данных";
-   econ.push(card("≈ К получению / шт",oc&&oc.received_per_unit!=null?R(oc.received_per_unit):"—","после прямых расходов МП · "+mr,"neu"));
+   // The month fact has a different composition (returns, other deductions and SKU-level promotion included), so it is shown for reference only, not as a comparison.
+   let mr=oc&&oc.month_received_per_unit!=null?"справочно, факт "+monthShort(oc.month)+" "+R(oc.month_received_per_unit)+" — другой состав: вкл. возвраты, прочие удержания и продвижение по SKU":"факт прошлого месяца: нет данных";
+   econ.push(card("≈ К получению / шт",oc&&oc.received_per_unit!=null?R(oc.received_per_unit):"—","цена − комиссия − логистика; без рекламы и прочих удержаний · "+mr,"neu"));
  }else{
    let op=operationalEconomicsFor(key,mk)||{},price=op.current_price!=null?N(op.current_price):(x.current_price!=null?N(x.current_price):null),pd=start&&price!=null?deltaPct(price,start.price):null;
    econ.push(card("Текущая цена",price!=null?R(price):"—",price==null?"Нет данных":X(op.price_source||"последняя известная")+(pd==null?"":" · "+(Math.abs(pd)<0.05?"без изменений":S(pd)+pd.toFixed(1)+"%")+" к "+dm(start.date)),"neu"));
    econ.push(card("Комиссия",op.commission_pct!=null?P(op.commission_pct):"—",op.commission_pct!=null?X(op.commission_source||""):"Нет данных","neu"));
    econ.push(card("Логистика / шт",op.logistics_per_unit!=null?R(op.logistics_per_unit):"—",op.logistics_per_unit!=null?X(op.logistics_source||""):"Нет данных","neu"));
-   econ.push(card("≈ К получению / шт",op.received_per_unit!=null?R(op.received_per_unit):"—","после прямых расходов МП","neu"));
+   econ.push(card("≈ К получению / шт",op.received_per_unit!=null?R(op.received_per_unit):"—","после привязанных к SKU расходов МП; без рекламы","neu"));
  }
  // Promotion for the selected period
  let promo=[];
@@ -940,13 +968,14 @@ function buildSkuOverview(key,a){
  }else if(mk==="YANDEX"){
    promo.push(card("Видимость",yv!=null?Number(yv).toFixed(1)+"%":"—",yv==null?"Нет данных":(yp==null?"индекс видимости Яндекс":"Δ "+S(yv-yp)+(yv-yp).toFixed(1)+" п.п."),signCls(yv!=null&&yp!=null?yv-yp:null)));
  }
- let ad=skuGeneralAds(key,a,mk,ds),adUnits=ad&&ad.dates.length?N(skuMarketStatsForDates(key,ad.dates).get(mk)?.units):0,adShare=ad&&adUnits?Math.min(100,N(ad.orders)/adUnits*100):null;
- let adNote=ad?[ad.note,ad.estimate?"вкл. оценку ОЗЗ по SKU":""].filter(Boolean).join(" · "):"";
- promo.push(card("Реклама",ad?(ad.estimate?"≈ ":"")+R(ad.spend):"—",ad?"ДРР общий "+Pd(ad.drr)+" · атрибутированный "+Pd(ad.drr_attr)+(ad.ctr!=null?" · CTR "+P(ad.ctr):"")+(adNote?" · "+adNote:""):(mk==="OZON"?"Нет полных данных по SKU за период":"Нет данных"),"neu"));
- promo.push(card("Рекламные заказы",ad?I(ad.orders):"—",ad?(adShare==null?"":P(adShare)+" от всех заказов SKU"+(ad.note?" "+ad.note:"")):"Нет данных","neu"));
+ let ad=skuGeneralAds(key,a,mk,ds),adShare=ad&&x&&x.units?Math.min(100,N(ad.orders)/N(x.units)*100):null;
+ // Spend, data coverage and ДРР are shown separately: spend is every known amount, ДРР only over dates with complete spend data.
+ let drrPart=ad?(ad.days?"ДРР общий "+(ad.estimate?"≈ ":"")+Pd(ad.drr)+(ad.note?" "+ad.note:""):"ДРР — нет полного покрытия данных"):"";
+ promo.push(card("Реклама",ad?(ad.estimate?"≈ ":"")+R(ad.spend):"—",ad?[drrPart,"атрибутированный "+Pd(ad.drr_attr),ad.ctr!=null?"CTR "+P(ad.ctr):"",ad.estimate?"вкл. оценку ОЗЗ по SKU":""].filter(Boolean).join(" · "):"Нет данных","neu"));
+ promo.push(card("Рекламные заказы",ad?I(ad.orders):"—",ad?(adShare==null?"":P(adShare)+" от всех заказов SKU за период"):"Нет данных","neu"));
  if(mk==="OZON"&&ad&&ad.ppo>0){
-   let ppoPct=ad.gmv?ad.ppo/ad.gmv*100:null;
-   promo.push(card("Оплата за заказ",(ad.estimate?"≈ ":"")+R(ad.ppo),Pd(ppoPct)+" оборота"+(ad.note?" "+ad.note:"")+" · "+(ad.estimate?"расход кампании — факт Ozon, доля SKU — оценка по обороту":"факт по SKU")+" · входит в «Рекламу»","neu"))}
+   let ppoPct=ad.days&&ad.gmv?ad.ppo_cov/ad.gmv*100:null;
+   promo.push(card("Оплата за заказ",(ad.estimate?"≈ ":"")+R(ad.ppo),(ppoPct!=null?Pd(ppoPct)+" оборота"+(ad.note?" "+ad.note:""):"доля оборота — нет полного покрытия")+" · "+(ad.estimate?"расход кампании — факт Ozon, доля SKU — оценка по обороту":"факт Ozon по SKU (отчёт ОЗЗ)")+" · входит в «Рекламу»","neu"))}
  // Marketplace card
  let cDate=skuContentDate(ct);
  let content=[card("Контент",ct?I(ct.content_score)+" / 100":"—",ct?((mk==="YANDEX"?"Content Rating Яндекс":mk==="WB"?"Content Score WB · наш расчёт":"Content Score Ozon")+(cDate?" · на "+dm(cDate):"")):"Нет данных","neu")];
@@ -1097,48 +1126,87 @@ body+=buildSkuDynamics(key,a);
  E("detail").innerHTML=body;setDetailTab(detailTab)
 }
 
-// Ad spend per canonical SKU for the selected period, only on dates with complete SKU-level ad data
-// (Ozon: daily rows on covered dates + period rows fully inside covered dates; WB: daily rows on covered dates).
+// Ad spend per canonical SKU for the selected period.
+// byMk: every known spend (Ozon: ozonAdRows().known; WB: daily rows in the window); covMk: spend on dates with complete data (for ДРР).
+// Rows that cannot be matched to a SKU with sales history are kept in `unmatched` (never dropped silently).
+function adsKeyMap(){return perfCache("adsKeyMap",D,()=>{let m=new Map();for(const x of D.sku_daily||[]){let k=canonicalKey(x),mk=rowMarketplace(x),art=normArticle(x.article);if(art&&!m.has(mk+"|art|"+art))m.set(mk+"|art|"+art,k);let s=mk+"|"+String(x.cabinet||"")+"|"+String(x.sku||"");if(!m.has(s))m.set(s,k)}return m})}
+function adRowKey(r,mk){let km=adsKeyMap();return mk==="WB"?km.get("WB|"+String(r.cabinet||"")+"|"+String(r.offer_id||"")):(km.get(mk+"|art|"+normArticle(r.offer_id))||km.get(mk+"|"+String(r.cabinet||"")+"|"+String(r.offer_id||"")))}
+function windowAdRows(ds){
+ return perfCache("winAdRows:"+ds[0]+":"+ds.at(-1)+":"+ds.length,ADS,()=>{
+   let oz=ozonAdRows(ds),wbCov=wbAdCoverage(ds),set=new Set(ds),covSet=new Set(oz.covered),out=[];
+   for(const r of oz.known)out.push({r,mk:"OZON",covered:covSet.has(r)});
+   for(const r of ADS)if(rowMarketplace(r)==="WB"&&String(r.period_from||"")===String(r.period_to||"")&&set.has(String(r.period_to||"")))out.push({r,mk:"WB",covered:wbCov.has(String(r.period_to||""))});
+   return out
+ })
+}
 function adsByKeyForPeriod(){
  let ds=periodDates(0),first=ds[0]||"",last=ds.at(-1)||"";
  return perfCache("adsByKey:"+first+":"+last+":"+ds.length,ADS,()=>{
-   let cov={OZON:ozonAdCoverage(ds),WB:wbAdCoverage(ds)},out=new Map();
-   let keyMap=perfCache("adsKeyMap",D,()=>{let m=new Map();for(const x of D.sku_daily||[]){let k=canonicalKey(x),mk=rowMarketplace(x),art=normArticle(x.article);if(art&&!m.has(mk+"|art|"+art))m.set(mk+"|art|"+art,k);let s=mk+"|"+String(x.cabinet||"")+"|"+String(x.sku||"");if(!m.has(s))m.set(s,k)}return m});
-   for(const r of ADS){
-     let mk=rowMarketplace(r);if(mk!=="OZON"&&mk!=="WB")continue;
-     let from=String(r.period_from||""),to=String(r.period_to||""),daily=from===to,c=cov[mk];
-     if(daily?!c.has(to):(mk!=="OZON"||!dateRangeList(from,to).every(d=>c.has(d))))continue;
-     let k=mk==="WB"?keyMap.get("WB|"+String(r.cabinet||"")+"|"+String(r.offer_id||"")):(keyMap.get(mk+"|art|"+normArticle(r.offer_id))||keyMap.get(mk+"|"+String(r.cabinet||"")+"|"+String(r.offer_id||"")));
-     if(!k)continue;
-     let st=String(r.source_type||""),z=out.get(k)||{spend:0,revenue:0,orders:0,shows:0,clicks:0,byMk:{},estimate:false};
+   let cov={OZON:ozonAdCoverage(ds),WB:wbAdCoverage(ds)},out=new Map(),unmatched=[];
+   for(const {r,mk,covered} of windowAdRows(ds)){
+     let k=adRowKey(r,mk);if(!k){unmatched.push({r,mk});continue}
+     let z=out.get(k)||{spend:0,revenue:0,orders:0,shows:0,clicks:0,byMk:{},covMk:{},estimate:false};
      z.spend+=N(r.spend);z.revenue+=N(r.ad_revenue);z.orders+=N(r.ad_orders);z.shows+=N(r.shows);z.clicks+=N(r.clicks);z.byMk[mk]=(z.byMk[mk]||0)+N(r.spend);
-     if(st==="ppo_estimate"||st.includes("DERIVED"))z.estimate=true;out.set(k,z)
+     if(covered)z.covMk[mk]=(z.covMk[mk]||0)+N(r.spend);
+     if(adRowEstimate(r))z.estimate=true;out.set(k,z)
    }
-   out.cov={OZON:ds.filter(d=>cov.OZON.has(d)),WB:ds.filter(d=>cov.WB.has(d))};out.total=ds.length;
+   out.cov={OZON:ds.filter(d=>cov.OZON.has(d)),WB:ds.filter(d=>cov.WB.has(d))};out.total=ds.length;out.unmatched=unmatched;
    return out
  })
 }
 globalThis.getSkuAdsByKey=adsByKeyForPeriod;
-// SKU-table ad figures under filter f: spend and turnover over the same covered dates per marketplace; covered dates without rows = confirmed zero.
+// SKU-table ad figures under filter f: shown spend = all known spend; ДРР = spend on covered dates / turnover on the same dates.
 function skuAdTableFor(f){
- let ads=adsByKeyForPeriod(),gm=new Map(),days=0;
+ let ads=adsByKeyForPeriod(),gm=new Map(),days=0,use=mk=>f.marketplace==="ALL"||f.marketplace===mk;
  for(const mk of ["OZON","WB"]){
-   if(f.marketplace!=="ALL"&&f.marketplace!==mk)continue;let cd=ads.cov[mk];if(!cd.length)continue;days=Math.max(days,cd.length);
-   for(const x of skuFor(cd,{...f,marketplace:mk})){let k=canonicalKey(x),g=gm.get(k)||{gmv:0,mks:new Set()};g.gmv+=N(x.gmv);g.mks.add(mk);gm.set(k,g)}
+   if(!use(mk))continue;let cd=ads.cov[mk];if(!cd.length)continue;days=Math.max(days,cd.length);
+   for(const x of skuFor(cd,{...f,marketplace:mk})){let k=canonicalKey(x);gm.set(k,(gm.get(k)||0)+N(x.gmv))}
  }
- return key=>{let z=ads.get(key),g=gm.get(key);if(!z&&!g)return null;let spend=0;if(z)for(const [mk,v] of Object.entries(z.byMk))if(f.marketplace==="ALL"||f.marketplace===mk)spend+=v;
-   let gmv=g?g.gmv:0;return{spend,gmv,drr:gmv?spend/gmv*100:null,estimate:!!(z&&z.estimate),days,total:ads.total}}
+ return key=>{let z=ads.get(key),g=gm.get(key)||0;if(!z&&!gm.has(key))return null;let spend=0,covSpend=0,known=false;
+   if(z)for(const mk of Object.keys(z.byMk))if(use(mk)){spend+=z.byMk[mk];covSpend+=z.covMk[mk]||0;known=true}
+   if(!known&&!gm.has(key))return null;
+   return{spend,covSpend,gmv:g,drr:days&&g?covSpend/g*100:null,estimate:!!(z&&z.estimate),days,total:ads.total}}
 }
-// Tenant-level advertising for the period: Ozon campaign totals (all campaign types, factual) + WB SKU rows,
-// with turnover over the same dates per marketplace.
+// SKUs with ad spend in the period but no orders in it (under filter f): a separate advertising list, outside every sales/finance aggregate.
+// nmID / Ozon SKU is only a technical identifier when the 1C article is unknown.
+function adOnlySkus(f,salesKeys){
+ let ds=periodDates(0),m=new Map(),use=mk=>f.marketplace==="ALL"||f.marketplace===mk;
+ for(const {r,mk} of windowAdRows(ds)){
+   if(!use(mk))continue;let k=adRowKey(r,mk);if(k&&salesKeys.has(k))continue;
+   let id=k||(mk+"|"+String(r.cabinet||"")+"|"+String(r.offer_id||"")),dim=k?null:(D.dimensions||[]).find(x=>String(x.marketplace||"")===mk&&String(x.cabinet||"")===String(r.cabinet||"")&&String(x.sku||"")===String(r.offer_id||""));
+   let rows=k?skuRowsByKey(k):[],ref=rows[0]||{};
+   let a=m.get(id)||{key:k||null,ad_only:true,marketplace:mk,cabinet:r.cabinet||ref.cabinet||"",article:k?(ref.canonical_sku||ref.article||""):(dim?(dim.canonical_sku||dim.offer_id||""):(mk==="OZON"?String(r.offer_id||""):"")),tech_id:mk==="WB"?String(r.offer_id||""):String(r.offer_id||""),product_name:ref.product_name||"",master_category:(dim&&dim.master_category)||"",brand:(dim&&dim.brand)||"",adSpend:0,adShows:0,adClicks:0,adOrders:0,adRevenue:0,adEstimate:false,gmv:0,units:0};
+   if(f.masterCategory!=="ALL"&&a.master_category!==f.masterCategory)continue;
+   if(f.brand!=="ALL"&&a.brand!==f.brand)continue;
+   a.adSpend+=N(r.spend);a.adShows+=N(r.shows);a.adClicks+=N(r.clicks);a.adOrders+=N(r.ad_orders);a.adRevenue+=N(r.ad_revenue);if(adRowEstimate(r))a.adEstimate=true;m.set(id,a)
+ }
+ return [...m.values()].filter(a=>a.adSpend>0).sort((x,y)=>y.adSpend-x.adSpend)
+}
+// Tenant-level advertising for the period.
+//  spend — every known amount without double counting: Ozon daily campaign totals + PPO reports lying fully inside the window
+//          (for dates/campaigns a report covers, that campaign's daily totals are skipped) + SKU daily rows on dates without campaign totals; WB daily rows.
+//  ДРР   — only over dates with complete data (Ozon: daily totals of all campaigns exist; WB: loaded range), turnover on the same dates.
 function periodAdTotals(){
- let ds=periodDates(0),set=new Set(ds),f=currentFilters(),spend=0,gmv=0,sources=new Set(),oz=new Set(),wbCov=wbAdCoverage(ds),wb=new Set();
- let use=mk=>f.marketplace==="ALL"||f.marketplace===mk;
- if(use("OZON"))for(const c of D.ozon_ads_campaigns||[]){let d=String(c.date||"");if(set.has(d)){spend+=N(c.spend);oz.add(d);sources.add("Ozon")}}
- if(use("WB")){for(const d of ds)if(wbCov.has(d))wb.add(d);for(const r of ADS){if(rowMarketplace(r)==="WB"&&String(r.period_from||"")===String(r.period_to||"")&&wb.has(String(r.period_to||"")))spend+=N(r.spend),sources.add("WB")}}
- for(const [mk,dd] of [["OZON",oz],["WB",wb]])if(dd.size)for(const x of skuFor([...dd],{...f,marketplace:mk}))gmv+=N(x.gmv);
+ let ds=periodDates(0),set=new Set(ds),f=currentFilters(),use=mk=>f.marketplace==="ALL"||f.marketplace===mk;
+ let spend=0,covSpend=0,sources=new Set(),oz=new Set(),wb=new Set(),parts=[];
+ if(use("OZON")){
+   let campDates=new Set();for(const c of D.ozon_ads_campaigns||[])campDates.add(String(c.date||""));
+   let reps=new Map();
+   for(const r of ADS){if(rowMarketplace(r)!=="OZON")continue;let ids=ppoReportCampaigns(r),f0=String(r.period_from||""),t0=String(r.period_to||"");if(!ids.length||f0===t0)continue;
+     if(!dateRangeList(f0,t0).every(d=>set.has(d)))continue;let k=f0+"|"+t0+"|"+ids.join(",");let x=reps.get(k)||{from:f0,to:t0,ids,spend:0};x.spend+=N(r.spend);reps.set(k,x)}
+   let added=[];for(const x of [...reps.values()].sort((a,b)=>a.from.localeCompare(b.from))){if(added.some(y=>y.ids.some(i=>x.ids.includes(i))&&!(x.to<y.from||x.from>y.to)))continue;added.push(x)}
+   let cs=0,rs=0,ss=0;
+   for(const c of D.ozon_ads_campaigns||[]){let d=String(c.date||"");if(!set.has(d))continue;oz.add(d);covSpend+=N(c.spend);
+     if(added.some(x=>d>=x.from&&d<=x.to&&x.ids.includes(String(c.campaign_id))))continue;cs+=N(c.spend)}
+   for(const x of added)rs+=x.spend;
+   for(const {r,mk} of windowAdRows(ds))if(mk==="OZON"&&String(r.period_from)===String(r.period_to)&&!campDates.has(String(r.period_to))&&!added.some(x=>String(r.period_to)>=x.from&&String(r.period_to)<=x.to))ss+=N(r.spend);
+   spend+=cs+rs+ss;if(cs||rs||ss)sources.add("Ozon");
+   parts.push({src:"Ozon: дневные итоги кампаний",spend:cs},{src:"Ozon: отчёты ОЗЗ за период",spend:rs,reports:added},{src:"Ozon: SKU-данные без дневных итогов",spend:ss});
+ }
+ if(use("WB")){let cov=wbAdCoverage(ds),ws=0;for(const d of ds)if(cov.has(d))wb.add(d);for(const r of ADS){if(rowMarketplace(r)==="WB"&&String(r.period_from||"")===String(r.period_to||"")&&wb.has(String(r.period_to||""))){ws+=N(r.spend);sources.add("WB")}}spend+=ws;covSpend+=ws;parts.push({src:"WB: дневные данные",spend:ws})}
+ let gmv=0;for(const [mk,dd] of [["OZON",oz],["WB",wb]])if(dd.size)for(const x of skuFor([...dd],{...f,marketplace:mk}))gmv+=N(x.gmv);
  let days=new Set([...oz,...wb]).size;
- return{spend,gmv,drr:gmv?spend/gmv*100:null,days,total:ds.length,sources:[...sources]}
+ return{spend,covSpend,gmv,drr:days&&gmv?covSpend/gmv*100:null,days,total:ds.length,sources:[...sources],parts}
 }
 globalThis.getPeriodAdTotals=periodAdTotals;
 function dailySkuWorkspace(local={}){
@@ -1169,7 +1237,8 @@ function dailySkuWorkspace(local={}){
  const problemSkus=[...problemMap.values()].filter(a=>a.risk.level>0).sort((a,b)=>b.problemImpact-a.problemImpact||b.risk.level-a.risk.level||b.gmv-a.gmv);
  const orgFilter={cab:"ALL",marketplace:"ALL",masterCategory:"ALL",category:"ALL",brand:"ALL",q:""};
  const orgGmv=aggregateSku(ds,orgFilter).reduce((sum,a)=>sum+N(a.gmv),0);
- return{skus,declineSkus,growthSkus,problemSkus,orgGmv};
+ const adOnly=adOnlySkus(f,new Set(currentSku.map(a=>a.key)));
+ return{skus,declineSkus,growthSkus,problemSkus,orgGmv,adOnly};
 }
 globalThis.getDailySkuWorkspace=dailySkuWorkspace;
 

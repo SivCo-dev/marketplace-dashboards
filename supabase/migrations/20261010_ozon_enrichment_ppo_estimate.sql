@@ -8,7 +8,7 @@ values ('ozon_enrichment_payload_v3_before_ppo', pg_get_functiondef('dev21.ozon_
 on conflict (name) do nothing;
 
 do $mig$
-declare d text; m1 text; m2 text; m3 text;
+declare d text; m1 text; m2 text; m3 text; m4 text;
 begin
   d := pg_get_functiondef('dev21.ozon_enrichment_payload_v3(text,date)'::regprocedure);
   if position('ppo_alloc' in d) > 0 then raise notice 'already patched'; return; end if;
@@ -56,6 +56,10 @@ begin
     || E'      ''unallocated'', (select coalesce(sum(p.spend), 0) from ppo_day p where not exists (select 1 from ppo_gmv g where g.d = p.d)),\n'
     || E'      ''unallocated_days'', (select coalesce(jsonb_agg(p.d order by p.d), ''[]''::jsonb) from ppo_day p where not exists (select 1 from ppo_gmv g where g.d = p.d))\n'
     || E'    )\n  ),');
+  m4 := E'''ppo_period:'' || string_agg(distinct source, '','')';
+  if position(m4 in d) = 0 then raise exception 'ppo_period marker not found'; end if;
+  -- campaign ids of the period report travel in source_type (ppo_period:<source>:<campaign_ids>) so the dashboard can avoid double counting with daily campaign totals
+  d := replace(d, m4, E'''ppo_period:'' || string_agg(distinct source, '','') || '':'' || string_agg(distinct campaign_id::text, '','')');
   d := replace(d, m2, E'    group by 1, 2, 3, 4\n'
     || E'    union all\n'
     || E'    select cabinet, offer_id, d, d, spend, null, null, null, null, null, ''ppo_estimate''\n'
