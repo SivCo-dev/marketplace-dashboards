@@ -14,7 +14,12 @@ initialResponse.catch(()=>{});
 let configs={W:w,CPR:cpr,ORANGE:orange};
 try{const runtime=dailyConfigsFromRegistry(await loadReportRegistry(),configs);if(Object.keys(runtime).length)configs=runtime}catch(error){console.warn('Report registry unavailable',error.message)}
 const query=new URLSearchParams(location.search),tenant=configs[query.get('tenant')]?query.get('tenant'):configs.W?'W':Object.keys(configs)[0];
-const config={...configs[tenant],data_url:configs[tenant].data_url+"&format=columnar",data_headers:{Authorization:'Bearer '+accessToken},theme:{accent:'#355846'},onRender:paint,data_response:tenant===requestedTenant?initialResponse:null};
+// The registry supplies display metadata (names/accounts) only. The actual data_url is
+// always the authorized endpoint, regardless of what data_url the registry (or any
+// future runtime config) happens to carry — a tenant's snapshot is never fetched from
+// the public, unauthenticated dashboard-data-dev23 endpoint from this page.
+const AUTH_DATA_BASE='https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/dashboard-data-auth-dev';
+const config={...configs[tenant],data_url:AUTH_DATA_BASE+'?tenant='+tenant+"&format=columnar",data_headers:{Authorization:'Bearer '+accessToken},theme:{accent:'#355846'},onRender:paint,data_response:tenant===requestedTenant?initialResponse:null};
 const $=id=>document.getElementById(id),num=v=>Number(v||0),fmt=v=>v==null?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(num(v)),money=v=>fmt(v)+' ₽';
 const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const pct=(a,b)=>a==null||b==null?null:num(b)?(num(a)/num(b)-1)*100:null;
