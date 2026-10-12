@@ -29,7 +29,7 @@ let view,focus='all',breakdown=null,limit=25,lastFocus;const skuLocal={masterCat
 const pending=startDashboard(config); // Shared calculations, canonical SKU mapping and SKU card economics.
 mountAuthBadge();
 const shell=document.querySelector('.shell'),header=document.querySelector('.header');
-header.innerHTML='<div><div class="eyebrow">АНАЛИТИКА ПРОДАЖ</div><h1>'+esc(config.display_name)+' · Ежедневный отчёт <span class="live-badge">● LIVE</span></h1><p class="muted">Оперативная динамика по маркетплейсам и товарам <span id="dataAsOf" class="data-as-of"></span></p></div><nav class="view-switch" aria-label="Вид отчёта"><span aria-current="page">По дням</span><a id="monthlyLink" href="../monthly/?tenant='+tenant+'">По месяцам</a></nav>';
+header.innerHTML='<div><div class="eyebrow">АНАЛИТИКА ПРОДАЖ</div><h1>'+esc(config.display_name)+' · Ежедневный отчёт <span class="live-badge">● LIVE</span></h1><p class="muted">Оперативная динамика по маркетплейсам и товарам <span id="dataAsOf" class="data-as-of"></span></p></div><nav class="view-switch" aria-label="Вид отчёта"><span aria-current="page">По дням</span><a id="weeklyLink" href="../weekly/?tenant='+tenant+'">По неделям</a><a id="monthlyLink" href="../monthly/?tenant='+tenant+'">По месяцам</a></nav>';
 const coreStatus=document.createElement('span');coreStatus.id='status';coreStatus.hidden=true;header.append(coreStatus);
 const toolbar=document.querySelector('.toolbar'),organization=document.createElement('div');
 organization.innerHTML='<label for="organization">Организация</label><select id="organization">'+Object.entries(configs).map(([id,c])=>'<option value="'+id+'" '+(id===tenant?'selected':'')+'>'+esc(c.display_name)+'</option>').join('')+'</select>';

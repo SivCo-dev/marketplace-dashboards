@@ -25,7 +25,7 @@ const previousPayload=()=>selectPayload(state.bundle,tenant(),previousMonth(mont
 const comparisonReady=()=>Boolean(state.payload&&previousPayload()&&state.payload.metadata.marketplace_close_status==="CLOSED"&&previousPayload().metadata.marketplace_close_status==="CLOSED");
 const metricRate=(p,key)=>rate(p?.financial_economics?.[key],p?.financial_economics?.sales);
 
-function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);history.replaceState(null,"",url);const daily=new URL("../daily/",location.href);daily.searchParams.set("tenant",tenant());const link=document.getElementById("dailyLink");if(link)link.href=daily.toString();}
+function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);history.replaceState(null,"",url);const daily=new URL("../daily/",location.href);daily.searchParams.set("tenant",tenant());const link=document.getElementById("dailyLink");if(link)link.href=daily.toString();const weekly=new URL("../weekly/",location.href);weekly.searchParams.set("tenant",tenant());const wlink=document.getElementById("weeklyLink");if(wlink)wlink.href=weekly.toString();}
 
 function availableMarkets(){
  const consolidated=selectPayload(state.bundle,tenant(),month(),"ALL");
