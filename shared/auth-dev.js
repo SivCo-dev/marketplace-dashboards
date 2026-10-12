@@ -5,10 +5,15 @@
 // it never decides who can see what on its own.
 import { getSupabase } from "./supabase-client-dev.js";
 
-const LOGIN_PATH = "/shared/login-dev.html";
+// Resolved relative to this module's own URL, not location.origin: this app is
+// published under a sub-path (GitHub Pages project site, /marketplace-dashboards/),
+// not at the domain root, so an absolute "/shared/login-dev.html" 404s in production
+// even though it works when served from localhost root in local testing.
+const LOGIN_URL = new URL("./login-dev.html", import.meta.url);
+const DAILY_URL = new URL("../daily/", import.meta.url).toString();
 
 function loginUrl(returnTo) {
-  const url = new URL(LOGIN_PATH, location.origin);
+  const url = new URL(LOGIN_URL);
   url.searchParams.set("return", returnTo || location.pathname + location.search);
   return url.toString();
 }
@@ -65,7 +70,7 @@ export async function logout({ extraCleanup } = {}) {
   if (typeof extraCleanup === "function") {
     try { extraCleanup(); } catch { /* best-effort */ }
   }
-  goToLogin("/daily/");
+  goToLogin(DAILY_URL);
 }
 
 // Drop-in replacement for fetch() that attaches the current access token and

@@ -39,7 +39,9 @@
   // If already signed in, skip straight to the destination.
   const supabase = await getSupabase();
   const { data: existing } = await supabase.auth.getSession();
-  const returnTo = new URLSearchParams(location.search).get("return") || "/daily/";
+  // Relative to this page's own URL, not an absolute "/daily/": this app is
+  // published under a sub-path on GitHub Pages, so an absolute root path 404s.
+  const returnTo = new URLSearchParams(location.search).get("return") || new URL("../daily/", import.meta.url).toString();
   if (existing?.session) { location.href = returnTo; }
 
   form.addEventListener("submit", async (event) => {
