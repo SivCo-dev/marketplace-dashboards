@@ -3,13 +3,13 @@
 // Server-side access checks (security.assert_tenant_access_v1 inside the *-auth-dev
 // edge functions) are the real boundary; this module only wires the client to them —
 // it never decides who can see what on its own.
-import { getSupabase } from "./supabase-client-dev.js";
+import { getSupabase } from "./supabase-client-dev.js?v=20261012authpathfix1";
 
 // Resolved relative to this module's own URL, not location.origin: this app is
 // published under a sub-path (GitHub Pages project site, /marketplace-dashboards/),
 // not at the domain root, so an absolute "/shared/login-dev.html" 404s in production
 // even though it works when served from localhost root in local testing.
-const LOGIN_URL = new URL("./login-dev.html", import.meta.url);
+const LOGIN_URL = new URL("./login-dev.html?v=20261012authpathfix1", import.meta.url);
 const DAILY_URL = new URL("../daily/", import.meta.url).toString();
 
 function loginUrl(returnTo) {

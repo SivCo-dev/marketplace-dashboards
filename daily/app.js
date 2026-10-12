@@ -3,7 +3,7 @@ import w from '../config/w.js';
 import cpr from '../config/cpr.js';
 import orange from '../config/orange.js';
 import {loadReportRegistry,dailyConfigsFromRegistry} from '../core/runtime-registry.js?v=20261004finish';
-import {ensureSession,getAccessToken,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js';
+import {ensureSession,getAccessToken,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js?v=20261012authpathfix1';
 const session=await ensureSession();
 const accessToken=await getAccessToken();
 const authedFetch=makeAuthedFetch({onAccessDenied:()=>{document.getElementById('load')?.classList.add('hide');const errEl=document.getElementById('err');if(errEl){errEl.classList.remove('hide');errEl.textContent='Нет доступа к этому кабинету для вашей учётной записи.';}}});

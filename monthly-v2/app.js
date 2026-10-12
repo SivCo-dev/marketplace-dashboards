@@ -1,7 +1,7 @@
 import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002orange";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
 import {createScopeLoader} from "./live-v2.js?v=20261006incomeunits";
-import {ensureSession,makeAuthedFetch,mountAuthBadge} from "../shared/auth-dev.js";
+import {ensureSession,makeAuthedFetch,mountAuthBadge} from "../shared/auth-dev.js?v=20261012authpathfix1";
 const session=await ensureSession();
 const authedFetch=makeAuthedFetch();
 mountAuthBadge();

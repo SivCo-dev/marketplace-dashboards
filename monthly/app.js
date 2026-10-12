@@ -3,7 +3,7 @@ import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePaylo
 import {createScopeLoader} from "./live-v2.js?v=20261006incomeunits";
 
 import {loadReportRegistry} from '../core/runtime-registry.js?v=20261004finish';
-import {ensureSession,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js';
+import {ensureSession,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js?v=20261012authpathfix1';
 const session=await ensureSession();
 const authedFetch=makeAuthedFetch();
 mountAuthBadge();

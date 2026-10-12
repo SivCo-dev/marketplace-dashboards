@@ -1,4 +1,4 @@
-import {makeAuthedFetch} from "../shared/auth-dev.js";
+import {makeAuthedFetch} from "../shared/auth-dev.js?v=20261012authpathfix1";
 const API='https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-import-auth-dev';
 const authedFetch=makeAuthedFetch({onAccessDenied:()=>{status('Нет прав на импорт для этого кабинета (нужна роль analyst или admin).',true);}});
 const labels={article:'Артикул продавца',sku:'SKU Ozon',operation:'Тип операции',amount:'Сумма операции',quantity:'Количество операции',compensation_amount:'Компенсация, ₽',decompensation_amount:'Декомпенсация, ₽',compensated_units:'Компенсировано, шт',disposal_units:'Утилизировано, шт',written_off_units:'Списано, шт',returned_units:'Возвращено, шт',returns_without_compensation:'Возврат без компенсации, шт'};
