@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
   const { data: auth, error: authError } = await client.auth.getUser(bearer);
   if (authError || !auth?.user?.id) return json(401, responseHeaders, { error: "AUTH_REQUIRED" });
 
-  const { data, error } = await client.rpc("get_weekly_finance_scope_for_user_v1", {
+  const { data, error } = await client.rpc("get_weekly_finance_scope_for_user_v2", {
     p_user_id: auth.user.id,
     p_tenant_id: tenant,
     p_account_id: account,
@@ -68,6 +68,6 @@ Deno.serve(async (req: Request) => {
     return json(500, responseHeaders, { error: "WEEKLY_READ_FAILED" });
   }
   if (!data) return json(404, responseHeaders, { error: "WEEKLY_DATA_NOT_FOUND" });
-  if (data.contract_version !== "weekly-finance-v1") return json(500, responseHeaders, { error: "UNEXPECTED_CONTRACT" });
+  if (data.contract_version !== "weekly-finance-v2") return json(500, responseHeaders, { error: "UNEXPECTED_CONTRACT" });
   return json(200, responseHeaders, data);
 });
