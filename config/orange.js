@@ -1,6 +1,6 @@
 export default {
   slug: "orange", tenant_id: "ORANGE", display_name: "Orange", core_version: "2.3.0",
-  data_url: "https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/dashboard-data-dev23?tenant=ORANGE",
+  data_url: "https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/dashboard-data-auth-dev?tenant=ORANGE",
   data_headers: {},
   theme: { accent: "#f47b20" },
   footer_note: "Reference UI: Orange 2.3 production",

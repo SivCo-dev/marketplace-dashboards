@@ -1,8 +1,8 @@
-const API='https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-import-v2';
+import {makeAuthedFetch} from "../shared/auth-dev.js";
+const API='https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/monthly-import-auth-dev';
+const authedFetch=makeAuthedFetch({onAccessDenied:()=>{status('Нет прав на импорт для этого кабинета (нужна роль analyst или admin).',true);}});
 const labels={article:'Артикул продавца',sku:'SKU Ozon',operation:'Тип операции',amount:'Сумма операции',quantity:'Количество операции',compensation_amount:'Компенсация, ₽',decompensation_amount:'Декомпенсация, ₽',compensated_units:'Компенсировано, шт',disposal_units:'Утилизировано, шт',written_off_units:'Списано, шт',returned_units:'Возвращено, шт',returns_without_compensation:'Возврат без компенсации, шт'};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const rememberedPin=()=>{try{return sessionStorage.getItem('monthlyImportPin')||'';}catch{return '';}};
-const rememberPin=pin=>{try{sessionStorage.setItem('monthlyImportPin',pin);}catch{}};
 const fmt=v=>Number(v??0).toLocaleString('ru-RU',{maximumFractionDigits:2});
 const button=document.createElement('button');button.type='button';button.id='uploadOpen';button.className='upload-open';button.textContent='↑ Загрузить файлы';
 document.querySelector('.title-block').append(button);
@@ -12,7 +12,6 @@ const dialog=document.createElement('dialog');dialog.id='uploadDialog';dialog.se
 <label>Организация<select id="uploadTenant" aria-label="Организация для импорта"></select></label>
 <label>Кабинет Ozon<select id="uploadAccount" aria-label="Кабинет для импорта"></select></label>
 <label>Месяц отчёта<input type="month" id="uploadMonth" aria-label="Месяц импорта"></label>
-<label>PIN импорта<input type="password" id="uploadPin" autocomplete="off" placeholder="PIN существующего загрузчика"></label>
 </div><div class="upload-drop"><label for="uploadFile">Выберите исходный файл</label><input type="file" id="uploadFile" accept=".xlsx,.xls,.csv"><small>XLSX, XLS или CSV · до 5 МБ · файл сохраняется вместе с историей обработки</small></div>
 <div id="uploadStatus" class="upload-status" role="status" aria-live="polite">Выберите файл. Кабинет и месяц определим по данным файла, если они указаны.</div>
 <div id="uploadSetup" hidden><div class="upload-fields">
@@ -24,7 +23,7 @@ const dialog=document.createElement('dialog');dialog.id='uploadDialog';dialog.se
 document.body.append(dialog);
 const $=id=>dialog.querySelector('#'+id);let catalog=[],file=null,base64='',tables=[],preview=null,busy=false;
 const status=(text,error=false)=>{$('uploadStatus').textContent=text;$('uploadStatus').classList.toggle('upload-error',error);};
-async function request(action,data={}){const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','x-import-pin':$('uploadPin').value},body:JSON.stringify({action,...data})});const result=await res.json();if(!res.ok)throw Error(result.error||'Ошибка '+res.status);return result;}
+async function request(action,data={}){const res=await authedFetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...data})});const result=await res.json();if(!res.ok)throw Error(result.error||'Ошибка '+res.status);return result;}
 const scope=()=>({tenant:$('uploadTenant').value,account_id:$('uploadAccount').value,month:$('uploadMonth').value});
 function refresh(){ $('uploadParse').disabled=busy||!file; $('uploadCheck').disabled=busy||!tables.length; $('uploadApply').disabled=busy||!preview||preview.errors.length>0;for(const el of dialog.querySelectorAll('input,select'))el.disabled=busy;$('uploadHistoryButton').disabled=busy;}
 function invalidate(){preview=null;$('uploadPreview').hidden=true;refresh();}
@@ -36,13 +35,13 @@ async function run(action){if(busy)return;busy=true;refresh();try{await action()
 button.addEventListener('click',()=>run(async()=>{
  if(!catalog.length){status('Загружаю список кабинетов…');catalog=(await request('catalog')).accounts;}
  const tenants=[...new Set(catalog.map(a=>a.tenant_id))];$('uploadTenant').innerHTML=tenants.map(t=>`<option>${esc(t)}</option>`).join('');$('uploadTenant').value=document.querySelector('#tenantSelect').value;accounts();$('uploadMonth').value=document.querySelector('#monthSelect').value;
- $('uploadPin').value=rememberedPin();status('Выберите файл и введите PIN импорта.');dialog.showModal();
+ status('Выберите файл для загрузки.');dialog.showModal();
 }));$('uploadClose').addEventListener('click',()=>dialog.close());
 $('uploadTenant').addEventListener('change',accounts);for(const id of ['uploadAccount','uploadMonth','uploadType'])$(id).addEventListener('change',invalidate);
 $('uploadFile').addEventListener('change',()=>{file=$('uploadFile').files[0]||null;base64='';tables=[];invalidate();$('uploadSetup').hidden=true;status(file?'Файл выбран. Нажмите «Прочитать файл».':'Выберите файл.');refresh();});
 $('uploadSheet').addEventListener('change',selectSheet);$('uploadHeader').addEventListener('change',mapping);
 $('uploadParse').addEventListener('click',()=>run(async()=>{
- if(!file)return;if(file.size>5*1024*1024)throw Error('Максимальный размер файла — 5 МБ');if(!$('uploadPin').value)throw Error('Введите PIN импорта');status('Читаю файл…');
+ if(!file)return;if(file.size>5*1024*1024)throw Error('Максимальный размер файла — 5 МБ');status('Читаю файл…');
  const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));base64=btoa(binary);
  const parsed=await request('parse',{filename:file.name,file_base64:base64});tables=parsed.tables;
  if(parsed.hints.account_ids.length===1){const hit=catalog.find(a=>a.account_id===parsed.hints.account_ids[0]);$('uploadTenant').value=hit.tenant_id;accounts();$('uploadAccount').value=hit.account_id;}
@@ -59,5 +58,5 @@ $('uploadCheck').addEventListener('click',()=>run(async()=>{
  $('uploadPreview').innerHTML=`<h3>Предпросмотр распределения</h3><div class="upload-totals">${totals}</div>${errors}<p class="driver-note">${preview.row_count} строк файла → ${preview.patches.length} SKU. При применении поля «${preview.fields.map(k=>esc(labels[k])).join(', ')}» заменят предыдущие значения этого кабинета за ${esc(scope().month)}. Остальные поля сохранятся.</p><div class="table-scroll"><table><thead><tr><th>SKU / артикул</th><th>Категория</th>${preview.fields.map(k=>`<th>${esc(labels[k])}</th>`).join('')}</tr></thead><tbody>${preview.patches.slice(0,300).map(p=>`<tr><td>${esc(p.article||p.sku)}</td><td>${esc(p.master_category||'—')}</td>${preview.fields.map(k=>`<td>${fmt(p.values[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${preview.patches.length>300?'<small>Показаны первые 300 SKU. Применятся все проверенные строки.</small>':''}`;
  status(preview.errors.length?'Исправьте ошибки и повторите проверку.':'Контроль сошёлся. Распределение готово к применению.',preview.errors.length>0);
 }));
-$('uploadApply').addEventListener('click',()=>run(async()=>{if(!preview||preview.errors.length)return;status('Применяю распределение…');const result=await request('apply',{batch_id:preview.batch_id});rememberPin($('uploadPin').value);preview=null;status(result.duplicate?'Этот файл уже учтён. Дубли не добавлены.':'Распределение применено. Обновляю отчёт…');location.reload();}));
+$('uploadApply').addEventListener('click',()=>run(async()=>{if(!preview||preview.errors.length)return;status('Применяю распределение…');const result=await request('apply',{batch_id:preview.batch_id,tenant:scope().tenant});preview=null;status(result.duplicate?'Этот файл уже учтён. Дубли не добавлены.':'Распределение применено. Обновляю отчёт…');location.reload();}));
 $('uploadHistoryButton').addEventListener('click',()=>run(async()=>{const rows=await request('history',scope());$('uploadHistory').innerHTML=rows.length?`<div class="table-scroll"><table><thead><tr><th>Файл</th><th>Дата</th><th>Состояние</th><th>Действующие поля</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.filename)}</td><td>${esc(new Date(r.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}))}</td><td>${r.status==='APPLIED'?'Применён · версия '+r.layer_revision:'Предпросмотр'}</td><td>${r.active_fields.map(k=>esc(labels[k]||k)).join(', ')||'—'}</td></tr>`).join('')}</tbody></table></div>`:'Файлы пока не загружены.';}));

@@ -3,6 +3,10 @@ import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePaylo
 import {createScopeLoader} from "./live-v2.js?v=20261006incomeunits";
 
 import {loadReportRegistry} from '../core/runtime-registry.js?v=20261004finish';
+import {ensureSession,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js';
+const session=await ensureSession();
+const authedFetch=makeAuthedFetch();
+mountAuthBadge();
 let TENANTS={...DEFAULT_TENANTS};
 try{const rows=await loadReportRegistry();const runtime=Object.fromEntries(rows.filter(t=>t.monthly_available).map(t=>[t.tenant_id,{label:t.display_name}]));if(Object.keys(runtime).length)TENANTS=runtime}catch(error){console.warn('Report registry unavailable',error.message)}
 const $=s=>document.querySelector(s);
@@ -188,7 +192,7 @@ function renderLoadStatus(){
  else if(selectedError)$text("#reviewNote",selectedError.message);
  else $text("#reviewNote","Актуальные данные Monthly · "+dateText(selected.refreshed_at)+(failed.length?" · Недоступно: "+failed.join(", "):""));
  $("#accessNote").hidden=!selectedError;
- if(selectedError)$text("#accessNote","Выбранный срез "+(TENANTS[tenant()]?.label??tenant())+" временно недоступен. Остальные организации и площадки работают независимо.");
+ if(selectedError)$text("#accessNote",selectedError.accessDenied?"Нет доступа к этому кабинету для вашей учётной записи.":"Выбранный срез "+(TENANTS[tenant()]?.label??tenant())+" временно недоступен. Остальные организации и площадки работают независимо.");
 }
 function render(){
  state.payload=selectPayload(state.bundle,tenant(),month(),state.market);renderLoadStatus();updateUrl();renderHeader();renderSummary();renderAllocation();renderComparison();renderExpenses();renderBridge();setCategories();renderProducts();
@@ -234,7 +238,7 @@ document.addEventListener("click",async event=>{
  const sku=event.target.closest("[data-sku]");if(sku){openProduct(sku.dataset.sku);}
 });
 render();
-loader=createScopeLoader({tenantIds:Object.keys(TENANTS),onUpdate:bundle=>{
+loader=createScopeLoader({tenantIds:Object.keys(TENANTS),fetcher:authedFetch,onUpdate:bundle=>{
  state.bundle=bundle;
  render();
 }});

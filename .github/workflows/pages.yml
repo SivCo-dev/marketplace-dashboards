@@ -28,10 +28,10 @@ jobs:
         run: |
           mkdir -p _site
           rsync -a --exclude '.git' --exclude '_site' ./ _site/
-          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev23/orange/index.html > _site/index.html
+          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' -e 's#../../shared/#./shared/#g' dev23/orange/index.html > _site/index.html
           cp _site/index.html _site/orange.html
-          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev23/w/index.html > _site/w.html
-          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' dev23/cpr/index.html > _site/cpr.html
+          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' -e 's#../../shared/#./shared/#g' dev23/w/index.html > _site/w.html
+          sed -e 's#../core/#./core/#g' -e 's#../config/#./config/#g' -e 's#../../shared/#./shared/#g' dev23/cpr/index.html > _site/cpr.html
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

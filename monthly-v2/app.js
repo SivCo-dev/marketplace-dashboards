@@ -1,6 +1,10 @@
 import {TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261002orange";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
 import {createScopeLoader} from "./live-v2.js?v=20261006incomeunits";
+import {ensureSession,makeAuthedFetch,mountAuthBadge} from "../shared/auth-dev.js";
+const session=await ensureSession();
+const authedFetch=makeAuthedFetch();
+mountAuthBadge();
 
 const $=s=>document.querySelector(s);
 const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all"};
@@ -185,7 +189,7 @@ function renderLoadStatus(){
  else if(selectedError)$text("#reviewNote",selectedError.message);
  else $text("#reviewNote","Актуальные данные Monthly · "+dateText(selected.refreshed_at)+(failed.length?" · Недоступно: "+failed.join(", "):""));
  $("#accessNote").hidden=!selectedError;
- if(selectedError)$text("#accessNote","Выбранный срез "+(TENANTS[tenant()]?.label??tenant())+" временно недоступен. Остальные организации и площадки работают независимо.");
+ if(selectedError)$text("#accessNote",selectedError.accessDenied?"Нет доступа к этому кабинету для вашей учётной записи.":"Выбранный срез "+(TENANTS[tenant()]?.label??tenant())+" временно недоступен. Остальные организации и площадки работают независимо.");
 }
 function render(){
  state.payload=selectPayload(state.bundle,tenant(),month(),state.market);renderLoadStatus();updateUrl();renderHeader();renderSummary();renderAllocation();renderComparison();renderExpenses();renderBridge();setCategories();renderProducts();
@@ -229,7 +233,7 @@ document.addEventListener("click",async event=>{
  const sku=event.target.closest("[data-sku]");if(sku){openProduct(sku.dataset.sku);}
 });
 render();
-loader=createScopeLoader({onUpdate:bundle=>{
+loader=createScopeLoader({fetcher:authedFetch,onUpdate:bundle=>{
  state.bundle=bundle;
  render();
 }});

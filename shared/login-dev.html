@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Вход — Маркеты (dev)</title>
+<style>
+  body{font:14px/1.5 system-ui,sans-serif;background:#111;color:#eee;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+  form{background:#1c1c1c;padding:28px 32px;border-radius:10px;width:320px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  h1{font-size:16px;margin:0 0 4px}
+  p.sub{color:#999;margin:0 0 20px;font-size:12px}
+  label{display:block;margin:12px 0 4px;color:#ccc}
+  input{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:6px;border:1px solid #444;background:#0f0f0f;color:#eee;font:inherit}
+  button{width:100%;margin-top:18px;padding:9px;border:0;border-radius:6px;background:#355846;color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .error{color:#ff8080;font-size:12px;margin-top:10px;min-height:14px}
+  .badge{display:inline-block;font-size:10px;letter-spacing:.04em;color:#f3b354;border:1px solid #6a4a1c;padding:1px 6px;border-radius:4px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<form id="loginForm">
+  <div class="badge">DEV · Step 5 auth</div>
+  <h1>Единый вход — аналитика «Маркеты»</h1>
+  <p class="sub">Supabase Auth. Доступ к кабинетам определяется ролью на сервере.</p>
+  <label for="email">Email</label>
+  <input id="email" type="email" autocomplete="username" required>
+  <label for="password">Пароль</label>
+  <input id="password" type="password" autocomplete="current-password" required>
+  <button id="submit" type="submit">Войти</button>
+  <div class="error" id="error" role="alert"></div>
+</form>
+<script type="module">
+  import { getSupabase } from "./supabase-client-dev.js";
+  const form = document.getElementById("loginForm");
+  const errorBox = document.getElementById("error");
+  const submitBtn = document.getElementById("submit");
+
+  // If already signed in, skip straight to the destination.
+  const supabase = await getSupabase();
+  const { data: existing } = await supabase.auth.getSession();
+  const returnTo = new URLSearchParams(location.search).get("return") || "/daily/";
+  if (existing?.session) { location.href = returnTo; }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    errorBox.textContent = "";
+    submitBtn.disabled = true;
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    submitBtn.disabled = false;
+    if (error) {
+      errorBox.textContent = error.message === "Invalid login credentials"
+        ? "Неверный email или пароль."
+        : "Ошибка входа: " + error.message;
+      return;
+    }
+    location.href = returnTo;
+  });
+</script>
+</body>
+</html>
