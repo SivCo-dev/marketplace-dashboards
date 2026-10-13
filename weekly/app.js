@@ -6,14 +6,18 @@ mountAuthBadge();
   'use strict';
   var PAYOUT_LAG = 17; // days from week start to payout date, as in the agreed mockup (Н39 21 сен -> 8 окт)
   var ACCOUNTS = [
-    { id: 'ozon_w', org: 'W', name: 'W · Ozon W' },
-    { id: 'ozon_cpr', org: 'CPR', name: 'CPR · Ozon CPR' },
-    { id: 'ozon_orange_ipt', org: 'ORANGE', name: 'Orange · IPT' },
-    { id: 'ozon_orange_bond', org: 'ORANGE', name: 'Orange · BOND' },
-    { id: 'ozon_orange_psk', org: 'ORANGE', name: 'Orange · PSK' },
-    { id: 'ozon_orange_ipch', org: 'ORANGE', name: 'Orange · IPCH' }
+    { id: 'ozon_w', org: 'W', market: 'OZON', name: 'W · Ozon W' },
+    { id: 'ozon_cpr', org: 'CPR', market: 'OZON', name: 'CPR · Ozon CPR' },
+    { id: 'ozon_orange_ipt', org: 'ORANGE', market: 'OZON', name: 'Orange · Ozon · IPT' },
+    { id: 'ozon_orange_bond', org: 'ORANGE', market: 'OZON', name: 'Orange · Ozon · BOND' },
+    { id: 'ozon_orange_psk', org: 'ORANGE', market: 'OZON', name: 'Orange · Ozon · PSK' },
+    { id: 'ozon_orange_ipch', org: 'ORANGE', market: 'OZON', name: 'Orange · Ozon · IPCH' }
   ];
   var ORGS = ['W', 'CPR', 'ORANGE'];
+  var MARKET_LABELS = { OZON: 'Ozon', WB: 'WB', YANDEX: 'Яндекс.Маркет' };
+  function marketOf(id) { return id.indexOf('wb_') === 0 ? 'WB' : (id.indexOf('yandex_') === 0 ? 'YANDEX' : 'OZON'); }
+  function isOzon(id) { return marketOf(id) === 'OZON'; }
+  function ozonOnly(accs) { return accs.filter(isOzon); }
   var EXP_GROUPS = ['commission', 'logistics', 'fbo', 'storage', 'promotion', 'other', 'unmapped'];
   var MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
   var MONTHS_FULL = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -25,13 +29,13 @@ mountAuthBadge();
     { n: 'Продвижение', d: X.dP, a: X.aP }, { n: 'Прочее', d: X.dO, a: X.aO }
   ];
 
-  var G = {}, weeks = [], T = [], CAT = {}, status = {};
+  var G = {}, weeks = [], T = [], CAT = {}, status = {}, MARKETS = ['OZON'];
   var rowsAcc = {};      // acc -> array of raw SKU rows (merged chunks)
   var loaded = {};       // acc -> true when all chunks arrived
   var flat = null;       // flat[week] = [row objects], built lazily
   var by = null;         // by[acc|sku][week] = row object
   var dirty = true;
-  var state = { org: 'W', acc: null, cat: 'ALL', week: null, open: { promotion: true, other: false }, skuOpen: null, showAll: false, fatal: null };
+  var state = { org: 'W', acc: 'ALL', market: 'ALL', cat: 'ALL', week: null, open: { promotion: true, other: false }, skuOpen: null, showAll: false, fatal: null };
 
   /* ---------- helpers ---------- */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -62,9 +66,13 @@ mountAuthBadge();
     if (bad <= -0.5) return { bg: 'var(--good-bg)', fg: 'var(--good)', bar: '#2f6b3f' };
     return { bg: 'var(--soft)', fg: 'var(--body)', bar: '#2f4a36' };
   }
-  function accName(id) { for (var i = 0; i < ACCOUNTS.length; i++) if (ACCOUNTS[i].id === id) return ACCOUNTS[i].name; return id; }
-  function orgAccs() { return ACCOUNTS.filter(function (a) { return a.org === state.org; }); }
-  function scopeAccs() { return [state.acc]; }
+  function accName(id) { if (id === 'ALL') return 'Все кабинеты'; for (var i = 0; i < ACCOUNTS.length; i++) if (ACCOUNTS[i].id === id) return ACCOUNTS[i].name; return id; }
+  function orgAccs() { return ACCOUNTS.filter(function (a) { return a.org === state.org && (state.market === 'ALL' || a.market === state.market); }); }
+  function scopeAccs() {
+    var mine = orgAccs().map(function (a) { return a.id; });
+    if (state.acc === 'ALL' || !state.acc || mine.indexOf(state.acc) < 0) return mine;
+    return [state.acc];
+  }
   function gval(acc, w, g) { var a = G[acc]; return a && a[w] && a[w][g] ? a[w][g] : 0; }
   function gsum(accs, w, g) { var s = 0; for (var i = 0; i < accs.length; i++) s += gval(accs[i], w, g); return s; }
   function skuReady(accs) { return accs.every(function (a) { return loaded[a]; }) && status.cats === 'ok'; }
@@ -87,11 +95,19 @@ mountAuthBadge();
     if (!state.week || weeks.indexOf(state.week) < 0) state.week = weeks[weeks.length - 1] || null;
     T = d.types;
     CAT = {}; d.cats.forEach(function (r) { CAT[r[0] + '|' + r[1]] = { cat: r[2] || NOCAT, art: r[3] }; });
+    MARKETS = (d.marketplaces && d.marketplaces.length) ? d.marketplaces : ['OZON'];
     rowsAcc = {}; loaded = {};
-    d.accounts.forEach(function (a) { rowsAcc[a] = []; loaded[a] = true; if (!ACCOUNTS.some(function (x) { return x.id === a; })) ACCOUNTS.push({ id: a, org: state.org, name: state.org + ' · ' + a }); });
+    d.accounts.forEach(function (a) {
+      rowsAcc[a] = []; loaded[a] = true;
+      if (!ACCOUNTS.some(function (x) { return x.id === a; })) {
+        var mk = marketOf(a), cab = a.replace(/^(ozon|wb|yandex)_[a-z]+_/, '').toUpperCase();
+        ACCOUNTS.push({ id: a, org: state.org, market: mk, name: state.org + ' · ' + MARKET_LABELS[mk] + ' · ' + cab });
+      }
+    });
     d.skus.forEach(function (r) { (rowsAcc[r[22]] = rowsAcc[r[22]] || []).push(r); });
+    if (state.market !== 'ALL' && MARKETS.indexOf(state.market) < 0) state.market = 'ALL';
     var mine = orgAccs().map(function (a) { return a.id; });
-    if (mine.length && mine.indexOf(state.acc) < 0) state.acc = mine[0];
+    if (state.acc !== 'ALL' && mine.indexOf(state.acc) < 0) state.acc = 'ALL';
     status = { group: 'ok', types: 'ok', cats: 'ok' };
     ACCOUNTS.forEach(function (a) { if (a.org === state.org) status['sku:' + a.id] = 'ok'; });
     dirty = true; flat = null;
@@ -104,7 +120,7 @@ mountAuthBadge();
       if (!r.ok) return Promise.reject({ code: r.status });
       return r.json().catch(function () { return Promise.reject({ code: 'parse' }); });
     }).then(function (d) {
-      if (!d || d.contract_version !== 'weekly-finance-v1') return Promise.reject({ code: 'parse' });
+      if (!d || d.contract_version !== 'weekly-finance-v2') return Promise.reject({ code: 'parse' });
       if (org !== state.org) return;
       cache[org] = d; applyData(d); render();
     }).catch(function (e) { if (org !== state.org) return; state.fatal = errText(e); render(); });
@@ -245,8 +261,8 @@ mountAuthBadge();
         rows.push(expRow({ name: lb || ('Тип ' + k.tid), rub: k.rub, kind: 'child', noAlert: true, tag: k.nosku ? 'без SKU, расчёт' : 'по SKU' }, B, alerts));
       });
     });
-    rows.push(expRow({ name: 'Итого расходы Ozon', rub: B.expTot, kind: 'total', noAlert: true }, B, alerts));
-    rows.push(expRow({ name: 'Компенсации Ozon (отдельно, вне расходов)', rub: B.comp, goodUp: true, kind: 'row' }, B, alerts));
+    rows.push(expRow({ name: 'Итого расходы', rub: B.expTot, kind: 'total', noAlert: true }, B, alerts));
+    rows.push(expRow({ name: 'Компенсации Ozon (отдельно, вне расходов)' + (ozonOnly(B.accs).length < B.accs.length ? ' · WB не включён' : ''), rub: B.comp, goodUp: true, kind: 'row' }, B, alerts));
     rows.push(expRow({ name: 'К выплате', rub: B.pay, goodUp: true, kind: 'total', noAlert: true }, B, alerts));
     var head = idxs(ci - 3, ci).map(function (i) {
       return '<th class="r" style="border-left:1px solid var(--line)">' + wlabel(weeks[i]) + '<small>' + range(weeks[i]) + (i >= weeks.length - 2 ? ' · предв.' : '') + '</small></th><th class="r">%</th>';
@@ -271,7 +287,7 @@ mountAuthBadge();
     var unpaidSum = unpaid.reduce(function (s, i) { return s + B.pay[i]; }, 0);
     var k = [];
     k.push({ l: 'Доставлено за неделю', v: uc == null ? '…' : num(uc) + ' шт', s: 'чистые продажи ' + num(B.net[ci]) + ' ₽', d: (un && uc != null) ? sgn(uc / un - 1) + Math.abs((uc / un - 1) * 100).toFixed(1).replace('.', ',') + '% к норме по шт' : '', c: (un && uc >= un) ? 'var(--good)' : 'var(--body)' });
-    k.push({ l: 'Расходы Ozon', v: num(B.expTot[ci]) + ' ₽', s: (ce == null ? '—' : pct(ce)) + ' от чистых продаж' + (uc > 0 ? ' · ' + num(B.expTot[ci] / uc) + ' ₽ на 1 шт' : '') + ' · в т.ч. хранение ' + num(B.exp.storage[ci]) + ' ₽', d: have ? pp(ce - ne) + ' к норме · ' + (over >= 0 ? '+' : '−') + num(over) + ' ₽ переплата' : '', c: have ? tones(ce - ne).fg : 'var(--body)' });
+    k.push({ l: 'Расходы', v: num(B.expTot[ci]) + ' ₽', s: (ce == null ? '—' : pct(ce)) + ' от чистых продаж' + (uc > 0 ? ' · ' + num(B.expTot[ci] / uc) + ' ₽ на 1 шт' : '') + ' · в т.ч. хранение ' + num(B.exp.storage[ci]) + ' ₽', d: have ? pp(ce - ne) + ' к норме · ' + (over >= 0 ? '+' : '−') + num(over) + ' ₽ переплата' : '', c: have ? tones(ce - ne).fg : 'var(--body)' });
     k.push({ l: 'К выплате за неделю', v: rubS(B.pay[ci]) + ' ₽', s: (cp == null ? '—' : pct(cp)) + ' от чистых продаж' + (np == null ? '' : ' · норма ' + pct(np)) + ' · компенсации ' + rubS(B.comp[ci]) + ' ₽ отдельно', d: (np == null || cp == null) ? '' : pp(cp - np) + ' к норме', c: (np == null || cp == null) ? 'var(--body)' : tones(-(cp - np)).fg });
     k.push({ l: 'Начислено, ещё не пришло', v: unpaid.length ? rubS(unpaidSum) + ' ₽' : '0 ₽', s: unpaid.length ? 'ближайшая выплата ' + dmon(payoutDate(weeks[unpaid[0]])) + ' · ' + rubS(B.pay[unpaid[0]]) + ' ₽' : 'все выплаты за последние недели по графику наступили', d: unpaid.length ? 'за ' + unpaid.map(function (i) { return wlabel(weeks[i]); }).join(' и ') : '', c: 'var(--body)' });
     return '<div class="kpis">' + k.map(function (x) {
@@ -305,8 +321,10 @@ mountAuthBadge();
     return cats;
   }
   function categoriesBlock(B) {
-    if (!skuReady(B.accs)) return '<div class="card"><div class="top"><h2>Расходы по мастер-категориям</h2></div><div class="sub">Загружаются данные по SKU и категориям…</div></div>';
-    var ci = B.ci, cats = catData(B), totNet = 0;
+    var oaccs = ozonOnly(B.accs);
+    if (!oaccs.length) return '<div class="card"><div class="top"><h2>Расходы по мастер-категориям</h2></div><div class="sub">Доступно только для кабинетов Ozon — в выборке их нет.</div></div>';
+    if (!skuReady(oaccs)) return '<div class="card"><div class="top"><h2>Расходы по мастер-категориям</h2></div><div class="sub">Загружаются данные по SKU и категориям…</div></div>';
+    var ci = B.ci, cats = catData({ accs: oaccs }), totNet = 0;
     var list = Object.keys(cats).map(function (name) {
       var c = cats[name], p = pctArr(c.exp, c.net), n = normOf(p, ci), cur = p[ci];
       var d = (cur != null && n != null) ? cur - n : null, ov = d == null ? 0 : d / 100 * c.net[ci];
@@ -327,7 +345,7 @@ mountAuthBadge();
         '<td class="r" style="padding:10px;font-weight:600;color:' + t.fg + '">' + (x.d == null || Math.abs(x.ov) < 500 ? '—' : sgn(x.ov) + num(x.ov)) + '</td>' +
         '<td class="lft" style="padding:10px;color:var(--body)">' + (x.drv || '—') + '</td></tr>';
     }).join('');
-    return '<div class="card"><div class="top"><h2>Расходы по мастер-категориям</h2><div class="n">Сортировка по переплате к норме · клик по строке ставит фильтр мастер-категории' + (state.cat !== 'ALL' ? ' · <button type="button" class="lnk" data-act="catclear">сбросить фильтр</button>' : '') + '</div></div>' +
+    return '<div class="card"><div class="top"><h2>Расходы по мастер-категориям</h2><div class="n">Сортировка по переплате к норме · клик по строке ставит фильтр мастер-категории' + (state.cat !== 'ALL' ? ' · <button type="button" class="lnk" data-act="catclear">сбросить фильтр</button>' : '') + (oaccs.length < B.accs.length ? ' · только по кабинетам Ozon в выборке' : '') + '</div></div>' +
       '<div class="scroll"><table style="min-width:900px;font-size:14px"><thead><tr><th class="lft" style="padding:8px 10px">Мастер-категория</th><th class="r" style="padding:8px 10px">Чистые продажи<small>' + wlabel(weeks[ci]) + ', ₽</small></th><th class="r" style="padding:8px 10px">Доля</th><th class="r" style="padding:8px 10px">Расходы Ozon<small>' + wlabel(weeks[ci]) + ', ₽</small></th><th class="r" style="padding:8px 10px">Расходы Ozon<small>норма → ' + wlabel(weeks[ci]) + '</small></th><th class="r" style="padding:8px 10px">Δ к норме</th><th class="r" style="padding:8px 10px">Переплата, ₽<small>за неделю</small></th><th class="lft" style="padding:8px 10px">Что выросло</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   }
 
@@ -344,7 +362,7 @@ mountAuthBadge();
         '<td class="r">' + num(B.exp.storage[ci]) + '</td><td class="r">' + rubS(B.comp[ci]) + '</td><td class="r" style="font-weight:600">' + rubS(B.pay[ci]) + '</td></tr>';
     }).join('');
     return '<div class="card"><div class="top"><h2>Кабинеты · ' + wlabel(weeks[ci]) + '</h2><div class="n">Клик по кабинету ставит фильтр · хранение входит в расходы, компенсации показаны отдельно</div></div>' +
-      '<div class="scroll"><table style="min-width:880px;font-size:14px"><thead><tr><th class="lft" style="padding:8px 10px">Кабинет</th><th class="r">Чистые продажи<small>₽</small></th><th class="r">Расходы Ozon<small>₽</small></th><th class="r">% от продаж</th><th class="r">Норма<small>4 нед.</small></th><th class="r">Δ к норме</th><th class="r">Хранение<small>₽</small></th><th class="r">Компенсации<small>₽</small></th><th class="r">К выплате<small>₽</small></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      '<div class="scroll"><table style="min-width:880px;font-size:14px"><thead><tr><th class="lft" style="padding:8px 10px">Кабинет</th><th class="r">Чистые продажи<small>₽</small></th><th class="r">Расходы<small>₽</small></th><th class="r">% от продаж</th><th class="r">Норма<small>4 нед.</small></th><th class="r">Δ к норме</th><th class="r">Хранение<small>₽</small></th><th class="r">Компенсации<small>₽</small></th><th class="r">К выплате<small>₽</small></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   }
 
   /* ---------- SKU price review ---------- */
@@ -364,10 +382,12 @@ mountAuthBadge();
     return out;
   }
   function skuBlock(B) {
-    if (!skuReady(B.accs)) return '<div class="card"><div class="top"><h2>Кандидаты на пересмотр цены</h2></div><div class="sub">Загружаются данные по SKU: ' + B.accs.filter(function (a) { return !loaded[a]; }).map(accName).join(', ') + '</div></div>';
-    var all = skuList(B), cand = all.filter(function (x) { return x.d != null && x.d > 1 && x.np != null; });
+    var oaccs = ozonOnly(B.accs);
+    if (!oaccs.length) return '<div class="card"><div class="top"><h2>Кандидаты на пересмотр цены</h2></div><div class="sub">Доступно только для кабинетов Ozon — в выборке их нет.</div></div>';
+    if (!skuReady(oaccs)) return '<div class="card"><div class="top"><h2>Кандидаты на пересмотр цены</h2></div><div class="sub">Загружаются данные по SKU: ' + oaccs.filter(function (a) { return !loaded[a]; }).map(accName).join(', ') + '</div></div>';
+    var all = skuList({ accs: oaccs, ci: B.ci }), cand = all.filter(function (x) { return x.d != null && x.d > 1 && x.np != null; });
     cand.sort(function (a, b) { return b.over - a.over; });
-    var shown = state.showAll ? cand : cand.slice(0, 10), multi = B.accs.length > 1;
+    var shown = state.showAll ? cand : cand.slice(0, 10), multi = oaccs.length > 1;
     var body = shown.map(function (x) {
       var o = x.o, key = o.acc + '|' + o.sku, open = state.skuOpen === key;
       var name = o.art || o.sku;
@@ -379,7 +399,7 @@ mountAuthBadge();
       return main + (open ? '<tr><td colspan="7" style="padding:0">' + skuDetail(x, B) + '</td></tr>' : '');
     }).join('');
     var allLink = (cand.length > 10 && !state.showAll) ? ' · <button type="button" class="lnk" data-act="showall">показать все ' + cand.length + '</button>' : (state.showAll ? ' · <button type="button" class="lnk" data-act="showtop">только топ-10</button>' : '');
-    return '<div class="card"><div class="top"><h2>Кандидаты на пересмотр цены</h2><div class="n">' + (state.showAll ? 'Все' : 'Топ-10') + ' по переплате · расходы Ozon выросли больше чем на 1 п.п. к норме · клик по SKU раскрывает разбор' + allLink + '</div></div>' +
+    return '<div class="card"><div class="top"><h2>Кандидаты на пересмотр цены</h2><div class="n">' + (state.showAll ? 'Все' : 'Топ-10') + ' по переплате · расходы Ozon выросли больше чем на 1 п.п. к норме · клик по SKU раскрывает разбор' + allLink + (oaccs.length < B.accs.length ? ' · только по кабинетам Ozon в выборке' : '') + '</div></div>' +
       '<div class="scroll"><table style="min-width:960px;font-size:14px"><thead><tr style="color:var(--mute)"><th class="lft" style="padding:8px 10px">SKU</th><th class="r" style="padding:8px 10px">Доставлено, шт</th><th class="r" style="padding:8px 10px">Расходы Ozon<small>норма → ' + wlabel(weeks[B.ci]) + '</small></th><th class="r" style="padding:8px 10px">Переплата, ₽<small>за неделю</small></th><th class="r" style="padding:8px 10px">Цена сейчас</th><th class="r" style="padding:8px 10px">Цена для нормы</th><th class="r" style="padding:8px 10px">Изменение</th></tr></thead><tbody>' +
       (body || '<tr><td colspan="7" class="lft" style="padding:18px 10px;color:var(--mute)">На этой неделе нет SKU с ростом расходов больше 1 п.п. к норме.</td></tr>') + '</tbody></table></div></div>';
   }
@@ -419,7 +439,8 @@ mountAuthBadge();
 
   /* ---------- reconciliation ---------- */
   function reconBlock(B) {
-    var ci = B.ci, w = weeks[ci], accs = B.accs;
+    var ci = B.ci, w = weeks[ci], accs = ozonOnly(B.accs);
+    if (!accs.length) return '<div class="card"><div class="top"><h2>Сверка итогов с v2</h2></div><div class="sub">Доступно только для кабинетов Ozon — в выборке их нет.</div></div>';
     if (!skuReady(accs)) return '<div class="card"><div class="top"><h2>Сверка итогов с v2</h2></div><div class="sub">Ждём данные по SKU для кабинетов: ' + accs.filter(function (a) { return !loaded[a]; }).map(accName).join(', ') + '</div></div>';
     var Bg = build(accs, 'ALL', false);
     ensureFlat(); var set = toSet(accs), sk = { net: 0, exp: 0, sto: 0, comp: 0, rows: 0 };
@@ -433,7 +454,7 @@ mountAuthBadge();
       var diff = l[1] - l[2], ok = Math.abs(diff) < 2; if (!ok) allOk = false;
       return '<tr class="rec" style="border-top:1px solid var(--line2)"><td class="lft">' + l[0] + '</td><td class="r">' + rubS(l[1]) + '</td><td class="r">' + rubS(l[2]) + '</td><td class="r">' + (Math.abs(diff) < 0.005 ? '0' : sgn(diff) + Math.abs(diff).toFixed(2).replace('.', ',')) + '</td><td class="r"><span class="' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'сходится' : 'расхождение') + '</span></td></tr>';
     }).join('');
-    return '<div class="card"><div class="top"><h2>Сверка итогов с v2 · ' + wlabel(w) + '</h2><div class="n">Отчёт по статьям (weekly_ozon_expense_group_v2) против суммы по SKU (weekly_ozon_expense_sku_v2) за выбранную неделю и кабинеты, без фильтра категории. Допуск 2 ₽ на округление.</div></div>' +
+    return '<div class="card"><div class="top"><h2>Сверка итогов с v2 · ' + wlabel(w) + '</h2><div class="n">Отчёт по статьям (weekly_ozon_expense_group_v2) против суммы по SKU (weekly_ozon_expense_sku_v2) за выбранную неделю и кабинеты, без фильтра категории. Допуск 2 ₽ на округление' + (accs.length < B.accs.length ? ' · только по кабинетам Ozon в выборке, для WB сверка по SKU пока недоступна' : '') + '.</div></div>' +
       '<div class="scroll"><table style="min-width:640px;font-size:14px"><thead><tr><th class="lft">Показатель</th><th class="r">По статьям, ₽</th><th class="r">По SKU, ₽</th><th class="r">Разница, ₽</th><th class="r">Итог</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="sub">' + (allOk ? 'Все итоги недели сходятся.' : 'Есть расхождение: расходы без SKU не распределяются, если у кабинета нет положительных чистых продаж по SKU за неделю.') + ' Строк SKU: ' + sk.rows + '.' +
       (accs.indexOf('ozon_orange_ipch') >= 0 ? ' IPCH: расхождение выплаты Ozon ведётся отдельной сверкой и не меняет начисления в отчёте.' : '') + '</div></div>';
@@ -441,7 +462,7 @@ mountAuthBadge();
 
   function statusChips() {
     var items = [['group', 'Статьи'], ['types', 'Типы начислений'], ['cats', 'Категории']].map(function (p) { return [status[p[0]], p[1]]; });
-    ACCOUNTS.forEach(function (a) { items.push([status['sku:' + a.id], 'SKU · ' + a.name.split(' · ')[1]]); });
+    ACCOUNTS.filter(function (a) { return isOzon(a.id); }).forEach(function (a) { items.push([status['sku:' + a.id], 'SKU · ' + a.name.split(' · ').pop()]); });
     return '<div class="status">' + items.map(function (it) {
       var s = it[0], wait = (s === 'wait' || s == null);
       return '<span class="' + (s === 'ok' ? 'ok' : (wait ? '' : 'err')) + '" title="' + esc(s === 'ok' || wait ? '' : s) + '">' + esc(it[1]) + (s === 'ok' ? ' ✓' : (wait ? ' …' : ' ✕')) + '</span>';
@@ -452,7 +473,14 @@ mountAuthBadge();
     var ci = weekIdx(), nb = '';
     var wsel = weeks.slice().reverse().map(function (w) { return '<option value="' + w + '"' + (w === state.week ? ' selected' : '') + '>' + wlabel(w) + ' · ' + range(w) + (weeks.indexOf(w) >= weeks.length - 2 ? ' · предв.' : '') + '</option>'; }).join('');
     var orgOpts = ORGS.map(function (o) { return '<option value="' + o + '"' + (state.org === o ? ' selected' : '') + '>' + o + '</option>'; }).join('');
-    var accOpts = orgAccs().map(function (a) { return '<option value="' + a.id + '"' + (state.acc === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>'; }).join('');
+    var allOrgAccs = ACCOUNTS.filter(function (a) { return a.org === state.org; });
+    var accList = orgAccs();
+    var accOpts = '<option value="ALL"' + (state.acc === 'ALL' ? ' selected' : '') + '>Все</option>' +
+      accList.map(function (a) { return '<option value="' + a.id + '"' + (state.acc === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>'; }).join('');
+    var mpOpts = '<option value="ALL"' + (state.market === 'ALL' ? ' selected' : '') + '>Все</option>' +
+      MARKETS.map(function (m) { return '<option value="' + m + '"' + (state.market === m ? ' selected' : '') + '>' + (MARKET_LABELS[m] || m) + '</option>'; }).join('');
+    var showAccFilter = allOrgAccs.length > 1;
+    var showMpFilter = MARKETS.length > 1;
     var catNames = {};
     if (skuReady(ACCOUNTS.map(function (a) { return a.id; }))) { ensureFlat(); var st = toSet(scopeAccs()); (flat[state.week] || []).forEach(function (o) { if (st[o.acc]) catNames[o.cat] = (catNames[o.cat] || 0) + Math.max(0, o.net); }); }
     if (state.cat !== 'ALL') catNames[state.cat] = catNames[state.cat] || 0;
@@ -460,8 +488,8 @@ mountAuthBadge();
     var catOpts = '<option value="ALL">Все</option>' + catList.map(function (c) { return '<option value="' + esc(c) + '"' + (state.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
     return '<div class="filters">' +
       '<label class="filter' + '' + '">Организация<select id="f-org">' + orgOpts + '</select></label>' +
-      '<label class="filter' + '' + '">Кабинет<select id="f-acc">' + accOpts + '</select></label>' +
-      '<label class="filter hl">Маркетплейс<select id="f-mp"><option>Ozon</option></select></label>' +
+      (showMpFilter ? '<label class="filter hl">Маркетплейс<select id="f-mp">' + mpOpts + '</select></label>' : '') +
+      (showAccFilter ? '<label class="filter' + '' + '">Кабинет<select id="f-acc">' + accOpts + '</select></label>' : '') +
       '<label class="filter hl">Мастер-категория<select id="f-cat">' + catOpts + '</select></label>' +
       '<div class="filter">Неделя<div class="nav"><button type="button" data-act="prev" aria-label="Предыдущая неделя"' + (ci <= 0 ? ' disabled' : '') + '>‹</button><select id="f-week" aria-label="Неделя">' + wsel + '</select><button type="button" data-act="next" aria-label="Следующая неделя"' + (ci >= weeks.length - 1 ? ' disabled' : '') + '>›</button></div></div></div>';
   }
@@ -470,13 +498,14 @@ mountAuthBadge();
     var app = document.getElementById('app'); if (!app) return;
     if (!weeks.length) {
       var msg = state.fatal;
-      app.innerHTML = '<div class="notice"><div>' + (msg ? esc(msg) : 'Загружаю финансовые данные Ozon…') + '</div>' + (msg ? '<button type="button" class="more" data-act="reload">Повторить</button>' : '') + '</div>' + statusChips();
+      app.innerHTML = '<div class="notice"><div>' + (msg ? esc(msg) : 'Загружаю финансовые данные…') + '</div>' + (msg ? '<button type="button" class="more" data-act="reload">Повторить</button>' : '') + '</div>' + statusChips();
       return;
     }
     var accs = scopeAccs();
     var scopeName = accName(state.acc);
-    var head = '<div class="head"><div class="hl"><div class="eyebrow">Monthly · Финансы</div><h1>' + esc(scopeName) + ' · Ozon · Неделя ' + isoWeek(state.week) + ' · ' + longRange(state.week) + '</h1>' +
-      '<div class="sub">Все расходы Ozon по группам: комиссия, логистика, хранение, продвижение, прочее. Компенсации показаны отдельно. Норма = среднее за 4 предыдущие недели' + (weekIdx() >= 4 ? ' (' + wlabel(weeks[weekIdx() - 4]) + '–' + wlabel(weeks[weekIdx() - 1]) + ')' : '') + '</div></div>' +
+    var marketLabel = state.market === 'ALL' ? (MARKETS.length > 1 ? 'Все площадки' : (MARKET_LABELS[MARKETS[0]] || MARKETS[0])) : (MARKET_LABELS[state.market] || state.market);
+    var head = '<div class="head"><div class="hl"><div class="eyebrow">Weekly · Финансы</div><h1>' + esc(scopeName) + ' · ' + esc(marketLabel) + ' · Неделя ' + isoWeek(state.week) + ' · ' + longRange(state.week) + '</h1>' +
+      '<div class="sub">Все расходы по группам: комиссия, логистика, хранение, продвижение, прочее. Компенсации показаны отдельно. Норма = среднее за 4 предыдущие недели' + (weekIdx() >= 4 ? ' (' + wlabel(weeks[weekIdx() - 4]) + '–' + wlabel(weeks[weekIdx() - 1]) + ')' : '') + '</div></div>' +
       '<div class="tools"><nav class="seg" aria-label="Вид отчёта"><a href="../daily/?tenant=' + encodeURIComponent(state.org) + '">По дням</a><a class="on" aria-current="page">По неделям</a><a href="../monthly/?tenant=' + encodeURIComponent(state.org) + '">По месяцам</a></nav><button type="button" class="chip" data-act="reload">Обновить</button></div></div>';
     var h = head + filtersHtml();
     var B = build(accs, state.cat, true), alerts = [];
@@ -484,7 +513,7 @@ mountAuthBadge();
     alerts.sort(function (a, b) { return b.d - a.d; });
     var ci = B.ci, pe = pctArr(B.expTot, B.net), ne = normOf(pe, ci), over = (pe[ci] != null && ne != null) ? (pe[ci] - ne) / 100 * B.net[ci] : 0;
     h += kpiBlock(B);
-    h += '<div class="alerts"><div class="t">Сигналы недели: ' + (over > 0 ? 'расходы Ozon выше нормы на ' + num(over) + ' ₽' : 'расходы Ozon в пределах нормы') + '</div>' +
+    h += '<div class="alerts"><div class="t">Сигналы недели: ' + (over > 0 ? 'расходы выше нормы на ' + num(over) + ' ₽' : 'расходы в пределах нормы') + '</div>' +
       (alerts.length ? alerts.slice(0, 6).map(function (a) { return '<div class="a">' + esc(a.text) + '</div>'; }).join('') : '<div class="a">Статей с ростом больше 0,5 п.п. к норме нет.</div>') + '</div>';
     h += table;
     h += categoriesBlock(B);
@@ -493,7 +522,7 @@ mountAuthBadge();
     h += payoutsBlock(B);
     h += reconBlock(B);
     h += statusChips();
-    h += '<div class="foot">Источник: weekly_ozon_expense_group_v2, weekly_ozon_expense_sku_v2 и ozon_finance_classified_v2; штуки и цена из строк продаж и возвратов, мастер-категории из справочника товаров. Данные в базе по ' + dmon(addDays(weeks[weeks.length - 1], 6)) + '. Подсветка Δ: оранжевый от +0,5 п.п., красный от +1,5 п.п. Цена для нормы: цена × (1 − расходы нормы) / (1 − расходы недели).</div>';
+    h += '<div class="foot">Источник: weekly_ozon_expense_group_v2, weekly_ozon_expense_sku_v2 и ozon_finance_classified_v2' + (accs.some(function (a) { return !isOzon(a); }) ? ', а также weekly_wb_expense_group_v1 (WB: только верхний уровень, без SKU и сверки)' : '') + '; штуки и цена из строк продаж и возвратов, мастер-категории из справочника товаров. Данные в базе по ' + dmon(addDays(weeks[weeks.length - 1], 6)) + '. Подсветка Δ: оранжевый от +0,5 п.п., красный от +1,5 п.п. Цена для нормы: цена × (1 − расходы нормы) / (1 − расходы недели).</div>';
     var fid = document.activeElement && document.activeElement.id;
     app.innerHTML = h;
     if (fid) { var el = document.getElementById(fid); if (el && el.focus) el.focus(); }
@@ -517,8 +546,9 @@ mountAuthBadge();
   });
   document.addEventListener('change', function (e) {
     var id = e.target.id;
-    if (id === 'f-org') { state.org = e.target.value; state.cat = 'ALL'; state.skuOpen = null; state.acc = null; try { var u = new URL(location.href); u.searchParams.set('tenant', state.org); history.replaceState(null, '', u); } catch (x) {} loadAll(false); return; }
+    if (id === 'f-org') { state.org = e.target.value; state.cat = 'ALL'; state.skuOpen = null; state.acc = 'ALL'; state.market = 'ALL'; try { var u = new URL(location.href); u.searchParams.set('tenant', state.org); history.replaceState(null, '', u); } catch (x) {} loadAll(false); return; }
     else if (id === 'f-acc') { state.acc = e.target.value; state.cat = 'ALL'; state.skuOpen = null; }
+    else if (id === 'f-mp') { state.market = e.target.value; state.acc = 'ALL'; state.cat = 'ALL'; state.skuOpen = null; }
     else if (id === 'f-cat') { state.cat = e.target.value; state.skuOpen = null; }
     else if (id === 'f-week') { state.week = e.target.value; state.skuOpen = null; }
     else return;
@@ -528,7 +558,7 @@ mountAuthBadge();
   function start() {
     var t = (new URLSearchParams(location.search).get('tenant') || '').toUpperCase();
     if (ORGS.indexOf(t) >= 0) state.org = t;
-    state.acc = null;
+    state.acc = 'ALL'; state.market = 'ALL';
     loadAll(false);
   }
   start();
