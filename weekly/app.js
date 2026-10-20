@@ -178,6 +178,9 @@ mountAuthBadge();
     return B;
   }
   function idxs(from, to) { var o = []; for (var i = from; i <= to; i++) if (i >= 0 && i < weeks.length) o.push(i); return o; }
+  // Comparison table: selected/latest week is the fixed anchor on the left;
+  // every older available week follows to the right, newest -> oldest.
+  function comparisonIdxs(ci) { var o = []; for (var i = ci; i >= 0; i--) o.push(i); return o; }
   function pctArr(rub, base) { return rub.map(function (v, i) { return base[i] > 0 ? v / base[i] * 100 : null; }); }
   function normOf(p, ci) { return avg(idxs(ci - 4, ci - 1).map(function (i) { return p[i]; }).filter(function (x) { return x != null; })); }
   function sparkOf(vals, ci, bar) {
@@ -189,9 +192,9 @@ mountAuthBadge();
 
   /* ---------- expense table ---------- */
   function cellsHtml(rub, p, ci, sign, t) {
-    return idxs(ci - 3, ci).map(function (i) {
-      return '<td class="r" style="border-left:1px solid var(--line2)">' + (rub[i] == null ? '' : rubS(sign ? -rub[i] : rub[i])) + '</td>' +
-        '<td class="r" style="color:' + (i === ci ? t.fgc : 'var(--mute)') + ';font-size:12px">' + (p[i] == null ? '—' : pct(p[i])) + '</td>';
+    return comparisonIdxs(ci).map(function (i, pos) {
+      return '<td class="r week-rub ' + (pos === 0 ? 'week-anchor' : 'week-history') + '">' + (rub[i] == null ? '' : rubS(sign ? -rub[i] : rub[i])) + '</td>' +
+        '<td class="r week-pct ' + (pos === 0 ? 'week-anchor-pct' : 'week-history') + '" style="color:' + (i === ci ? t.fgc : 'var(--mute)') + '">' + (p[i] == null ? '—' : pct(p[i])) + '</td>';
     }).join('');
   }
   function expRow(o, B, alerts) {
@@ -223,7 +226,7 @@ mountAuthBadge();
     var per = B.units && B.units[ci] > 0 ? num(v[ci] / B.units[ci]) : '—';
     return '<tr style="background:' + (bold ? 'var(--total)' : '#fff') + ';border-top:1px solid ' + (bold ? '#d9d5ca' : 'var(--soft)') + ';font-weight:' + (bold ? 600 : 400) + '">' +
       '<td class="lft" style="padding-left:10px">' + esc(name) + '</td>' +
-      idxs(ci - 3, ci).map(function (i) { return '<td class="r" style="border-left:1px solid var(--line2)">' + rubS(v[i]) + '</td><td></td>'; }).join('') +
+      comparisonIdxs(ci).map(function (i, pos) { return '<td class="r week-rub ' + (pos === 0 ? 'week-anchor' : 'week-history') + '">' + rubS(v[i]) + '</td><td class="r week-pct ' + (pos === 0 ? 'week-anchor-pct' : 'week-history') + '"></td>'; }).join('') +
       '<td class="r" style="padding-inline:10px;border-left:1px solid var(--line)">' + per + '</td>' +
       '<td class="r" style="color:var(--mute);padding-inline:10px">' + (n == null ? '—' : num(n)) + '</td>' +
       '<td class="r" style="padding:5px 10px">' + (n ? '<span class="badge" style="background:' + t.bg + ';color:' + t.fg + '">' + sgn(g) + Math.abs(g).toFixed(1).replace('.', ',') + '%</span>' : '') + '</td>' +
@@ -264,12 +267,13 @@ mountAuthBadge();
     rows.push(expRow({ name: 'Итого расходы', rub: B.expTot, kind: 'total', noAlert: true }, B, alerts));
     rows.push(expRow({ name: 'Компенсации Ozon (отдельно, вне расходов)' + (ozonOnly(B.accs).length < B.accs.length ? ' · WB не включён' : ''), rub: B.comp, goodUp: true, kind: 'row' }, B, alerts));
     rows.push(expRow({ name: 'К выплате', rub: B.pay, goodUp: true, kind: 'total', noAlert: true }, B, alerts));
-    var head = idxs(ci - 3, ci).map(function (i) {
-      return '<th class="r" style="border-left:1px solid var(--line)">' + wlabel(weeks[i]) + '<small>' + range(weeks[i]) + (i >= weeks.length - 2 ? ' · предв.' : '') + '</small></th><th class="r">%</th>';
+    var compareWeeks = comparisonIdxs(ci);
+    var head = compareWeeks.map(function (i, pos) {
+      return '<th class="r week-rub ' + (pos === 0 ? 'week-anchor' : 'week-history') + '">' + wlabel(weeks[i]) + '<small>' + range(weeks[i]) + (i >= weeks.length - 2 ? ' · предв.' : '') + '</small></th><th class="r week-pct ' + (pos === 0 ? 'week-anchor-pct' : 'week-history') + '">%</th>';
     }).join('');
     return '<div class="card"><div class="top"><h2>Расходы по статьям · ₽ и % от чистых продаж</h2>' +
       '<div class="n">' + wlabel(weeks[Math.max(0, weeks.length - 2)]) + '–' + wlabel(weeks[weeks.length - 1]) + ' предварительные: возвраты и обратная доставка доначисляются до 2 недель · Хранение и компенсации показаны отдельными строками' + (T.length && !B.fromSku ? ' · «Продвижение», «Прочее» и «Хранение» раскрываются по типам начислений Ozon' : '') + '</div></div>' +
-      '<div class="scroll"><table style="min-width:1260px;font-size:13.5px"><thead><tr style="border-bottom:1px solid var(--line)"><th class="lft" style="padding-left:10px">Статья</th>' + head +
+      '<div class="scroll week-scroll"><table class="expense-week-table" style="min-width:' + Math.max(1260, 690 + compareWeeks.length * 168) + 'px;font-size:13.5px"><thead><tr style="border-bottom:1px solid var(--line)"><th class="lft week-article" style="padding-left:10px">Статья</th>' + head +
       '<th class="r" style="padding-inline:10px;border-left:1px solid var(--line)">На 1 шт<small>' + wlabel(weeks[ci]) + ', ₽</small></th><th class="r" style="padding-inline:10px">Норма<small>4 нед.</small></th><th class="r" style="padding-inline:10px">Δ к норме</th><th class="r" style="padding-inline:10px">Δ, ₽<small>за неделю</small></th><th class="lft">8 недель</th></tr></thead><tbody>' +
       rows.join('') + '</tbody></table></div></div>';
   }
