@@ -90,3 +90,26 @@ tr.click:hover{background:var(--sub)}
 .seg a{display:inline-flex;align-items:center;height:36px;padding:0 18px;border-radius:8px;font-size:14px;font-weight:500;color:var(--body);text-decoration:none;cursor:pointer}
 .seg a.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(23,32,46,.15);cursor:default}
 .seg a:not(.on):hover{color:var(--ink)}
+
+/* Weekly comparison rail: anchor week stays visible on the left while older weeks scroll to the right. */
+.week-scroll{overflow-x:auto;position:relative;scrollbar-gutter:stable}
+.expense-week-table{table-layout:auto}
+.expense-week-table .week-article{
+  position:sticky;left:0;z-index:6;min-width:230px;width:230px;max-width:230px;background:inherit;
+  box-shadow:1px 0 0 var(--line);
+}
+.expense-week-table .week-rub{min-width:106px;width:106px;border-left:1px solid var(--line2)}
+.expense-week-table .week-pct{min-width:62px;width:62px;font-size:12px}
+.expense-week-table .week-anchor{
+  position:sticky;left:230px;z-index:5;background:inherit;border-left:1px solid var(--line);
+}
+.expense-week-table .week-anchor-pct{
+  position:sticky;left:336px;z-index:5;background:inherit;
+  box-shadow:8px 0 12px -12px rgba(30,36,32,.65),1px 0 0 var(--line);
+}
+.expense-week-table thead .week-article,
+.expense-week-table thead .week-anchor,
+.expense-week-table thead .week-anchor-pct{background:var(--card);z-index:8}
+.expense-week-table tbody tr:hover .week-article,
+.expense-week-table tbody tr:hover .week-anchor,
+.expense-week-table tbody tr:hover .week-anchor-pct{background:inherit}
