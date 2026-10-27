@@ -34,7 +34,7 @@ mountAuthBadge();
   var loaded = {};       // acc -> true when all chunks arrived
   var flat = null;       // flat[week] = [row objects], built lazily
   var by = null;         // by[acc|sku][week] = row object
-  var dirty = true;
+  var dirty = true, histInit = false;
   var state = { org: 'W', acc: 'ALL', market: 'ALL', cat: 'ALL', week: null, open: { promotion: true, other: false }, skuOpen: null, showAll: false, fatal: null };
 
   /* ---------- helpers ---------- */
@@ -178,24 +178,23 @@ mountAuthBadge();
     return B;
   }
   function idxs(from, to) { var o = []; for (var i = from; i <= to; i++) if (i >= 0 && i < weeks.length) o.push(i); return o; }
-  // Comparison table: selected/latest week is the fixed anchor on the left;
-  // every older available week follows to the right, newest -> oldest.
-  function comparisonIdxs(ci) { var o = []; for (var i = ci; i >= 0; i--) o.push(i); return o; }
   function pctArr(rub, base) { return rub.map(function (v, i) { return base[i] > 0 ? v / base[i] * 100 : null; }); }
   function normOf(p, ci) { return avg(idxs(ci - 4, ci - 1).map(function (i) { return p[i]; }).filter(function (x) { return x != null; })); }
-  function sparkOf(vals, ci, bar) {
-    var ix = idxs(ci - 7, ci), v = ix.map(function (i) { return vals[i] == null ? 0 : vals[i]; });
-    var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v);
-    return v.map(function (x, k) { return { h: Math.round(4 + (mx === mn ? 0.5 : (x - mn) / (mx - mn)) * 18), c: ix[k] === ci ? bar : '#cfccc2' }; });
-  }
-  function sparkHtml(sp) { return '<div class="spark">' + sp.map(function (s) { return '<i style="height:' + s.h + 'px;background:' + s.c + '"></i>'; }).join('') + '</div>'; }
 
-  /* ---------- expense table ---------- */
-  function cellsHtml(rub, p, ci, sign, t) {
-    return comparisonIdxs(ci).map(function (i, pos) {
-      return '<td class="r week-rub ' + (pos === 0 ? 'week-anchor' : 'week-history') + '">' + (rub[i] == null ? '' : rubS(sign ? -rub[i] : rub[i])) + '</td>' +
-        '<td class="r week-pct ' + (pos === 0 ? 'week-anchor-pct' : 'week-history') + '" style="color:' + (i === ci ? t.fgc : 'var(--mute)') + '">' + (p[i] == null ? '—' : pct(p[i])) + '</td>';
-    }).join('');
+  /* ---------- expense table: anchor week pinned left, older weeks scroll right as a full history rail ---------- */
+  function mon(i) { return weeks[i].slice(0, 7); }
+  function monthEdge(i, ci) { return i === ci - 1 || mon(i) !== mon(i + 1); }
+  function cellsHtml(rub, p, ci, sign, t, plain) {
+    return '<td class="r week-rub week-anchor">' + (rub[ci] == null ? '' : rubS(sign ? -rub[ci] : rub[ci])) + '</td>' +
+      '<td class="r week-pct week-anchor-pct" style="color:' + (plain ? 'var(--mute)' : t.fgc) + '">' + (plain ? '' : (p[ci] == null ? '—' : pct(p[ci]))) + '</td>';
+  }
+  function histCells(rub, p, ci, sign, plain) {
+    var out = '';
+    for (var i = ci - 1; i >= 0; i--) {
+      out += '<td class="r week-history' + (monthEdge(i, ci) ? ' month-edge' : '') + '">' + (rub[i] == null ? '' : rubS(sign ? -rub[i] : rub[i])) + '</td>' +
+        '<td class="r week-history" style="color:var(--mute);font-size:12px">' + (plain ? '' : (p[i] == null ? '—' : pct(p[i]))) + '</td>';
+    }
+    return out;
   }
   function expRow(o, B, alerts) {
     var ci = B.ci, base = o.base || B.net;
@@ -217,7 +216,7 @@ mountAuthBadge();
       '<td class="r" style="color:var(--mute);padding-inline:10px">' + (n == null ? '—' : pct(n)) + '</td>' +
       '<td class="r" style="padding:5px 10px">' + (have ? '<span class="badge" style="background:' + t.bg + ';color:' + t.fg + '">' + pp(d) + '</span>' : '') + '</td>' +
       '<td class="r" style="font-weight:600;padding-inline:10px;color:' + (have && Math.abs(dR) >= 500 ? t.fg : 'var(--mute2)') + '">' + (have ? (Math.abs(dR) < 500 ? '—' : sgn(dR) + num(dR)) : '') + '</td>' +
-      '<td style="padding:5px 10px">' + sparkHtml(sparkOf(p, ci, t.bar)) + '</td></tr>';
+      histCells(o.rub, p, ci, o.sign, false) + '</tr>';
   }
   function moneyRow(name, v, B, bold, unitsRow) {
     var ci = B.ci, n = avg(idxs(ci - 4, ci - 1).map(function (i) { return v[i]; }));
@@ -226,12 +225,12 @@ mountAuthBadge();
     var per = B.units && B.units[ci] > 0 ? num(v[ci] / B.units[ci]) : '—';
     return '<tr style="background:' + (bold ? 'var(--total)' : '#fff') + ';border-top:1px solid ' + (bold ? '#d9d5ca' : 'var(--soft)') + ';font-weight:' + (bold ? 600 : 400) + '">' +
       '<td class="lft" style="padding-left:10px">' + esc(name) + '</td>' +
-      comparisonIdxs(ci).map(function (i, pos) { return '<td class="r week-rub ' + (pos === 0 ? 'week-anchor' : 'week-history') + '">' + rubS(v[i]) + '</td><td class="r week-pct ' + (pos === 0 ? 'week-anchor-pct' : 'week-history') + '"></td>'; }).join('') +
+      cellsHtml(v, [], ci, false, t, true) +
       '<td class="r" style="padding-inline:10px;border-left:1px solid var(--line)">' + per + '</td>' +
       '<td class="r" style="color:var(--mute);padding-inline:10px">' + (n == null ? '—' : num(n)) + '</td>' +
       '<td class="r" style="padding:5px 10px">' + (n ? '<span class="badge" style="background:' + t.bg + ';color:' + t.fg + '">' + sgn(g) + Math.abs(g).toFixed(1).replace('.', ',') + '%</span>' : '') + '</td>' +
       '<td class="r" style="color:var(--body);padding-inline:10px">' + (n == null ? '' : sgn(v[ci] - n) + num(v[ci] - n)) + '</td>' +
-      '<td style="padding:5px 10px">' + sparkHtml(sparkOf(v, ci, t.bar)) + '</td></tr>';
+      histCells(v, [], ci, false, true) + '</tr>';
   }
   function typeKids(B, g) {
     var set = toSet(B.accs), keys = {}, lbl = {}, m = {};
@@ -267,14 +266,16 @@ mountAuthBadge();
     rows.push(expRow({ name: 'Итого расходы', rub: B.expTot, kind: 'total', noAlert: true }, B, alerts));
     rows.push(expRow({ name: 'Компенсации Ozon (отдельно, вне расходов)' + (ozonOnly(B.accs).length < B.accs.length ? ' · WB не включён' : ''), rub: B.comp, goodUp: true, kind: 'row' }, B, alerts));
     rows.push(expRow({ name: 'К выплате', rub: B.pay, goodUp: true, kind: 'total', noAlert: true }, B, alerts));
-    var compareWeeks = comparisonIdxs(ci);
-    var head = compareWeeks.map(function (i, pos) {
-      return '<th class="r week-rub ' + (pos === 0 ? 'week-anchor' : 'week-history') + '">' + wlabel(weeks[i]) + '<small>' + range(weeks[i]) + (i >= weeks.length - 2 ? ' · предв.' : '') + '</small></th><th class="r week-pct ' + (pos === 0 ? 'week-anchor-pct' : 'week-history') + '">%</th>';
-    }).join('');
+    var anchorHead = '<th class="r week-rub week-anchor">' + wlabel(weeks[ci]) + '<small>' + range(weeks[ci]) + (ci >= weeks.length - 2 ? ' · предв.' : '') + '</small></th><th class="r week-pct week-anchor-pct">%</th>';
+    var histHead = '';
+    for (var hi = ci - 1; hi >= 0; hi--) {
+      var wl = wlabel(weeks[hi]) + '<small>' + range(weeks[hi]) + (hi >= weeks.length - 2 ? ' · предв.' : '') + '</small>';
+      histHead += '<th class="r week-history' + (monthEdge(hi, ci) ? ' month-edge' : '') + '">' + (monthEdge(hi, ci) ? '<span class="mlab">' + MONTHS_FULL[+mon(hi).slice(5) - 1] + '</span>' : '') + wl + '</th><th class="r week-history">%</th>';
+    }
     return '<div class="card"><div class="top"><h2>Расходы по статьям · ₽ и % от чистых продаж</h2>' +
-      '<div class="n">' + wlabel(weeks[Math.max(0, weeks.length - 2)]) + '–' + wlabel(weeks[weeks.length - 1]) + ' предварительные: возвраты и обратная доставка доначисляются до 2 недель · Хранение и компенсации показаны отдельными строками' + (T.length && !B.fromSku ? ' · «Продвижение», «Прочее» и «Хранение» раскрываются по типам начислений Ozon' : '') + '</div></div>' +
-      '<div class="scroll week-scroll"><table class="expense-week-table" style="min-width:' + Math.max(1260, 690 + compareWeeks.length * 168) + 'px;font-size:13.5px"><thead><tr style="border-bottom:1px solid var(--line)"><th class="lft week-article" style="padding-left:10px">Статья</th>' + head +
-      '<th class="r" style="padding-inline:10px;border-left:1px solid var(--line)">На 1 шт<small>' + wlabel(weeks[ci]) + ', ₽</small></th><th class="r" style="padding-inline:10px">Норма<small>4 нед.</small></th><th class="r" style="padding-inline:10px">Δ к норме</th><th class="r" style="padding-inline:10px">Δ, ₽<small>за неделю</small></th><th class="lft">8 недель</th></tr></thead><tbody>' +
+      '<div class="n">' + wlabel(weeks[Math.max(0, weeks.length - 2)]) + '–' + wlabel(weeks[weeks.length - 1]) + ' предварительные: возвраты и обратная доставка доначисляются до 2 недель · Выбранная неделя закреплена слева, предыдущие недели идут правее и листаются · Хранение и компенсации показаны отдельными строками' + (T.length && !B.fromSku ? ' · «Продвижение», «Прочее» и «Хранение» раскрываются по типам начислений Ozon' : '') + '</div></div>' +
+      '<div class="scroll week-scroll" id="weekHistScroll"><table class="expense-week-table" style="min-width:' + Math.max(1260, 690 + ci * 168) + 'px;font-size:13.5px"><thead><tr style="border-bottom:1px solid var(--line)"><th class="lft week-article" style="padding-left:10px">Статья</th>' + anchorHead +
+      '<th class="r" style="padding-inline:10px;border-left:1px solid var(--line)">На 1 шт<small>' + wlabel(weeks[ci]) + ', ₽</small></th><th class="r" style="padding-inline:10px">Норма<small>4 нед.</small></th><th class="r" style="padding-inline:10px">Δ к норме</th><th class="r" style="padding-inline:10px">Δ, ₽<small>за неделю</small></th>' + histHead + '</tr></thead><tbody>' +
       rows.join('') + '</tbody></table></div></div>';
   }
 
@@ -528,7 +529,10 @@ mountAuthBadge();
     h += statusChips();
     h += '<div class="foot">Источник: weekly_ozon_expense_group_v2, weekly_ozon_expense_sku_v2 и ozon_finance_classified_v2' + (accs.some(function (a) { return !isOzon(a); }) ? ', а также weekly_wb_expense_group_v1 (WB: только верхний уровень, без SKU и сверки)' : '') + '; штуки и цена из строк продаж и возвратов, мастер-категории из справочника товаров. Данные в базе по ' + dmon(addDays(weeks[weeks.length - 1], 6)) + '. Подсветка Δ: оранжевый от +0,5 п.п., красный от +1,5 п.п. Цена для нормы: цена × (1 − расходы нормы) / (1 − расходы недели).</div>';
     var fid = document.activeElement && document.activeElement.id;
+    var hs = document.getElementById('weekHistScroll'); var keep = hs ? hs.scrollLeft : null; var wasInit = histInit;
     app.innerHTML = h;
+    hs = document.getElementById('weekHistScroll');
+    if (hs) { if (wasInit && keep != null) hs.scrollLeft = keep; else { hs.scrollLeft = 0; histInit = true; } }
     if (fid) { var el = document.getElementById(fid); if (el && el.focus) el.focus(); }
   }
 

@@ -58,8 +58,6 @@ td{padding:8px 8px;white-space:nowrap}
 .tag{padding:1px 6px;border-radius:5px;font-size:11px;margin-left:4px}
 .tgl{background:transparent;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:6px 0;min-height:36px;font-weight:inherit;text-align:left}
 .tgl .m{color:var(--accent);width:12px}
-.spark{display:flex;align-items:flex-end;gap:3px;height:24px}
-.spark i{display:block;width:6px;border-radius:1px}
 .lnk{background:transparent;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer}
 .chip{height:36px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 12px;cursor:pointer;font-size:14px}
 .more{height:40px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 16px;cursor:pointer;font-weight:600}
@@ -113,3 +111,15 @@ tr.click:hover{background:var(--sub)}
 .expense-week-table tbody tr:hover .week-article,
 .expense-week-table tbody tr:hover .week-anchor,
 .expense-week-table tbody tr:hover .week-anchor-pct{background:inherit}
+
+/* History rail past the anchor week: plain scrolling columns, grouped visually by calendar month. */
+.expense-week-table th.week-history,
+.expense-week-table td.week-history{min-width:84px;border-left:1px solid var(--line2)}
+.expense-week-table th.week-history + th.week-history,
+.expense-week-table td.week-history + td.week-history{min-width:48px;font-size:12px}
+.expense-week-table th.month-edge,
+.expense-week-table td.month-edge{border-left:2px solid var(--line)}
+.mlab{display:block;color:var(--accent);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+@media (max-width:900px){
+  .expense-week-table .week-article,.expense-week-table .week-anchor,.expense-week-table .week-anchor-pct{position:static!important;max-width:none!important}
+}
