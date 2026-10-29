@@ -528,7 +528,7 @@ mountAuthBadge();
     h += payoutsBlock(B);
     h += reconBlock(B);
     h += statusChips();
-    h += '<div class="foot">Источник: weekly_ozon_expense_group_v2, weekly_ozon_expense_sku_v2 и ozon_finance_classified_v2' + (accs.some(function (a) { return !isOzon(a); }) ? ', а также weekly_wb_expense_group_v1 (WB: только верхний уровень, без SKU и сверки)' : '') + '; штуки и цена из строк продаж и возвратов, мастер-категории из справочника товаров. Данные в базе по ' + dmon(addDays(weeks[weeks.length - 1], 6)) + '. Подсветка Δ: оранжевый от +0,5 п.п., красный от +1,5 п.п. Цена для нормы: цена × (1 − расходы нормы) / (1 − расходы недели).</div>';
+    h += '<div class="foot">Источник: Ozon — weekly_ozon_expense_group_v2 / weekly_ozon_expense_sku_v2; WB — weekly_wb_expense_group_v1; Яндекс.Маркет — weekly_yandex_expense_group_v1. Для WB и Яндекс сейчас доступен верхний финансовый уровень без SKU-сверки и мастер-категорий. Данные в базе по ' + dmon(addDays(weeks[weeks.length - 1], 6)) + '. Подсветка Δ: оранжевый от +0,5 п.п., красный от +1,5 п.п.</div>';
     var fid = document.activeElement && document.activeElement.id;
     var hs = document.getElementById('weekHistScroll'); var keep = hs ? hs.scrollLeft : null; var wasInit = histInit;
     app.innerHTML = h;
