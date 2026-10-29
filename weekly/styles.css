@@ -126,6 +126,5 @@ tr.click:hover{background:var(--sub)}
 .expense-week-table th.month-edge,
 .expense-week-table td.month-edge{border-left:2px solid var(--line)}
 .mlab{display:block;color:var(--accent);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-@media (max-width:900px){
-  .expense-week-table .week-article,.expense-week-table .week-anchor,.expense-week-table .week-anchor-pct{position:static!important;max-width:none!important}
-}
+/* Статья и выбранная неделя остаются закреплены слева на любой ширине экрана —
+   это и есть смысл этой таблицы, отключать его на узких окнах не нужно. */
