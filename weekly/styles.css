@@ -58,8 +58,6 @@ td{padding:8px 8px;white-space:nowrap}
 .tag{padding:1px 6px;border-radius:5px;font-size:11px;margin-left:4px}
 .tgl{background:transparent;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:6px 0;min-height:36px;font-weight:inherit;text-align:left}
 .tgl .m{color:var(--accent);width:12px}
-.spark{display:flex;align-items:flex-end;gap:3px;height:24px}
-.spark i{display:block;width:6px;border-radius:1px}
 .lnk{background:transparent;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer}
 .chip{height:36px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 12px;cursor:pointer;font-size:14px}
 .more{height:40px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 16px;cursor:pointer;font-weight:600}
@@ -97,14 +95,20 @@ tr.click:hover{background:var(--sub)}
 .expense-week-table .week-article{
   position:sticky;left:0;z-index:6;min-width:230px;width:230px;max-width:230px;background:inherit;
   box-shadow:1px 0 0 var(--line);
+  overflow:hidden;
 }
+/* Caps the article-name cell's intrinsic (min-content) width so long names/tags can't
+   force the whole sticky column wider than 230px — the fixed width above is otherwise
+   only a hint under table-layout:auto and gets overridden by nowrap content. */
+.expense-week-table .artclip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.expense-week-table .artclip .tgl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;vertical-align:bottom}
 .expense-week-table .week-rub{min-width:106px;width:106px;border-left:1px solid var(--line2)}
 .expense-week-table .week-pct{min-width:62px;width:62px;font-size:12px}
 .expense-week-table .week-anchor{
-  position:sticky;left:230px;z-index:5;background:inherit;border-left:1px solid var(--line);
+  position:sticky;left:var(--art-w,230px);z-index:5;background:inherit;border-left:1px solid var(--line);
 }
 .expense-week-table .week-anchor-pct{
-  position:sticky;left:336px;z-index:5;background:inherit;
+  position:sticky;left:var(--anchor2-left,336px);z-index:5;background:inherit;
   box-shadow:8px 0 12px -12px rgba(30,36,32,.65),1px 0 0 var(--line);
 }
 .expense-week-table thead .week-article,
@@ -113,3 +117,14 @@ tr.click:hover{background:var(--sub)}
 .expense-week-table tbody tr:hover .week-article,
 .expense-week-table tbody tr:hover .week-anchor,
 .expense-week-table tbody tr:hover .week-anchor-pct{background:inherit}
+
+/* History rail past the anchor week: plain scrolling columns, grouped visually by calendar month. */
+.expense-week-table th.week-history,
+.expense-week-table td.week-history{min-width:84px;border-left:1px solid var(--line2)}
+.expense-week-table th.week-history + th.week-history,
+.expense-week-table td.week-history + td.week-history{min-width:48px;font-size:12px}
+.expense-week-table th.month-edge,
+.expense-week-table td.month-edge{border-left:2px solid var(--line)}
+.mlab{display:block;color:var(--accent);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+/* Статья и выбранная неделя остаются закреплены слева на любой ширине экрана —
+   это и есть смысл этой таблицы, отключать его на узких окнах не нужно. */
