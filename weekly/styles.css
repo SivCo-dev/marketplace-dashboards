@@ -95,14 +95,20 @@ tr.click:hover{background:var(--sub)}
 .expense-week-table .week-article{
   position:sticky;left:0;z-index:6;min-width:230px;width:230px;max-width:230px;background:inherit;
   box-shadow:1px 0 0 var(--line);
+  overflow:hidden;
 }
+/* Caps the article-name cell's intrinsic (min-content) width so long names/tags can't
+   force the whole sticky column wider than 230px — the fixed width above is otherwise
+   only a hint under table-layout:auto and gets overridden by nowrap content. */
+.expense-week-table .artclip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.expense-week-table .artclip .tgl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;vertical-align:bottom}
 .expense-week-table .week-rub{min-width:106px;width:106px;border-left:1px solid var(--line2)}
 .expense-week-table .week-pct{min-width:62px;width:62px;font-size:12px}
 .expense-week-table .week-anchor{
-  position:sticky;left:230px;z-index:5;background:inherit;border-left:1px solid var(--line);
+  position:sticky;left:var(--art-w,230px);z-index:5;background:inherit;border-left:1px solid var(--line);
 }
 .expense-week-table .week-anchor-pct{
-  position:sticky;left:336px;z-index:5;background:inherit;
+  position:sticky;left:var(--anchor2-left,336px);z-index:5;background:inherit;
   box-shadow:8px 0 12px -12px rgba(30,36,32,.65),1px 0 0 var(--line);
 }
 .expense-week-table thead .week-article,

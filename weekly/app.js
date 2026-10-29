@@ -207,10 +207,11 @@ mountAuthBadge();
     var bg = o.kind === 'child' ? 'var(--sub)' : (o.kind === 'total' ? 'var(--total)' : '#fff');
     var bt = o.kind === 'total' ? '2px solid var(--ink)' : '1px solid var(--soft)';
     var ind = o.kind === 'child' ? 52 : (o.kind === 'row' ? 26 : 10);
+    var artW = 222 - ind; // keeps article column total width constant (230px content) across indent levels
     var nameCell = o.key ? '<button type="button" class="tgl" data-act="grp" data-k="' + o.key + '"><span class="m">' + (state.open[o.key] ? '▾' : '▸') + '</span>' + esc(o.name) + '</button>' : esc(o.name);
     var per = B.units && B.units[ci] > 0 ? num(o.rub[ci] / B.units[ci]) : '—';
     return '<tr style="background:' + bg + ';border-top:' + bt + ';font-weight:' + (o.kind === 'total' ? 600 : 400) + '">' +
-      '<td class="lft" style="padding-left:' + ind + 'px;color:' + (o.kind === 'child' ? 'var(--body)' : 'var(--ink)') + '">' + nameCell + (o.tag ? ' <span class="tag" style="background:var(--soft);color:var(--mute)">' + esc(o.tag) + '</span>' : '') + '</td>' +
+      '<td class="lft week-article" style="padding-left:' + ind + 'px;color:' + (o.kind === 'child' ? 'var(--body)' : 'var(--ink)') + '"><div class="artclip" style="width:' + artW + 'px">' + nameCell + (o.tag ? ' <span class="tag" style="background:var(--soft);color:var(--mute)">' + esc(o.tag) + '</span>' : '') + '</div></td>' +
       cellsHtml(o.rub, p, ci, o.sign, t) +
       '<td class="r" style="padding-inline:10px;border-left:1px solid var(--line)">' + per + '</td>' +
       '<td class="r" style="color:var(--mute);padding-inline:10px">' + (n == null ? '—' : pct(n)) + '</td>' +
@@ -224,7 +225,7 @@ mountAuthBadge();
     var t = Math.abs(g) < 3 ? tones(0) : (g > 0 ? { bg: 'var(--good-bg)', fg: 'var(--good)', bar: '#2f6b3f' } : { bg: 'var(--warn-bg)', fg: 'var(--warn)', bar: '#c0773f' });
     var per = B.units && B.units[ci] > 0 ? num(v[ci] / B.units[ci]) : '—';
     return '<tr style="background:' + (bold ? 'var(--total)' : '#fff') + ';border-top:1px solid ' + (bold ? '#d9d5ca' : 'var(--soft)') + ';font-weight:' + (bold ? 600 : 400) + '">' +
-      '<td class="lft" style="padding-left:10px">' + esc(name) + '</td>' +
+      '<td class="lft week-article" style="padding-left:10px"><div class="artclip" style="width:212px">' + esc(name) + '</div></td>' +
       cellsHtml(v, [], ci, false, t, true) +
       '<td class="r" style="padding-inline:10px;border-left:1px solid var(--line)">' + per + '</td>' +
       '<td class="r" style="color:var(--mute);padding-inline:10px">' + (n == null ? '—' : num(n)) + '</td>' +
@@ -533,6 +534,18 @@ mountAuthBadge();
     app.innerHTML = h;
     hs = document.getElementById('weekHistScroll');
     if (hs) { if (wasInit && keep != null) hs.scrollLeft = keep; else { hs.scrollLeft = 0; histInit = true; } }
+    // The article and anchor-rub columns' real rendered width can end up wider than their
+    // declared CSS width (table-layout:auto redistributes leftover space), so the sticky
+    // offsets of the following pinned cells are measured, not hardcoded, to stay aligned.
+    var etbl = document.querySelector('.expense-week-table');
+    if (etbl) {
+      var artCell = etbl.querySelector('.week-article'), anchorCell = etbl.querySelector('.week-rub.week-anchor');
+      if (artCell && anchorCell) {
+        var aw = artCell.getBoundingClientRect().width, rw = anchorCell.getBoundingClientRect().width;
+        etbl.style.setProperty('--art-w', aw + 'px');
+        etbl.style.setProperty('--anchor2-left', (aw + rw) + 'px');
+      }
+    }
     if (fid) { var el = document.getElementById(fid); if (el && el.focus) el.focus(); }
   }
 
