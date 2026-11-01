@@ -117,6 +117,8 @@ begin
     raise exception 'incomplete batch: complete=%, manifest rows=%, actual rows=%', p_manifest->'complete', v_expected, v_received;
   end if;
 
+  drop table if exists _src;
+  drop table if exists _changed;
   create temp table _src on commit drop as
   select distinct on (x->>'merchant_order_id')
     x->>'merchant_order_id' as merchant_order_id,
