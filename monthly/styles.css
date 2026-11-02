@@ -59,3 +59,7 @@
 .products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:112px;min-width:112px;max-width:112px}
 
 .products td:not(:first-child){font-size:12px}
+
+.products td:not(:first-child){font-size:13px}
+.products td .cell-delta{width:50px;margin-left:5px;text-align:right}
+.products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:118px;min-width:118px;max-width:118px}
