@@ -49,3 +49,7 @@
 
 .products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:104px;min-width:104px;max-width:104px;padding-left:6px;padding-right:6px}
 .products th.direct-yield-col,.products th.all-expenses-col{white-space:normal;line-height:1.15}
+
+.products .product-link{min-width:178px;max-width:190px}
+.products .product-link small{max-width:118px}
+.products .ops-badge{max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
