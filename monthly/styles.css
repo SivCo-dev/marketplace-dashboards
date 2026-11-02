@@ -57,3 +57,5 @@
 .products td:not(:first-child){font-size:11px}
 .products td .cell-delta{font-size:9px}
 .products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:112px;min-width:112px;max-width:112px}
+
+.products td:not(:first-child){font-size:12px}
