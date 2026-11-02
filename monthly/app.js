@@ -114,13 +114,20 @@ function renderBridge(){
 }
 
 const comparableProductResult=row=>numberOrNull(row?.result_after_cogs)??(numberOrNull(row?.result_without_compensation)==null?null:Number(row.result_without_compensation)+(numberOrNull(row.compensation)??0));
+const previousProduct=row=>previousPayload()?.sku_rows?.find(item=>(row.product_id!=null&&item.product_id===row.product_id)||String(item.canonical_sku)===String(row.canonical_sku));
+const percentChange=(current,previous)=>current==null||previous==null||previous===0?null:(current-previous)/previous*100;
+const soldUnitsValue=row=>numberOrNull(row?.sale_units_display??row?.financial_sale_units);
+const resultWithoutReturnsPerUnit=row=>{
+ const result=numberOrNull(row?.result_without_compensation),netUnits=numberOrNull(row?.financial_net_units);
+ return result==null||netUnits==null||netUnits<=0?null:result/netUnits;
+};
 function productDelta(row){
  if(!comparisonReady())return null;
- const previous=previousPayload()?.sku_rows?.find(item=>(row.product_id!=null&&item.product_id===row.product_id)||String(item.canonical_sku)===String(row.canonical_sku));
- const currentValue=comparableProductResult(row),oldValue=comparableProductResult(previous);
- if(currentValue==null||oldValue==null||oldValue===0)return null;
- return (currentValue-oldValue)/Math.abs(oldValue)*100;
+ return percentChange(resultWithoutReturnsPerUnit(row),resultWithoutReturnsPerUnit(previousProduct(row)));
 }
+const productSalesDelta=row=>comparisonReady()?percentChange(numberOrNull(row?.sales),numberOrNull(previousProduct(row)?.sales)):null;
+const productUnitsDelta=row=>comparisonReady()?percentChange(soldUnitsValue(row),soldUnitsValue(previousProduct(row))):null;
+const deltaMarkup=value=>value==null?'<span class="cell-delta unavailable">—</span>':'<span class="cell-delta '+(value>0?'up':value<0?'down':'flat')+'">'+(value>0?'↑ +':value<0?'↓ −':'→ ')+Math.abs(value).toLocaleString("ru-RU",{maximumFractionDigits:1})+'%</span>';
 
 function focusMembers(source,focus){
  if(focus==="leaders")return [...source].filter(row=>comparableProductResult(row)!=null).sort((a,b)=>comparableProductResult(b)-comparableProductResult(a)).slice(0,12);
@@ -149,7 +156,7 @@ function renderProducts(){
  const rows=filterRows(focused,{search:$("#skuSearch").value,category:$("#categoryFilter").value,focus:"all",sort:$("#sortSelect").value});
  const losses=focusMembers(source,"negative").length,expenseOnlyCount=focusMembers(source,"expense-only").length;
  $("#productAlerts").innerHTML='<button data-focus="negative"><i class="red-dot"></i>Товаров в минусе: '+losses+'</button><button data-focus="expense-only"><i class="amber-dot"></i>Только расходы: '+expenseOnlyCount+'</button>';
- $("#skuBody").innerHTML=rows.map(row=>{const delta=productDelta(row);const soldUnits=Number(row.sale_units_display??row.financial_sale_units??0),returnUnits=Number(row.return_writeoff_units??row.financial_return_units??0),incomeUnits=Number(row.income_units??row.financial_net_units??0),returnPct=soldUnits>0?returnUnits/soldUnits:null,resultMp=Number(row.result_without_compensation??0),comp=Number(row.compensation??0),resultWithComp=resultMp+comp,resultPerUnit=incomeUnits>0?resultMp/incomeUnits:null,resultWithCompPerUnit=incomeUnits>0?resultWithComp/incomeUnits:null,afterCogsPerUnit=incomeUnits>0&&row.result_after_cogs!=null?Number(row.result_after_cogs)/incomeUnits:null;return '<tr><td><button class="product-link" data-sku="'+e(row.canonical_sku)+'"><span class="product-monogram">'+e((row.article||row.canonical_sku||"?").slice(0,2))+'</span><span><strong>'+e(row.article||row.canonical_sku)+'</strong><small>'+e(row.product_name||"Название не передано")+'</small>'+(expenseOnly(row)?'<em>Только расходы</em>':"")+'</span><b>›</b></button></td><td>'+money(row.sales,false)+'</td><td>'+units(soldUnits)+'</td><td>'+units(returnUnits)+'</td><td>'+(returnPct==null?"—":(returnPct*100).toLocaleString("ru-RU",{maximumFractionDigits:1})+"%")+'</td><td>'+money(row.marketplace_expenses,false)+'</td><td class="'+signedClass(row.result_without_compensation)+'">'+money(row.result_without_compensation,false)+'</td><td>'+money(resultPerUnit,false)+'</td><td class="'+(delta==null?"delta-na":delta>=0?"delta-down":"delta-up")+'">'+(delta==null?"—":(delta>0?"↑ +":"↓ −")+Math.abs(delta).toLocaleString("ru-RU",{maximumFractionDigits:1})+"%")+'</td><td>'+money(row.compensation,false)+'</td><td>'+money(resultWithCompPerUnit,false)+'</td><td class="result-col '+signedClass(row.result_after_cogs)+'">'+money(afterCogsPerUnit,false)+'</td></tr>';}).join("");
+ $("#skuBody").innerHTML=rows.map(row=>{const delta=productDelta(row),salesDelta=productSalesDelta(row),unitsDelta=productUnitsDelta(row);const soldUnits=Number(row.sale_units_display??row.financial_sale_units??0),returnUnits=Number(row.return_writeoff_units??row.financial_return_units??0),incomeUnits=Number(row.income_units??row.financial_net_units??0),returnPct=soldUnits>0?returnUnits/soldUnits:null,resultMp=Number(row.result_without_compensation??0),comp=Number(row.compensation??0),resultWithComp=resultMp+comp,resultPerUnit=incomeUnits>0?resultMp/incomeUnits:null,resultWithCompPerUnit=incomeUnits>0?resultWithComp/incomeUnits:null,afterCogsPerUnit=incomeUnits>0&&row.result_after_cogs!=null?Number(row.result_after_cogs)/incomeUnits:null;return '<tr><td><button class="product-link" data-sku="'+e(row.canonical_sku)+'"><span class="product-monogram">'+e((row.article||row.canonical_sku||"?").slice(0,2))+'</span><span><strong>'+e(row.article||row.canonical_sku)+'</strong><small>'+e(row.product_name||"Название не передано")+'</small>'+(expenseOnly(row)?'<em>Только расходы</em>':"")+'</span><b>›</b></button></td><td>'+money(row.sales,false)+deltaMarkup(salesDelta)+'</td><td>'+units(soldUnits)+deltaMarkup(unitsDelta)+'</td><td>'+units(returnUnits)+'</td><td>'+(returnPct==null?"—":(returnPct*100).toLocaleString("ru-RU",{maximumFractionDigits:1})+"%")+'</td><td>'+money(row.marketplace_expenses,false)+'</td><td class="'+signedClass(row.result_without_compensation)+'">'+money(row.result_without_compensation,false)+'</td><td>'+money(resultPerUnit,false)+'</td><td>'+deltaMarkup(delta)+'</td><td>'+money(row.compensation,false)+'</td><td>'+money(resultWithCompPerUnit,false)+'</td><td class="result-col '+signedClass(row.result_after_cogs)+'">'+money(afterCogsPerUnit,false)+'</td></tr>';}).join("");
  $("#skuEmpty").hidden=rows.length>0;
  $text("#skuEmpty",source.length?"Нет товаров по выбранным условиям. Измените поиск или режим анализа.":state.payload?.metadata.finance_data_status==="WAITING_FOR_FINANCE"?"Finance за этот месяц ещё не поступил.":"Для выбранной площадки нет товарных данных.");
 }
