@@ -121,9 +121,13 @@ const yieldUnits=row=>{const value=numberOrNull(row?.income_units??row?.financia
 const netUnitsValue=row=>{const value=numberOrNull(row?.financial_net_units);return value!=null&&value>0?value:null;};
 const perUnit=(amount,count)=>amount==null||count==null||count<=0?null:amount/count;
 const monthClosed=()=>state.payload?.metadata?.marketplace_close_status==="CLOSED";
-const opsReady=row=>numberOrNull(row?.physical_returned_units)!=null||monthClosed();
+const opsReadyIn=(row,payload)=>numberOrNull(row?.physical_returned_units)!=null||payload?.metadata?.marketplace_close_status==="CLOSED";
+const opsReady=row=>opsReadyIn(row,state.payload);
+const deltaUnits=(row,prev)=>opsReadyIn(row,state.payload)&&opsReadyIn(prev,previousPayload())?yieldUnits:netUnitsValue;
+const compareAll=(row,prev)=>{const u=deltaUnits(row,prev);return percentChange(perUnit(numberOrNull(row?.result_without_compensation),u(row)),perUnit(numberOrNull(prev?.result_without_compensation),u(prev)));};
+const compareDirect=(row,prev)=>{const u=deltaUnits(row,prev);return percentChange(perUnit(directResultAmount(row),u(row)),perUnit(directResultAmount(prev),u(prev)));};
 const sumGroups=(row,kind)=>{const values=GROUPS.map(([key])=>numberOrNull(row?.expense_structure?.[kind]?.[key]));return values.every(value=>value==null)?null:values.reduce((sum,value)=>sum+(value??0),0);};
-const splitAvailableFor=payload=>payload?.metadata?.marketplace_close_status==="CLOSED"||Boolean(payload?.sku_rows?.some(row=>{const shared=sumGroups(row,"allocated_shared");return shared!=null&&Math.abs(shared)>0;}));
+const splitAvailableFor=payload=>Boolean(payload?.sku_rows?.some(row=>{const shared=sumGroups(row,"allocated_shared");return shared!=null&&Math.abs(shared)>0;}));
 const splitAvailable=()=>splitAvailableFor(state.payload);
 const directResultAmount=row=>{
  const provided=numberOrNull(row?.direct_net_received);
@@ -135,12 +139,12 @@ const directResultPerUnit=row=>perUnit(directResultAmount(row),yieldUnits(row));
 const allExpensesPerUnit=row=>perUnit(numberOrNull(row?.result_without_compensation),yieldUnits(row));
 function productDelta(row){
  if(!comparisonReady())return null;
- return percentChange(allExpensesPerUnit(row),allExpensesPerUnit(previousProduct(row)));
+ return compareAll(row,previousProduct(row));
 }
 const productSalesDelta=row=>comparisonReady()?percentChange(numberOrNull(row?.sales),numberOrNull(previousProduct(row)?.sales)):null;
 const productUnitsDelta=row=>comparisonReady()?percentChange(soldUnitsValue(row),soldUnitsValue(previousProduct(row))):null;
-const productDirectDelta=row=>comparisonReady()&&splitAvailable()&&splitAvailableFor(previousPayload())?percentChange(directResultPerUnit(row),directResultPerUnit(previousProduct(row))):null;
-const deltaMarkup=(value,approx=false)=>value==null?'<span class="cell-delta unavailable">—</span>':approx?'<span class="cell-delta approx" title="Месяц не закрыт: возвраты, утиль и разнесение общих расходов могут измениться">≈ '+(value>0?'+':value<0?'−':'')+Math.abs(value).toLocaleString("ru-RU",{maximumFractionDigits:1})+'%</span>':'<span class="cell-delta '+(value>0?'up':value<0?'down':'flat')+'">'+(value>0?'↑ +':value<0?'↓ −':'→ ')+Math.abs(value).toLocaleString("ru-RU",{maximumFractionDigits:1})+'%</span>';
+const productDirectDelta=row=>comparisonReady()&&splitAvailable()&&splitAvailableFor(previousPayload())?compareDirect(row,previousProduct(row)):null;
+const deltaMarkup=(value,approx=false)=>value==null?'<span class="cell-delta unavailable">—</span>':approx?'<span class="cell-delta approx" title="Месяц не закрыт: данные могут измениться. Если за один из месяцев нет физических возвратов и утиля, сравнение идёт на чистых единицах">≈ '+(value>0?'+':value<0?'−':'')+Math.abs(value).toLocaleString("ru-RU",{maximumFractionDigits:1})+'%</span>':'<span class="cell-delta '+(value>0?'up':value<0?'down':'flat')+'">'+(value>0?'↑ +':value<0?'↓ −':'→ ')+Math.abs(value).toLocaleString("ru-RU",{maximumFractionDigits:1})+'%</span>';
 
 function focusMembers(source,focus){
  if(focus==="leaders")return [...source].filter(row=>comparableProductResult(row)!=null).sort((a,b)=>comparableProductResult(b)-comparableProductResult(a)).slice(0,12);
