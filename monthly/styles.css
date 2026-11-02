@@ -46,3 +46,6 @@
 .bridge-list b{font-weight:600;white-space:nowrap}.bridge-list small{display:block;margin-top:1px;font-size:8px;color:var(--muted)}
 .bridge-list .total{background:#f5f6f1;margin:0 -8px;padding:6px 8px;border-radius:6px;border-bottom:0}.bridge-list .total b{font-weight:700}
 .bridge-note{margin:6px 0 0;font-size:9px;color:#8a5a14}
+
+.products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:104px;min-width:104px;max-width:104px;padding-left:6px;padding-right:6px}
+.products th.direct-yield-col,.products th.all-expenses-col{white-space:normal;line-height:1.15}
