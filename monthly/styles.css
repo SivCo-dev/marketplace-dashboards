@@ -53,3 +53,7 @@
 .products .product-link{min-width:178px;max-width:190px}
 .products .product-link small{max-width:118px}
 .products .ops-badge{max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.products td:not(:first-child){font-size:11px}
+.products td .cell-delta{font-size:9px}
+.products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:112px;min-width:112px;max-width:112px}
