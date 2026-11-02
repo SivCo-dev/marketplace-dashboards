@@ -73,3 +73,5 @@
 
 .products td .cell-delta{width:50px;margin-left:4px;text-align:left}
 .products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:112px;min-width:112px;max-width:112px}
+
+.products td .cell-delta{width:46px;margin-left:3px;text-align:left}
