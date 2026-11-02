@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.sh; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://tcefrvybgulcwwsdarcw.supabase.co https://esm.sh; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'">
 <title>Monthly — пульт руководителя</title><link rel="stylesheet" href="./styles.css?v=20261031unitkpis4"></head><body>
 <a class="skip" href="#overview">К отчёту</a>
@@ -11,7 +11,7 @@
  <div class="controls">
   <label id="tenantControl">Организация<select id="tenantSelect" aria-label="Организация"></select></label>
   <label>Период<select id="monthSelect" aria-label="Период"></select></label>
-  <label>Сравнение<select id="comparisonSelect" aria-label="Сравнение" disabled><option>Нет сопоставимой истории</option></select></label>
+  <label>Сравнение<select id="comparisonSelect" aria-label="Сравнение"><option>Загружаем месяцы…</option></select></label>
   <label>Маркетплейс<select id="marketSelect" aria-label="Маркетплейс"></select></label>
  </div></div>
 </header>
@@ -36,4 +36,4 @@
 <footer><span>Monthly v2</span><details><summary>Состояние данных</summary><pre id="technicalState">Нет данных</pre></details><span id="footerCoverage">Актуальные данные</span></footer>
 </main>
 <dialog id="productDrawer" aria-labelledby="drawerTitle"><div class="drawer-head"><div><span class="eyebrow">КАРТОЧКА ТОВАРА</span><span id="drawerSku" class="muted"></span></div><button id="drawerClose" class="icon-button" aria-label="Закрыть карточку">✕</button></div><div class="drawer-scroll"><h2 id="drawerTitle"></h2><div id="drawerTabs" class="drawer-tabs" role="group" aria-label="Площадка товара"></div><div id="drawerBody"></div></div></dialog>
-<script type="module" src="./app.js?v=20261031unitkpis4"></script><script type="module" src="./import.js?v=20261012authpathfix1"></script></body></html>
+<script type="module" src="./app.js?v=20261102comparemonth1"></script><script type="module" src="./import.js?v=20261012authpathfix1"></script></body></html>
