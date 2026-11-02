@@ -68,3 +68,5 @@
 .cell-delta.approx.down{color:var(--red)}
 .cell-delta.approx.flat{color:#92988f}
 .products td .cell-delta{font-size:10px;font-weight:400;width:56px}
+
+.products .product-toolbar{margin:12px 0 8px auto;width:min(620px,100%)}
