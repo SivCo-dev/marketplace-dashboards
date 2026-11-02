@@ -70,3 +70,6 @@
 .products td .cell-delta{font-size:10px;font-weight:400;width:56px}
 
 .products .product-toolbar{margin:12px 0 8px auto;width:min(620px,100%)}
+
+.products td .cell-delta{width:50px;margin-left:4px;text-align:left}
+.products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:112px;min-width:112px;max-width:112px}
