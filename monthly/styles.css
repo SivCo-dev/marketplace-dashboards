@@ -63,3 +63,8 @@
 .products td:not(:first-child){font-size:13px}
 .products td .cell-delta{width:50px;margin-left:5px;text-align:right}
 .products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:118px;min-width:118px;max-width:118px}
+
+.cell-delta.approx.up{color:var(--green)}
+.cell-delta.approx.down{color:var(--red)}
+.cell-delta.approx.flat{color:#92988f}
+.products td .cell-delta{font-size:10px;font-weight:400;width:56px}
