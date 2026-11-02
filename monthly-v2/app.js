@@ -7,7 +7,7 @@ const authedFetch=makeAuthedFetch();
 mountAuthBadge();
 
 const $=s=>document.querySelector(s);
-const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all"};
+const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all",comparisonMonth:null};
 const query=new URLSearchParams(location.search);
 const EXPENSE_ORDER=[["commission","Комиссия"],["promotion","Продвижение"],["logistics","Логистика"],["other","Прочее"],["storage","Хранение"]];
 const $text=(selector,value)=>{$(selector).textContent=value;};
@@ -18,11 +18,13 @@ const signedClass=v=>numberOrNull(v)==null?"":Number(v)<0?"negative":"positive";
 const dateText=v=>v?new Date(v).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Moscow"})+" МСК":"—";
 const clamp=v=>Math.max(0,Math.min(100,numberOrNull(v)??0));
 const previousMonth=value=>{const[y,m]=value.split("-").map(Number);return new Date(Date.UTC(y,m-2,1)).toISOString().slice(0,7);};
-const previousPayload=()=>selectPayload(state.bundle,tenant(),previousMonth(month()),state.market);
-const comparisonReady=()=>Boolean(state.payload&&previousPayload()&&state.payload.metadata.marketplace_close_status==="CLOSED"&&previousPayload().metadata.marketplace_close_status==="CLOSED");
+const comparisonCandidates=()=>MONTHS.filter(value=>value<month());
+const comparisonMonth=()=>state.comparisonMonth;
+const previousPayload=()=>selectPayload(state.bundle,tenant(),comparisonMonth(),state.market);
+const comparisonReady=()=>{const previous=previousPayload();return Boolean(state.payload&&previous&&state.payload.metadata.data_available!==false&&previous.metadata.data_available!==false&&previous.metadata.marketplace_close_status==="CLOSED");};
 const metricRate=(p,key)=>rate(p?.financial_economics?.[key],p?.financial_economics?.sales);
 
-function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);history.replaceState(null,"",url);}
+function updateUrl(){const url=new URL(location.href);url.searchParams.set("tenant",tenant());url.searchParams.set("month",month());url.searchParams.set("marketplace",state.market);if(comparisonMonth())url.searchParams.set("compare",comparisonMonth());else url.searchParams.delete("compare");history.replaceState(null,"",url);}
 
 function availableMarkets(){
  const consolidated=selectPayload(state.bundle,tenant(),month(),"ALL");
@@ -34,9 +36,11 @@ function renderHeader(){
  $text("#pageTitle",(TENANTS[tenant()]?.label??tenant())+" · "+monthLabel(month()).replace(/^./,c=>c.toUpperCase()));
  $text("#monthStatus",p?(m.marketplace_close_status==="CLOSED"?"Закрыт · ревизия "+m.base_close_revision:m.marketplace_close_status==="LIVE"?"LIVE · текущий месяц":"Нет данных"):"Нет данных");
  $("#monthStatus").className="status-pill "+(m.marketplace_close_status==="CLOSED"?"closed":m.marketplace_close_status==="LIVE"?"live":"empty");
- const ready=comparisonReady(),prev=previousMonth(month());
- $("#comparisonSelect").innerHTML='<option>'+(ready?"к "+shortMonth(prev):"Нет сопоставимой истории")+'</option>';
- $("#comparisonSelect").disabled=!ready;
+ const candidates=comparisonCandidates();
+ if(!candidates.includes(comparisonMonth()))state.comparisonMonth=candidates[0]??null;
+ $("#comparisonSelect").innerHTML=candidates.length?candidates.map(value=>'<option value="'+value+'">к '+e(shortMonth(value))+'</option>').join(""):'<option value="">Нет предыдущих месяцев</option>';
+ $("#comparisonSelect").value=comparisonMonth()??"";
+ $("#comparisonSelect").disabled=!candidates.length;
  const marketLabel=MARKETPLACES.find(item=>item.id===state.market)?.label??state.market;
  $text("#bridgeMarket",state.market==="ALL"?(available.length>1?"Все площадки":MARKETPLACES.find(item=>item.id===available[0])?.label??"Все площадки"):marketLabel);
  $text("#footerCoverage",state.market==="ALL"?(available.length?"Доступно: "+available.map(id=>MARKETPLACES.find(item=>item.id===id)?.label??id).join(" · "):"Нет доступных площадок"):(p?"Данные: "+marketLabel:"Площадка не подключена"));
@@ -81,8 +85,8 @@ function renderAllocation(){
 function renderComparison(){
  const p=state.payload,prev=previousPayload(),ready=comparisonReady();
  const rows=[["Комиссия","commission"],["Продвижение","promotion"],["Логистика","logistics"],["Возвраты","returns"],["Результат МП","result_without_compensation"]];
- const previousLabel=ready?shortMonth(previousMonth(month())):"Прошлый месяц";
- $("#comparisonTable").innerHTML='<table class="comparison-table"><thead><tr><th>Показатель</th><th>'+e(previousLabel)+'</th><th>'+e(shortMonth(month()))+'</th><th>Изменение</th></tr></thead><tbody>'+rows.map(([label,key])=>{const current=metricRate(p,key),old=metricRate(prev,key),delta=ready?deltaText(current,old,"pp"):"—";return '<tr><td>'+e(label)+'</td><td>'+(ready?pct(old):"—")+'</td><td>'+pct(current)+'</td><td class="'+(delta.startsWith("↑")?"delta-up":delta.startsWith("↓")?"delta-down":"delta-na")+'">'+e(delta)+'</td></tr>';}).join("")+'</tbody></table>'+(ready?"":'<p class="comparison-empty">Сравнение включится автоматически, когда API передаст сопоставимый закрытый месяц.</p>');
+ const previousLabel=ready?shortMonth(comparisonMonth()):"Выбранный месяц";
+ $("#comparisonTable").innerHTML='<table class="comparison-table"><thead><tr><th>Показатель</th><th>'+e(previousLabel)+'</th><th>'+e(shortMonth(month()))+'</th><th>Изменение</th></tr></thead><tbody>'+rows.map(([label,key])=>{const current=metricRate(p,key),old=metricRate(prev,key),delta=ready?deltaText(current,old,"pp"):"—";return '<tr><td>'+e(label)+'</td><td>'+(ready?pct(old):"—")+'</td><td>'+pct(current)+'</td><td class="'+(delta.startsWith("↑")?"delta-up":delta.startsWith("↓")?"delta-down":"delta-na")+'">'+e(delta)+'</td></tr>';}).join("")+'</tbody></table>'+(ready?"":'<p class="comparison-empty">Для выбранного месяца сравнения нет закрытых сопоставимых данных.</p>');
 }
 
 function renderExpenses(){
@@ -201,13 +205,17 @@ $("#marketSelect").innerHTML=MARKETPLACES.map(item=>'<option value="'+item.id+'"
 $("#tenantSelect").value=TENANTS[query.get("tenant")]?query.get("tenant"):"W";
 $("#monthSelect").value=MONTHS.includes(query.get("month"))?query.get("month"):"2026-09";
 state.market=MARKETPLACES.some(item=>item.id===query.get("marketplace"))?query.get("marketplace"):"ALL";
+state.comparisonMonth=MONTHS.includes(query.get("compare"))&&query.get("compare")<month()?query.get("compare"):(comparisonCandidates()[0]??null);
 $("#marketSelect").value=state.market;
 let loader;
 async function ensureSelection(){
- await loader.loadTenant(tenant(),[month(),previousMonth(month())]);
- if(state.market!=="ALL")await Promise.allSettled([loader.loadScope(tenant(),month(),state.market),loader.loadScope(tenant(),previousMonth(month()),state.market)]);
+ const months=[month(),comparisonMonth()].filter(Boolean);
+ await loader.loadTenant(tenant(),months);
+ if(state.market!=="ALL")await Promise.allSettled(months.map(value=>loader.loadScope(tenant(),value,state.market)));
 }
-for(const id of ["#tenantSelect","#monthSelect"])$(id).addEventListener("change",async()=>{state.focus="all";render();await ensureSelection();render();});
+$("#tenantSelect").addEventListener("change",async()=>{state.focus="all";render();await ensureSelection();render();});
+$("#monthSelect").addEventListener("change",async()=>{state.focus="all";state.comparisonMonth=comparisonCandidates()[0]??null;render();await ensureSelection();render();});
+$("#comparisonSelect").addEventListener("change",async()=>{state.focus="all";state.comparisonMonth=$("#comparisonSelect").value||null;render();await ensureSelection();render();});
 $("#marketSelect").addEventListener("change",async()=>{state.market=$("#marketSelect").value;state.focus="all";render();await ensureSelection();render();});
 $("#skuSearch").addEventListener("input",renderProducts);
 for(const id of ["#categoryFilter","#sortSelect"])$(id).addEventListener("change",renderProducts);
