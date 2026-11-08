@@ -1,0 +1,1737 @@
+{
+  "captured_at": "2026-11-08",
+  "workflow_id": "eCbJrROiffWmLjlM",
+  "name": "Ozon | Ads SKU Daily (Performance, W + CPR)",
+  "draft_version_id": "b4ba485c-30c1-49d7-afd1-f2f5266edf57",
+  "published_version_id": "241acda4-c2fb-4459-8c3e-291e01517547",
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "PcRGtV7JLo5D6kls",
+    "timezone": "Europe/Moscow",
+    "executionTimeout": 300,
+    "binaryMode": "separate"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 25 11 * * *"
+            }
+          ]
+        }
+      },
+      "id": "4cc6286c-a642-45c0-b413-b7a3a123329a",
+      "name": "Daily 11:25 MSK",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/token",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "id": "3e5a1017-ab67-454f-b9f9-abe8fdf379eb",
+      "name": "W | Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        224,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "Zl3PnReV2WAKzaDM",
+          "name": "Ozon W Perfomance"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api-performance.ozon.ru/api/client/campaign",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('W | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5b01885f-8925-42b9-b962-4482b63f98d2",
+      "name": "W | Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+      },
+      "id": "6d4d9cc1-3ffe-4ef9-82de-32dd5e32ff5a",
+      "name": "W | Pick SKU campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('W | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "843ee795-eab8-48c3-95c3-9ac5ec92e5f7",
+      "name": "W | SKU stats yesterday",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$('W | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'W',cabinet:'W',report_date:String(v.date||p.day),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+      },
+      "id": "95dd4258-9867-4da5-861c-250f326a830a",
+      "name": "W | Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();",
+        "options": {}
+      },
+      "id": "75ec0ec6-0f9d-49a1-8ede-45ff958bb3ca",
+      "name": "W | Save",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1328,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "t5iYzMG6rhAIC4Rt",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/token",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "id": "e1752e0f-689c-4806-a255-7fc43c5b31bf",
+      "name": "CPR | Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        224,
+        224
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "p3vx2nyijDwFnDyo",
+          "name": "Ozon perfomance CPR"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api-performance.ozon.ru/api/client/campaign",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CPR | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8fed14e9-2df5-473f-b014-2817280f8aed",
+      "name": "CPR | Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        448,
+        224
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+      },
+      "id": "6f87f519-8a0a-4bc0-8d89-491a3eca869e",
+      "name": "CPR | Pick SKU campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CPR | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "ccf38cf7-c766-4612-9034-78af795344a8",
+      "name": "CPR | SKU stats yesterday",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        224
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$('CPR | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'CPR',cabinet:'CPR',report_date:String(v.date||p.day),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+      },
+      "id": "7343ff03-1bac-4a67-b24a-b1830edb125b",
+      "name": "CPR | Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();",
+        "options": {}
+      },
+      "id": "c42828f0-c498-4e93-b33b-4df2a827cecb",
+      "name": "CPR | Save",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1328,
+        224
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "t5iYzMG6rhAIC4Rt",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "7dfb2233-f0c9-443e-a132-2a5c6c75e0e3",
+      "name": "Manual Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/token",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "id": "b4358e03-8944-433b-9708-5d5a4e567250",
+      "name": "ORANGE BOND | Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        624
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "6h35sjUdLNgAlxmZ",
+          "name": "BOND Ozon Perf"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/token",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "id": "493670f8-8781-4eda-8bff-3397b8953ef9",
+      "name": "ORANGE IPCH | Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        768
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "F8kZt7ELIc3temsb",
+          "name": "IPCH Ozon PERF"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/token",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "id": "efb073c7-de85-43ef-a443-6ac8cd4c8aac",
+      "name": "ORANGE IPT | Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        912
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "DGfJKyJ003WOmjoL",
+          "name": "IPT OZON PERF"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/token",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {}
+      },
+      "id": "9261bc5d-9828-4f9a-b33d-3e14ceb84db6",
+      "name": "ORANGE PSK | Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1104,
+        1040
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "gQmPHlYIZzsHkVtG",
+          "name": "PSK OZON PERF"
+        }
+      }
+    },
+    {
+      "id": "4affb1c8-48a4-4512-8e81-6aad505357b1",
+      "name": "ORANGE BOND | Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        620
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api-performance.ozon.ru/api/client/campaign",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE BOND | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1d0ef072-0216-4c84-8fa9-7a343d92ffa8",
+      "name": "ORANGE BOND | Pick SKU campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+      }
+    },
+    {
+      "id": "755efa6f-85b1-4224-b955-5dd34e470fd0",
+      "name": "ORANGE BOND | SKU stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1820,
+        620
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE BOND | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "c70bdca3-6ae4-4bb4-bf10-7e2022757ffc",
+      "name": "ORANGE BOND | Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$('ORANGE BOND | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'ORANGE',cabinet:'BOND',report_date:String(v.date||p.dateTo),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+      }
+    },
+    {
+      "id": "1399d522-fa73-4f12-bba0-a35251223ac6",
+      "name": "ORANGE BOND | Save",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2300,
+        620
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "t5iYzMG6rhAIC4Rt",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "id": "b7776ba9-338e-4b18-af8b-d03a6e569514",
+      "name": "ORANGE IPCH | Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        760
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api-performance.ozon.ru/api/client/campaign",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE IPCH | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "30e2c8a3-d6fa-4274-9ccb-a3fa100b1090",
+      "name": "ORANGE IPCH | Pick SKU campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+      }
+    },
+    {
+      "id": "48dbc79a-0656-425c-8816-de12b36a1b14",
+      "name": "ORANGE IPCH | SKU stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1820,
+        760
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE IPCH | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "ab870f4d-0a7e-4e59-8afa-438abcb9a00f",
+      "name": "ORANGE IPCH | Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        760
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$('ORANGE IPCH | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'ORANGE',cabinet:'IPCH',report_date:String(v.date||p.dateTo),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+      }
+    },
+    {
+      "id": "a7fd692e-e3be-435c-a705-907296d7140a",
+      "name": "ORANGE IPCH | Save",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2300,
+        760
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "t5iYzMG6rhAIC4Rt",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "id": "905be484-2920-41d2-974a-efde506973ce",
+      "name": "ORANGE IPT | Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        900
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api-performance.ozon.ru/api/client/campaign",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE IPT | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d7bd0cb4-bae5-49ba-9566-2a41abb40a4f",
+      "name": "ORANGE IPT | Pick SKU campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        900
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+      }
+    },
+    {
+      "id": "a0fbf5cf-5b88-46f5-8bb3-fd3274666ea9",
+      "name": "ORANGE IPT | SKU stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1820,
+        900
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE IPT | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "38a6afa7-8d46-4014-b0dd-f2f482f15c08",
+      "name": "ORANGE IPT | Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        900
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$('ORANGE IPT | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'ORANGE',cabinet:'Market IPT',report_date:String(v.date||p.dateTo),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+      }
+    },
+    {
+      "id": "6ed654eb-e193-47ae-881a-bc34759e2a11",
+      "name": "ORANGE IPT | Save",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2300,
+        900
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "t5iYzMG6rhAIC4Rt",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "id": "0deeda46-e28f-4bf8-82b4-8f44094229e6",
+      "name": "ORANGE PSK | Campaigns",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        1040
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api-performance.ozon.ru/api/client/campaign",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE PSK | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "95a1ddd5-c537-4240-81bc-b3eff573c215",
+      "name": "ORANGE PSK | Pick SKU campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        1040
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+      }
+    },
+    {
+      "id": "918b8bd9-5009-49b5-8a38-28a3ac70645e",
+      "name": "ORANGE PSK | SKU stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1820,
+        1040
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('ORANGE PSK | Token').first().json.access_token }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "64ea50ea-5ab5-4392-85d4-bfbd84ddeb89",
+      "name": "ORANGE PSK | Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        1040
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p=$('ORANGE PSK | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'ORANGE',cabinet:'PSK',report_date:String(v.date||p.dateTo),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+      }
+    },
+    {
+      "id": "5de7a198-c704-4e19-a177-d135b2242e2c",
+      "name": "ORANGE PSK | Save",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2300,
+        1040
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "t5iYzMG6rhAIC4Rt",
+          "name": "Postgres account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 11:25 MSK": {
+      "main": [
+        [
+          {
+            "node": "W | Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W | Token": {
+      "main": [
+        [
+          {
+            "node": "W | Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W | Campaigns": {
+      "main": [
+        [
+          {
+            "node": "W | Pick SKU campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W | Pick SKU campaigns": {
+      "main": [
+        [
+          {
+            "node": "W | SKU stats yesterday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W | SKU stats yesterday": {
+      "main": [
+        [
+          {
+            "node": "W | Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W | Normalize": {
+      "main": [
+        [
+          {
+            "node": "W | Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W | Save": {
+      "main": [
+        [
+          {
+            "node": "CPR | Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPR | Token": {
+      "main": [
+        [
+          {
+            "node": "CPR | Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPR | Campaigns": {
+      "main": [
+        [
+          {
+            "node": "CPR | Pick SKU campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPR | Pick SKU campaigns": {
+      "main": [
+        [
+          {
+            "node": "CPR | SKU stats yesterday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPR | SKU stats yesterday": {
+      "main": [
+        [
+          {
+            "node": "CPR | Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPR | Normalize": {
+      "main": [
+        [
+          {
+            "node": "CPR | Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Run": {
+      "main": [
+        [
+          {
+            "node": "W | Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE BOND | Token": {
+      "main": [
+        [
+          {
+            "node": "ORANGE BOND | Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE BOND | Campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE BOND | Pick SKU campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE BOND | Pick SKU campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE BOND | SKU stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE BOND | SKU stats": {
+      "main": [
+        [
+          {
+            "node": "ORANGE BOND | Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE BOND | Normalize": {
+      "main": [
+        [
+          {
+            "node": "ORANGE BOND | Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPCH | Token": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPCH | Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPCH | Campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPCH | Pick SKU campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPCH | Pick SKU campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPCH | SKU stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPCH | SKU stats": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPCH | Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPCH | Normalize": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPCH | Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPT | Token": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPT | Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPT | Campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPT | Pick SKU campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPT | Pick SKU campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPT | SKU stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPT | SKU stats": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPT | Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPT | Normalize": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPT | Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE PSK | Token": {
+      "main": [
+        [
+          {
+            "node": "ORANGE PSK | Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE PSK | Campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE PSK | Pick SKU campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE PSK | Pick SKU campaigns": {
+      "main": [
+        [
+          {
+            "node": "ORANGE PSK | SKU stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE PSK | SKU stats": {
+      "main": [
+        [
+          {
+            "node": "ORANGE PSK | Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE PSK | Normalize": {
+      "main": [
+        [
+          {
+            "node": "ORANGE PSK | Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPR | Save": {
+      "main": [
+        [
+          {
+            "node": "ORANGE BOND | Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE BOND | Save": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPCH | Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPCH | Save": {
+      "main": [
+        [
+          {
+            "node": "ORANGE IPT | Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ORANGE IPT | Save": {
+      "main": [
+        [
+          {
+            "node": "ORANGE PSK | Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "activeVersion": {
+    "sameAsDraft": false,
+    "nodes": [
+      {
+        "id": "4cc6286c-a642-45c0-b413-b7a3a123329a",
+        "name": "Daily 11:25 MSK",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 25 11 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "3e5a1017-ab67-454f-b9f9-abe8fdf379eb",
+        "name": "W | Token",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          220,
+          0
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api-performance.ozon.ru/api/client/token",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpCustomAuth"
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000,
+        "credentials": {
+          "httpCustomAuth": {
+            "id": "Zl3PnReV2WAKzaDM",
+            "name": "Ozon W Perfomance"
+          }
+        }
+      },
+      {
+        "id": "5b01885f-8925-42b9-b962-4482b63f98d2",
+        "name": "W | Campaigns",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          440,
+          0
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api-performance.ozon.ru/api/client/campaign",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('W | Token').first().json.access_token }}"
+              },
+              {
+                "name": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000
+      },
+      {
+        "id": "6d4d9cc1-3ffe-4ef9-82de-32dd5e32ff5a",
+        "name": "W | Pick SKU campaigns",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          660,
+          0
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "language": "javaScript",
+          "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+        }
+      },
+      {
+        "id": "843ee795-eab8-48c3-95c3-9ac5ec92e5f7",
+        "name": "W | SKU stats yesterday",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          880,
+          0
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('W | Token').first().json.access_token }}"
+              },
+              {
+                "name": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "json",
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.body) }}"
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "95dd4258-9867-4da5-861c-250f326a830a",
+        "name": "W | Normalize",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1100,
+          0
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "language": "javaScript",
+          "jsCode": "const p=$('W | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'W',cabinet:'W',report_date:String(v.date||p.day),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+        }
+      },
+      {
+        "id": "75ec0ec6-0f9d-49a1-8ede-45ff958bb3ca",
+        "name": "W | Save",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1320,
+          0
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "t5iYzMG6rhAIC4Rt",
+            "name": "Postgres account 2"
+          }
+        }
+      },
+      {
+        "id": "e1752e0f-689c-4806-a255-7fc43c5b31bf",
+        "name": "CPR | Token",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          220,
+          220
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api-performance.ozon.ru/api/client/token",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpCustomAuth"
+        },
+        "executeOnce": true,
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000,
+        "credentials": {
+          "httpCustomAuth": {
+            "id": "p3vx2nyijDwFnDyo",
+            "name": "Ozon perfomance CPR"
+          }
+        }
+      },
+      {
+        "id": "8fed14e9-2df5-473f-b014-2817280f8aed",
+        "name": "CPR | Campaigns",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          440,
+          220
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api-performance.ozon.ru/api/client/campaign",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('CPR | Token').first().json.access_token }}"
+              },
+              {
+                "name": "Accept",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000
+      },
+      {
+        "id": "6f87f519-8a0a-4bc0-8d89-491a3eca869e",
+        "name": "CPR | Pick SKU campaigns",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          660,
+          220
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "language": "javaScript",
+          "jsCode": "const list=($input.first().json.list)||[];\nconst sku=list.filter(c=>c.advObjectType==='SKU'&&c.state!=='CAMPAIGN_STATE_ARCHIVED');\nconst titles={};for(const c of sku)titles[String(c.id)]={title:c.title,payment:c.PaymentType||'CPC'};\nconst day=$now.setZone('Europe/Moscow').minus({days:1}).toISODate();\nreturn [{json:{body:{campaignIds:sku.map(c=>String(c.id)),dateFrom:day,dateTo:day},titles,day,campaigns:sku.length}}];"
+        }
+      },
+      {
+        "id": "ccf38cf7-c766-4612-9034-78af795344a8",
+        "name": "CPR | SKU stats yesterday",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          880,
+          220
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api-performance.ozon.ru/api/client/statistics/products/sku",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $('CPR | Token').first().json.access_token }}"
+              },
+              {
+                "name": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "json",
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.body) }}"
+        },
+        "retryOnFail": true,
+        "maxTries": 3,
+        "waitBetweenTries": 5000,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "7343ff03-1bac-4a67-b24a-b1830edb125b",
+        "name": "CPR | Normalize",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1100,
+          220
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "language": "javaScript",
+          "jsCode": "const p=$('CPR | Pick SKU campaigns').first().json;const r=$input.first().json||{};const src=Array.isArray(r.rows)?r.rows:[];const num=v=>{if(v===null||v===undefined||v==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};\nconst rows=src.filter(v=>/^\\d+$/.test(String(v.sku))&&/^\\d+$/.test(String(v.campaignId))).map(v=>({tenant_id:'CPR',cabinet:'CPR',report_date:String(v.date||p.day),campaign_id:String(v.campaignId),campaign_title:(p.titles[String(v.campaignId)]||{}).title||null,payment_type:(p.titles[String(v.campaignId)]||{}).payment||'CPC',sku:String(v.sku),views:num(v.views),clicks:num(v.clicks),to_cart:num(v.toCart),orders:num(v.orders),sales:num(v.sales),expense:num(v.expense),average_cpc:num(v.avgCpc),ctr:num(v.ctr),drr:num(v.drr)}));\nreturn [{json:{rows,row_count:rows.length,campaigns:p.campaigns,api_error:r.error?String(r.error.message||r.error):null}}];"
+        }
+      },
+      {
+        "id": "c42828f0-c498-4e93-b33b-4df2a827cecb",
+        "name": "CPR | Save",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1320,
+          220
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "insert into public.ozon_ads_sku_daily_v1 (tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,captured_at)\nselect tenant_id,cabinet,report_date,campaign_id,campaign_title,payment_type,sku,views,clicks,to_cart,orders,sales,expense,average_cpc,ctr,drr,now()\nfrom jsonb_to_recordset($ozads${{ JSON.stringify($json.rows) }}$ozads$::jsonb) as x(tenant_id text,cabinet text,report_date date,campaign_id bigint,campaign_title text,payment_type text,sku text,views numeric,clicks numeric,to_cart numeric,orders numeric,sales numeric,expense numeric,average_cpc numeric,ctr numeric,drr numeric)\non conflict (tenant_id,cabinet,report_date,campaign_id,sku) do update set campaign_title=excluded.campaign_title,payment_type=excluded.payment_type,views=excluded.views,clicks=excluded.clicks,to_cart=excluded.to_cart,orders=excluded.orders,sales=excluded.sales,expense=excluded.expense,average_cpc=excluded.average_cpc,ctr=excluded.ctr,drr=excluded.drr,captured_at=now();"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "t5iYzMG6rhAIC4Rt",
+            "name": "Postgres account 2"
+          }
+        }
+      },
+      {
+        "id": "7dfb2233-f0c9-443e-a132-2a5c6c75e0e3",
+        "name": "Manual Run",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          200
+        ],
+        "parameters": {}
+      }
+    ],
+    "connections": {
+      "Daily 11:25 MSK": {
+        "main": [
+          [
+            {
+              "node": "W | Token",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "W | Token": {
+        "main": [
+          [
+            {
+              "node": "W | Campaigns",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "W | Campaigns": {
+        "main": [
+          [
+            {
+              "node": "W | Pick SKU campaigns",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "W | Pick SKU campaigns": {
+        "main": [
+          [
+            {
+              "node": "W | SKU stats yesterday",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "W | SKU stats yesterday": {
+        "main": [
+          [
+            {
+              "node": "W | Normalize",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "W | Normalize": {
+        "main": [
+          [
+            {
+              "node": "W | Save",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "W | Save": {
+        "main": [
+          [
+            {
+              "node": "CPR | Token",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CPR | Token": {
+        "main": [
+          [
+            {
+              "node": "CPR | Campaigns",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CPR | Campaigns": {
+        "main": [
+          [
+            {
+              "node": "CPR | Pick SKU campaigns",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CPR | Pick SKU campaigns": {
+        "main": [
+          [
+            {
+              "node": "CPR | SKU stats yesterday",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CPR | SKU stats yesterday": {
+        "main": [
+          [
+            {
+              "node": "CPR | Normalize",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CPR | Normalize": {
+        "main": [
+          [
+            {
+              "node": "CPR | Save",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Manual Run": {
+        "main": [
+          [
+            {
+              "node": "W | Token",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": []
+  }
+}
