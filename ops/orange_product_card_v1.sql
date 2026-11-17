@@ -12,3 +12,10 @@
 -- Ozon offer_id can carry a variant suffix (e.g. Ri-50TUW+RA+P11, +P01, +M26) while the canonical SKU has none.
 -- Stock rows are now mapped to the canonical SKU (exact match first, else strip /\+[A-Za-z]+[0-9]+$/ if that canonical exists),
 -- in both get_orange_stock_summary_v1 and the stock block of get_orange_product_card_for_user_v1 (variants kept per offer_id).
+
+-- CORRECTION (migration orange_stock_map_by_ozon_sku): the suffix-stripping rule above was wrong and is superseded.
+-- Canonical mapping of Ozon rows is by Ozon numeric sku -> core.orange_identity_source_map_v2 (marketplace='OZON'),
+-- falling back to offer_id only when no id match. Example: canonical Ri-50TUW+RA sits in Ozon as offer_id 'Ri-50TU+RA_NEW'
+-- (sku 2229759143, 111 pcs FBS); offer 'Ri-50TUW+RA+P11' belongs to canonical 'Ri-50TUW+RA-P11-021'.
+-- Applies to stock, orders (30d units/orders) and Ozon price history in get_orange_product_card_for_user_v1,
+-- and to get_orange_stock_summary_v1. Result: all 3272 current offers map to a canonical (96 under a different name).
