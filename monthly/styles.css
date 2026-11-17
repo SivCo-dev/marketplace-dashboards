@@ -75,3 +75,48 @@
 .products th.direct-yield-col,.products td.direct-yield-col,.products th.all-expenses-col,.products td.all-expenses-col{width:112px;min-width:112px;max-width:112px}
 
 .products td .cell-delta{width:46px;margin-left:3px;text-align:left}
+
+/* Orange product card (oc-*). Applied only when the Orange tenant is open. */
+dialog.oc-dialog{width:min(1040px,calc(100vw - 32px));height:min(92dvh,1000px);max-height:92dvh}
+dialog.oc-dialog #drawerTitle,dialog.oc-dialog #drawerTabs{display:none}
+.oc{--oc-card:#fffefa;--oc-text:var(--ink);--oc-sec:var(--muted);--oc-accent:#314b3c;--oc-pos:#16835b;--oc-neg:#c65543;--oc-warn:#d28b24;font-size:13px;color:var(--ink)}
+.oc-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.oc-photo{width:52px;height:52px;border-radius:10px;border:1px dashed #c9c8bd;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);background:#f7f6ef}
+.oc-name{font-weight:600;font-size:16px;line-height:1.3}
+.oc-l{font-size:11px;color:var(--muted)}.oc-top{margin-top:8px}.oc-m0{margin:0}.oc-gap{margin-top:12px}
+.oc-nd{color:#9aa39b}.oc-up,.oc-pos{color:var(--green)}.oc-dn{color:var(--red)}.oc-sm{font-size:12px;line-height:1.5;margin-top:4px}
+.oc-filters{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.oc-filters label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}
+.oc-filters select{font-size:12px;height:30px;min-width:120px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);padding:0 8px}
+.oc-static{font-size:12px;height:30px;display:flex;align-items:center;color:var(--ink);padding:0 4px;font-weight:600}
+.oc-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.oc-pill{font-size:11px;padding:1px 7px;border-radius:6px;white-space:nowrap;display:inline-block;font-weight:400}
+.oc-pu{background:#e8f3e9;color:#0f6a49}.oc-pd{background:#fae9e5;color:#a8412f}.oc-pw{background:#f8efdc;color:#8a5a12}.oc-pn{background:#efeee6;color:#5f6a61}
+.oc-note{background:#f8efdc;color:#8a5a12;border-radius:8px;padding:6px 10px;font-size:12px;margin-bottom:10px}
+.oc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
+.oc-k{background:#f6f5ee;border-radius:10px;padding:10px 12px;border:1px solid transparent;text-align:left}
+.oc-kb{font:inherit;color:inherit;cursor:pointer;border-color:#cfd8cf}.oc-kb:hover{background:#eef2ea}
+.oc-v{font-size:18px;margin:2px 0 4px}
+.oc-tabs{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0}
+.oc-tab{border:0;background:transparent;font:inherit;font-size:12px;color:var(--muted);padding:6px 11px;border-radius:8px;cursor:pointer}
+.oc-tab.oc-on{background:#e8f3e9;color:#1f4a37;font-weight:600}
+.oc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-top:12px}
+.oc-card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.oc-wide{grid-column:1/-1}
+.oc-h{font-size:13px;font-weight:600;margin:0 0 10px}
+.oc-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px}
+.oc-two{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,1.3fr);gap:16px;align-items:center;margin-top:10px}
+.oc-t{width:100%;border-collapse:collapse;font-size:12px}
+.oc-t th{font-weight:400;color:var(--muted);text-align:right;padding:4px;border-bottom:1px solid var(--line);font-size:11px;vertical-align:bottom}
+.oc-t td{text-align:right;padding:5px 4px;border-bottom:1px solid #ecebe2;vertical-align:top}
+.oc-t th:first-child,.oc-t td:first-child{text-align:left}
+.oc-t td small,.oc-t th small{display:block;font-size:11px;color:var(--muted);margin-top:1px;font-weight:400}
+.oc-t td small .oc-pill{font-size:10px}
+.oc-t tr.oc-tot td{font-weight:600;border-top:1px solid #bdbcad}
+.oc-t .oc-cur,.oc-t tr.oc-curr td{background:#f3f4ec}
+.oc-t td.oc-dn{color:var(--red)}.oc-t td.oc-up{color:var(--green)}
+.oc-ev{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #ecebe2;font-size:12px}
+.oc-ev.oc-tot{font-weight:600;border-top:1px solid #bdbcad;border-bottom:0}
+.oc-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:6px 0 10px;padding:12px 0 0;border-top:1px solid var(--line)}
+.oc-scroll{overflow-x:auto}
+@media(max-width:700px){.oc-two{grid-template-columns:1fr}.oc-grid{grid-template-columns:1fr}}

@@ -1,6 +1,7 @@
 import {TENANTS as DEFAULT_TENANTS,MONTHS,MARKETPLACES,GROUPS} from "./config.js?v=20261004periods";
 import {escapeHtml as e,money,units,rate,pct,monthLabel,shortMonth,validatePayload,selectPayload,expenseOnly,filterRows,monthsBefore,numberOrNull} from "./core.js?v=20261002orange";
-import {createScopeLoader} from "./live-v2.js?v=20261006incomeunits";
+import {createScopeLoader} from "./live-v2.js?v=20261117card1";
+import {buildModel,renderCard} from "./orange-card.js?v=20261117card1";
 
 import {loadReportRegistry} from '../core/runtime-registry.js?v=20261004finish';
 import {ensureSession,makeAuthedFetch,mountAuthBadge} from '../shared/auth-dev.js?v=20261012authpathfix1';
@@ -10,7 +11,7 @@ mountAuthBadge();
 let TENANTS={...DEFAULT_TENANTS};
 try{const rows=await loadReportRegistry();const runtime=Object.fromEntries(rows.filter(t=>t.monthly_available).map(t=>[t.tenant_id,{label:t.display_name}]));if(Object.keys(runtime).length)TENANTS=runtime}catch(error){console.warn('Report registry unavailable',error.message)}
 const $=s=>document.querySelector(s);
-const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all",comparisonMonth:null};
+const state={bundle:null,market:"ALL",payload:null,product:null,productMarket:"ALL",focus:"all",comparisonMonth:null,card:{tab:"overview",market:"ALL",cabinet:"ALL",compare:null,pricesOpen:true,extras:null,extrasKey:null,extrasError:false}};
 const query=new URLSearchParams(location.search);
 const EXPENSE_ORDER=[["commission","Комиссия"],["promotion","Продвижение"],["logistics","Логистика"],["other","Прочее"],["storage","Хранение"]];
 const $text=(selector,value)=>{$(selector).textContent=value;};
@@ -196,6 +197,8 @@ function drawerTabs(selected){
 function dlRows(rows){return '<dl class="detail-list">'+rows.map(([name,value,note])=>'<div><dt>'+e(name)+'</dt><dd><span>'+e(value)+'</span>'+(note?'<small>'+e(note)+'</small>':"")+'</dd></div>').join("")+'</dl>';}
 function renderDrawer(){
  const identity=state.product;if(!identity)return;
+ if(tenant()==="ORANGE"){try{renderOrangeCard();return;}catch(error){console.error("Orange card failed, using classic card",error);}}
+ $("#productDrawer").classList.remove("oc-dialog");
  $("#drawerTabs").innerHTML=drawerTabs(state.productMarket);
  const selectedPayload=selectPayload(state.bundle,tenant(),month(),state.productMarket);
  if(!selectedPayload){$("#drawerBody").innerHTML='<div class="empty drawer-empty"><h3>Площадка ещё не подключена</h3><p>Для выбранного периода нет финансового слоя.</p></div>';return;}
@@ -233,7 +236,48 @@ function renderDrawer(){
  ];
  $("#drawerBody").innerHTML='<p class="drawer-scope">'+e(monthLabel(month()))+' · '+(state.productMarket==="ALL"?"Все доступные площадки":MARKETPLACES.find(item=>item.id===state.productMarket)?.label??state.productMarket)+'</p>'+unitsBlock+moneyBlock+'<div class="drawer-unit-kpis">'+unitKpis.map(([label,value,note])=>'<article><span>'+e(label)+'</span><strong class="'+signedClass(value)+'">'+money(value)+'</strong><small>'+e(note)+'</small></article>').join("")+'<article class="drawer-comp-kpi"><span>Компенсация / возврат + утиль, шт</span><strong>'+money(compensationPerReturnedDisposedUnit)+'</strong><small>'+(returnedAndWrittenOffUnits>0?e("Компенсации / "+units(returnedAndWrittenOffUnits)+" возвратов и списаний"):"Нет возвратов/утиля")+'</small></article><article class="drawer-result drawer-result-compact"><span>После себестоимости</span><strong class="'+signedClass(row.result_after_cogs)+'">'+money(row.result_after_cogs)+'</strong><small>Промежуточный результат</small></article></div><div class="drawer-status">'+statuses.map(([key,value])=>'<span>'+key+': <strong>'+value+'</strong></span>').join("")+'</div><h3>Экономика товара</h3>'+dlRows(detail)+'<h3>По площадкам и кабинетам</h3><div class="table-scroll"><table class="allocation-table"><thead><tr><th>Площадка · кабинет</th><th>Продано, шт</th><th>Продажи, ₽</th></tr></thead><tbody>'+(row.source_rows??[row]).map(source=>'<tr><td>'+e((MARKETPLACES.find(item=>item.id===source.marketplace)?.label??source.marketplace)+' · '+(source.cabinet??source.account_id??'—'))+'</td><td>'+units(source.financial_sale_units??source.sale_units_display)+'</td><td>'+money(source.sales,false)+'</td></tr>').join('')+'</tbody></table></div><h3>Прямые и распределённые расходы</h3><div class="table-scroll"><table class="allocation-table"><thead><tr><th>Статья</th><th>Прямые</th><th>Shared</th></tr></thead><tbody>'+GROUPS.map(([key,label])=>'<tr><td>'+label+'</td><td>'+money(row.expense_structure?.direct?.[key])+'</td><td>'+money(row.expense_structure?.allocated_shared?.[key])+'</td></tr>').join("")+'</tbody></table></div><h3>Результат по месяцам</h3><div class="product-timeline">'+timeline+'</div>';
 }
-function openProduct(sku){const row=state.payload?.sku_rows.find(item=>String(item.canonical_sku)===String(sku));if(!row)return;state.product=row;state.productMarket=state.market;$text("#drawerTitle",row.product_name||row.article||row.canonical_sku);$text("#drawerSku",(row.article||"")+" · SKU "+row.canonical_sku);renderDrawer();$("#productDrawer").showModal();document.body.classList.add("drawer-open");$(".drawer-scroll").scrollTop=0;}
+
+const CARD_BASE="https://tcefrvybgulcwwsdarcw.supabase.co/functions/v1/orange-product-card-auth";
+function cardMonths(){return monthsBefore(month());}
+function renderOrangeCard(){
+ const identity=state.product;if(!identity)return;
+ const card=state.card;
+ $("#productDrawer").classList.add("oc-dialog");
+ $("#drawerTabs").innerHTML="";
+ const compare=card.compare&&comparisonCandidates().includes(card.compare)?card.compare:(comparisonCandidates()[0]??null);
+ card.compare=compare;
+ const model=buildModel({sku:identity.canonical_sku,month:month(),compareMonth:compare,months:cardMonths(),getPayload:m=>selectPayload(state.bundle,tenant(),m,"ALL"),extras:card.extras,market:card.market,cabinet:card.cabinet});
+ if(!model.cur.has){$("#drawerBody").innerHTML='<div class="empty drawer-empty"><h3>Данные за период ещё не загружены</h3><p>Подождите несколько секунд и откройте карточку снова.</p></div>';return;}
+ $("#drawerBody").innerHTML=renderCard(model,{tab:card.tab,pricesOpen:card.pricesOpen,extras:card.extras,extrasError:card.extrasError,compareOptions:comparisonCandidates()},identity);
+}
+async function openOrangeCard(row){
+ const card=state.card;
+ Object.assign(card,{tab:"overview",market:"ALL",cabinet:"ALL",compare:comparisonMonth()||comparisonCandidates()[0]||null,pricesOpen:true,extras:null,extrasError:false});
+ const sku=String(row.canonical_sku),key=sku+"|"+month();
+ card.extrasKey=key;
+ renderDrawer();
+ const months=[...new Set([...cardMonths(),card.compare].filter(Boolean))];
+ const histories=Promise.allSettled(months.filter(m=>!selectPayload(state.bundle,tenant(),m,"ALL")).map(m=>loader.loadScope(tenant(),m,"ALL")));
+ const extras=authedFetch(CARD_BASE+"?"+new URLSearchParams({sku,month:month()}),{cache:"no-store"}).then(async r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();});
+ const [,extrasResult]=await Promise.allSettled([histories,extras]).then(rs=>rs.map(r=>r));
+ if(card.extrasKey!==key)return;
+ if(extrasResult?.status==="fulfilled"){card.extras=extrasResult.value;card.extrasError=false;}else{card.extras=null;card.extrasError=true;}
+ renderDrawer();
+}
+document.addEventListener("click",event=>{
+ const dialog=event.target.closest("#productDrawer");if(!dialog||tenant()!=="ORANGE")return;
+ const tab=event.target.closest("[data-oc-tab]");if(tab){state.card.tab=tab.dataset.ocTab;renderDrawer();return;}
+ const toggle=event.target.closest("[data-oc-toggle]");if(toggle){state.card.pricesOpen=!state.card.pricesOpen;renderDrawer();}
+});
+document.addEventListener("change",event=>{
+ const control=event.target.closest("[data-oc]");if(!control||tenant()!=="ORANGE")return;
+ const card=state.card,kind=control.dataset.oc;
+ if(kind==="market"){card.market=control.value;card.cabinet="ALL";}
+ else if(kind==="cabinet")card.cabinet=control.value;
+ else if(kind==="compare"){card.compare=control.value||null;}
+ renderDrawer();
+});
+function openProduct(sku){const row=state.payload?.sku_rows.find(item=>String(item.canonical_sku)===String(sku));if(!row)return;state.product=row;state.productMarket=state.market;$text("#drawerTitle",row.product_name||row.article||row.canonical_sku);$text("#drawerSku",(row.article||"")+" · SKU "+row.canonical_sku);if(tenant()==="ORANGE")openOrangeCard(row);else renderDrawer();$("#productDrawer").showModal();document.body.classList.add("drawer-open");$(".drawer-scroll").scrollTop=0;}
 
 function renderLoadStatus(){
  const selected=state.bundle?.tenant_status?.[tenant()];

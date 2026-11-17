@@ -56,6 +56,8 @@ function adaptRow(row,scope){
   marketplace_expenses:marketplaceExpenses,
   result_without_compensation:resultWithoutCompensation,
   compensation,
+  compensation_in:n(row.compensation_amount),
+  decompensation_in:n(row.decompensation_amount),
   unit_cost:nullable(row.accepted_unit_cost),
   cogs,
   cost_units:economicUnits,
@@ -76,7 +78,7 @@ export function aggregateCanonicalRows(rows){
   if(!groups.has(key))groups.set(key,[]);
   groups.get(key).push(row);
  }
- const additive=['sales','returns','net_sales','financial_sale_units','financial_return_units','financial_net_units','income_units','sale_units_display','return_writeoff_units','physical_returned_units','written_off_units','compensated_units',...GROUPS,'marketplace_expenses','result_without_compensation','compensation','cogs','cost_units','result_after_cogs','business_expenses','final_business_result'];
+ const additive=['sales','returns','net_sales','financial_sale_units','financial_return_units','financial_net_units','income_units','sale_units_display','return_writeoff_units','physical_returned_units','written_off_units','compensated_units',...GROUPS,'marketplace_expenses','result_without_compensation','compensation','compensation_in','decompensation_in','cogs','cost_units','result_after_cogs','business_expenses','final_business_result'];
  const total=(sources,key)=>sources.some(row=>row[key]==null)?null:sources.reduce((value,row)=>value+row[key],0);
  return [...groups.values()].map(sources=>{
   const row={...sources[0],row_id:sources[0].canonical_sku||sources[0].row_id,source_rows:sources};

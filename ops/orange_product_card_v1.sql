@@ -1,0 +1,5 @@
+-- Orange product card v1: read-only data RPC (applied via migration orange_product_card_v1).
+-- Rollback: drop function public.get_orange_product_card_for_user_v1(uuid,text,date);
+-- Authoritative definition lives in DB; see pg_get_functiondef. Called by edge function orange-product-card-auth.
+-- Returns jsonb: ops (Ozon/Yandex sale/return ops), orders, units_30d, price_history, seller_prices, stock.
+-- Access: security.assert_tenant_access_v1(user,'ORANGE','viewer'); SECURITY DEFINER, search_path='', statement_timeout 25s.
