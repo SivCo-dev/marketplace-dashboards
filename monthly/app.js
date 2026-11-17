@@ -140,6 +140,13 @@ const directResultAmount=row=>{
 };
 const directResultPerUnit=row=>perUnit(directResultAmount(row),yieldUnits(row));
 const allExpensesPerUnit=row=>perUnit(numberOrNull(row?.result_without_compensation),yieldUnits(row));
+const trendUnits=row=>numberOrNull(row?.financial_net_units)??numberOrNull(row?.sale_units_display)??numberOrNull(row?.financial_sale_units);
+const unitsTrend=row=>{
+ if(!comparisonReady())return null;
+ const cur=trendUnits(row);if(cur==null)return null;
+ const prev=trendUnits(previousProduct(row))??0;
+ return cur-prev;
+};
 function productDelta(row){
  if(!comparisonReady())return null;
  return compareAll(row,previousProduct(row));
@@ -155,8 +162,8 @@ function focusMembers(source,focus){
  if(focus==="expenses")return [...source].filter(row=>numberOrNull(row.marketplace_expenses)!=null&&row.marketplace_expenses!==0).sort((a,b)=>Math.abs(b.marketplace_expenses)-Math.abs(a.marketplace_expenses)).slice(0,12);
  if(focus==="negative")return source.filter(row=>comparableProductResult(row)!=null&&comparableProductResult(row)<0);
  if(focus==="expense-only")return source.filter(expenseOnly);
- if(focus==="growth")return comparisonReady()?source.filter(row=>(productDelta(row)??0)>0):[];
- if(focus==="decline")return comparisonReady()?source.filter(row=>(productDelta(row)??0)<0):[];
+ if(focus==="growth")return comparisonReady()?source.filter(row=>(unitsTrend(row)??0)>0):[];
+ if(focus==="decline")return comparisonReady()?source.filter(row=>(unitsTrend(row)??0)<0):[];
  return [...source];
 }
 
