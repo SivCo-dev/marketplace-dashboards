@@ -38,12 +38,13 @@ Deno.serve(async (req: Request) => {
 
   const url = new URL(req.url);
   for (const key of url.searchParams.keys()) {
-    if (!["sku", "month"].includes(key)) return json(400, responseHeaders, { error: "UNSUPPORTED_QUERY_PARAMETER", parameter: key });
+    if (!["sku", "month", "stock"].includes(key)) return json(400, responseHeaders, { error: "UNSUPPORTED_QUERY_PARAMETER", parameter: key });
   }
+  const stockOnly = url.searchParams.get("stock") === "1";
   const sku = (url.searchParams.get("sku") ?? "").trim();
   const month = (url.searchParams.get("month") ?? "").trim();
-  if (!sku || sku.length > 128) return json(400, responseHeaders, { error: "INVALID_SKU" });
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return json(400, responseHeaders, { error: "INVALID_MONTH", expected: "YYYY-MM" });
+  if (!stockOnly && (!sku || sku.length > 128)) return json(400, responseHeaders, { error: "INVALID_SKU" });
+  if (!stockOnly && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return json(400, responseHeaders, { error: "INVALID_MONTH", expected: "YYYY-MM" });
 
   const client = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -55,6 +56,15 @@ Deno.serve(async (req: Request) => {
   const { data: auth, error: authError } = await client.auth.getUser(bearer);
   if (authError || !auth?.user?.id) return json(401, responseHeaders, { error: "AUTH_REQUIRED" });
 
+  if (stockOnly) {
+    const { data: stock, error: stockError } = await client.rpc("get_orange_stock_summary_v1", { p_user_id: auth.user.id });
+    if (stockError) {
+      if (stockError.code === "42501") return json(403, responseHeaders, { error: "TENANT_ACCESS_DENIED" });
+      console.error("orange-stock-summary failure", { code: stockError.code });
+      return json(500, responseHeaders, { error: "STOCK_READ_FAILED" });
+    }
+    return json(200, responseHeaders, stock);
+  }
   const { data, error } = await client.rpc("get_orange_product_card_for_user_v1", {
     p_user_id: auth.user.id,
     p_sku: sku,
