@@ -7,3 +7,8 @@
 -- Added: public.get_orange_stock_summary_v1(uuid) — bulk Ozon stock per SKU for the monthly products table
 -- (migration orange_stock_summary_v1; FBS counted once via max, FBO/rFBS summed; u30 = orders units last 30 days).
 -- Served by the same edge function with ?stock=1. Rollback: drop function public.get_orange_stock_summary_v1(uuid);
+
+-- Fix (migrations orange_stock_offer_suffix_variants, orange_card_stock_variants_distinct):
+-- Ozon offer_id can carry a variant suffix (e.g. Ri-50TUW+RA+P11, +P01, +M26) while the canonical SKU has none.
+-- Stock rows are now mapped to the canonical SKU (exact match first, else strip /\+[A-Za-z]+[0-9]+$/ if that canonical exists),
+-- in both get_orange_stock_summary_v1 and the stock block of get_orange_product_card_for_user_v1 (variants kept per offer_id).
